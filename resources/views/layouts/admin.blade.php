@@ -56,20 +56,28 @@
 
 
         {{-- Merch --}}
-        <li class="relative group">
-            <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
-                Merch
-            </button>
-            {{-- Dropdown Merch --}}
-            <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
-                <li>
-                    <a href="{{ route('admin.merch.dashboard') }}" 
-                       class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                        Transaksi Merch
-                    </a>
-                </li>
-            </ul>
+       {{-- Merch --}}
+<li class="relative group">
+    <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
+        Merch
+    </button>
+    {{-- Dropdown Merch --}}
+    <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
+        <li>
+            <a href="{{ route('admin.merch.dashboard') }}" 
+               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                Transaksi Merch
+            </a>
         </li>
+        <li>
+            <a href="{{ route('admin.merch.index') }}" 
+               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                Kelola Merchandise
+            </a>
+        </li>
+    </ul>
+</li>
+
     </ul>
 </nav>
 
