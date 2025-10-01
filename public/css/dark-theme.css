@@ -1,0 +1,203 @@
+/* public/css/theme-dark.css */
+
+/* ===============================
+   ðŸ“± Konsistensi Font di Semua Device
+   =============================== */
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  font-size: 16px;
+  font-family: 'Poppins', sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  font-size: 1rem;
+  background-color: #000c1c !important;
+  color: #e5e7eb !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Heading */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  margin: 0 0 0.5em;
+  line-height: 1.2;
+  color: #f3f4f6 !important;
+}
+/* Heading tetap stabil */
+h1 { font-size: 32px !important; }
+h2 { font-size: 24px !important; }
+h3 { font-size: 20px !important; }
+
+/* Text umum */
+p, span, label { font-size: 1rem; color: #d1d5db !important; }
+/* ===============================
+   ðŸŽ¨ Dark Theme Global Styling
+   =============================== */
+
+/* Card */
+.card {
+  background-color: #1f2937 !important; 
+  color: #f3f4f6 !important;
+}
+.card-header {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #374151 !important;
+}
+.card-title,
+.card-text,
+.card-body,
+.fw-bold {
+  color: #f3f4f6 !important;
+}
+
+/* Input & Form */
+.form-control {
+  background-color: #111827 !important;
+  border: 1px solid #374151 !important;
+  color: #f9fafb !important;
+  font-size: 1rem; /* konsisten */
+}
+.form-control:focus {
+  background-color: #1f2937 !important;
+  color: #fff !important;
+  border-color: #f97316 !important;
+  box-shadow: 0 0 0 0.25rem rgba(249,115,22,0.3) !important;
+}
+
+/* Alert */
+.alert-danger {
+  background-color: #dc2626 !important;
+  border: none !important;
+  color: #fff !important;
+  font-size: 0.95rem;
+}
+.alert-warning {
+  background-color: #facc15 !important;
+  color: #111 !important;
+  border: none !important;
+  font-size: 0.95rem;
+}
+
+/* Floating Alert */
+#page-alert {
+  position: fixed;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 350px;
+  opacity: 0;
+  transition: all 0.5s ease;
+  font-size: 0.95rem;
+}
+#page-alert.show {
+  top: 20px;
+  opacity: 1;
+}
+
+/* Placeholder text */
+.form-control::placeholder {
+  color: #9ca3af !important;
+  opacity: 1;
+  font-size: 0.95rem;
+}
+
+/* Animation */
+.fade-in { animation: fadeIn 0.3s ease-in-out; }
+.fade-out { animation: fadeOut 0.3s ease-in-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+
+/* ðŸ”˜ Tombol bulat */
+.btn-orange-circle {
+  background: linear-gradient(to right, #f97316, #fbbf24);
+  border: none;
+  color: white;
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  font-size: 1rem;
+}
+.btn-orange-circle:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(249, 115, 22, 0.3);
+}
+
+/* ðŸ”¶ Tombol pill */
+.btn-orange-pill {
+  background: linear-gradient(to right, #f97316, #fbbf24);
+  border: none;
+  color: white !important;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-orange-pill:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 8px rgba(249, 115, 22, 0.3);
+}
+
+.btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.trash-btn {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.trash-btn:hover {
+  background-color: #dc2626;
+  transform: scale(1.1);
+}
+
+/* Logo Gradient */
+.logo-gradient {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(to right, #f97316, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  display: inline-block;
+  transition: opacity 0.3s ease;
+  font-size: 1.25rem;
+}
+.logo-gradient:hover {
+  opacity: 0.85;
+}
+
+/* ===============================
+   ðŸŽ¨ Custom Event Info
+   =============================== */
+
+/* Warna utama oranye */
+.text-orange {
+  color: #f97316 !important;
+}
+
+/* Tombol outline oranye */
+.btn-outline-orange {
+  border: 1px solid #f97316 !important;
+  color: #f97316 !important;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+.btn-outline-orange:hover {
+  background: #f97316 !important;
+  color: #fff !important;
+}
