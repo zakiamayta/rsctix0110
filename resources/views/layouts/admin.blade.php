@@ -27,26 +27,33 @@
 <nav class="bg-white border-b border-gray-100 px-6 py-3 shadow-sm">
     <ul class="flex gap-4 items-center">
         {{-- Tiket --}}
-        <li class="relative group">
-            <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
-                Tiket
-            </button>
-            {{-- Dropdown Tiket --}}
-            <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
-                <li>
-                    <a href="{{ route('admin.dashboard') }}" 
-                       class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                        Transaksi Tiket
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('admin.absensi') }}" 
-                       class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                        Absensi
-                    </a>
-                </li>
-            </ul>
+<li class="relative group">
+    <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
+        Tiket
+    </button>
+    {{-- Dropdown Tiket --}}
+    <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
+        <li>
+            <a href="{{ route('admin.dashboard') }}" 
+               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                Transaksi Tiket
+            </a>
         </li>
+        <li>
+            <a href="{{ route('admin.absensi') }}" 
+               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                Absensi
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('admin.event.index') }}" 
+               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                Kelola Event
+            </a>
+        </li>
+    </ul>
+</li>
+
 
         {{-- Merch --}}
         <li class="relative group">

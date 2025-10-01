@@ -142,6 +142,17 @@ Route::middleware('auth')->group(function () {
     // Attendee detail
     Route::get('/admin/attendee/{email}', [AdminController::class, 'showAttendeeDetail'])->name('admin.attendee.detail');
 
+    // ====================
+// ADMIN EVENT ROUTES
+// ====================
+    Route::get('/admin/event', [\App\Http\Controllers\AdminEventController::class, 'index'])->name('admin.event.index');
+    Route::post('/admin/event', [\App\Http\Controllers\AdminEventController::class, 'store'])->name('admin.event.store');
+    Route::get('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'show'])->name('admin.event.show'); // detail (JSON/modal)
+    Route::put('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'update'])->name('admin.event.update');
+    Route::delete('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'destroy'])->name('admin.event.destroy');
+    Route::get('/admin/event/{id}/edit', [\App\Http\Controllers\AdminEventController::class, 'edit'])->name('admin.event.edit');
+
+
     // Admin Merch
     Route::get('/admin/merch', [AdminMerchController::class, 'index'])->name('admin.merch.index');
     Route::post('/admin/merch', [AdminMerchController::class, 'store'])->name('admin.merch.store');
