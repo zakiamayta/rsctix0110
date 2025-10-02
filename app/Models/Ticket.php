@@ -18,4 +18,16 @@ class Ticket extends Model
 
         return view('home', compact('events'));
     }
+
+    protected $fillable = [
+        'event_id',
+        'name',
+        'price',
+        'stock',
+    ];
+
+    public function event()
+    {
+        return $this->belongsTo(Event::class);
+    }
 }
