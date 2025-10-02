@@ -30,7 +30,7 @@
                      alt="{{ $event->title }}" 
                      class="w-full h-full object-cover object-center transition-transform duration-500 hover:scale-105">
             </div>
-            <div class="p-6 flex flex-col flex-grow justify-between h-280px]">
+            <div class="p-6 flex flex-col flex-grow justify-between">
                 <div>
                     <h3 class="text-2xl font-semibold text-gray-900 truncate" title="{{ $event->title }}">{{ $event->title }}</h3>
                     <p class="mt-2 text-gray-600 text-sm line-clamp-3 leading-relaxed">{{ $event->description }}</p>
