@@ -3,47 +3,51 @@
 @section('title', 'Konfirmasi Pembayaran')
 
 @section('content')
-<div class="container-fluid py-5" style="max-width: 700px; margin:auto; padding-left:12px; padding-right:12px;">
-  <div class="card shadow-lg border-0 rounded-3 fade-in">
-    
+<div class="container py-5" style="max-width:700px;">
+  <div class="card shadow border-0 rounded-4">
+
     {{-- Header --}}
-    <div class="card-header text-center">
-      <h2 class="text-white fs-2 mb-0 fw-bold">Konfirmasi Pembayaran</h2>
+    <div class="card-header bg-orange text-white text-center rounded-top-4 py-3">
+      <h2 class="fw-bold mb-0">Konfirmasi Pembayaran</h2>
     </div>
 
-    <div class="card-body p-4">
+    <div class="card-body p-4 bg-white">
+
       {{-- Info Transaksi --}}
       <div class="row g-3 mb-4">
         <div class="col-md-6">
-          <div class="p-3 rounded bg-card">
-            <span class="fw-semibold">
-              <i class="bi bi-envelope me-1"></i> Email:
+          <div class="p-3 rounded bg-light border">
+            <span class="fw-semibold text-muted">
+              <i class="bi bi-envelope me-1"></i> Email
             </span><br>
             {{ $transaction->email ?? '-' }}
           </div>
         </div>
+
         <div class="col-md-6">
-          <div class="p-3 rounded bg-card">
-            <span class="fw-semibold">
-              <i class="bi bi-credit-card me-1"></i> Status:
+          <div class="p-3 rounded bg-light border">
+            <span class="fw-semibold text-muted">
+              <i class="bi bi-credit-card me-1"></i> Status
             </span><br>
             <span class="{{ $transaction->payment_status == 'paid' ? 'text-success fw-semibold' : 'text-warning fw-semibold' }}">
-              {{ ucfirst($transaction->payment_status ?? 'Belum diketahui') }}
+              {{ ucfirst($transaction->payment_status ?? '-') }}
             </span>
           </div>
         </div>
+
         <div class="col-md-6">
-          <div class="p-3 rounded bg-card">
-            <span class="fw-semibold">
-              <i class="bi bi-clock me-1"></i> Waktu Checkout:
+          <div class="p-3 rounded bg-light border">
+            <span class="fw-semibold text-muted">
+              <i class="bi bi-clock me-1"></i> Waktu Checkout
             </span><br>
             {{ $transaction->checkout_time ?? '-' }}
           </div>
         </div>
+
         <div class="col-md-6">
-          <div class="p-3 rounded bg-card">
-            <span class="fw-semibold">
-              <i class="bi bi-upc-scan me-1"></i> ID Transaksi:
+          <div class="p-3 rounded bg-light border">
+            <span class="fw-semibold text-muted">
+              <i class="bi bi-upc-scan me-1"></i> ID Transaksi
             </span><br>
             #{{ $transaction->id ?? '-' }}
           </div>
@@ -52,8 +56,9 @@
 
       {{-- Daftar Tiket --}}
       <h5 class="fw-bold mb-3">Daftar Tiket</h5>
+
       @forelse($details as $d)
-        <div class="d-flex align-items-center p-3 mb-3 rounded bg-card shadow-sm">
+        <div class="d-flex align-items-center p-3 mb-3 rounded border bg-white shadow-sm">
           <div class="btn-orange-circle me-3">
             <i class="bi bi-ticket-perforated"></i>
           </div>
@@ -68,9 +73,9 @@
         <p class="text-muted fst-italic">Tidak ada data tiket ditemukan.</p>
       @endforelse
 
-      {{-- Ringkasan Harga --}}
+      {{-- Ringkasan Pembayaran --}}
       <h5 class="fw-bold mt-4 mb-3">Ringkasan Pembayaran</h5>
-      <div class="p-3 rounded bg-bg-card">
+      <div class="p-3 rounded bg-light border">
         <div class="d-flex justify-content-between mb-2">
           <span>Harga per Tiket</span>
           <span>Rp{{ number_format($hargaTiket, 0, ',', '.') }}</span>
@@ -79,7 +84,7 @@
           <span>Jumlah Tiket</span>
           <span>{{ count($details) }}</span>
         </div>
-        <div class="border-top pt-2 mt-2 d-flex justify-content-between fw-bold text-orange-500">
+        <div class="border-top pt-2 mt-2 d-flex justify-content-between fw-bold text-orange">
           <span>Total Bayar</span>
           <span>Rp{{ number_format($totalBayar, 0, ',', '.') }}</span>
         </div>
@@ -87,7 +92,7 @@
 
       {{-- Error --}}
       @if(isset($errorMessage))
-        <div class="alert alert-danger mt-4 fade-in">
+        <div class="alert alert-danger mt-4">
           <strong>Info:</strong> {{ $errorMessage }}
         </div>
       @endif
@@ -97,18 +102,20 @@
       <div class="d-flex justify-content-end gap-2 mt-4">
         <form action="{{ route('ticket.cancel', $transaction->id) }}" method="POST">
           @csrf
-          <button type="submit" class="btn btn-secondary rounded-pill px-4">
+          <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">
             Batalkan
           </button>
         </form>
+
         <form action="{{ route('ticket.pay', $transaction->id) }}" method="POST">
           @csrf
-          <button type="submit" class="btn-orange-pill px-4">
+          <button type="submit" class="btn btn-orange rounded-pill px-4 text-white">
             Bayar Sekarang
           </button>
         </form>
       </div>
       @endif
+
     </div>
   </div>
 </div>

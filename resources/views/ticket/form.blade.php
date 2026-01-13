@@ -3,76 +3,110 @@
 @section('title', 'Pembelian Tiket')
 
 @section('content')
-<div class="px-6 lg:px-16 xl:px-24 2xl:px-32 py-8">
+<div class="px-6 lg:px-16 xl:px-24 2xl:px-32 py-8 bg-light">
   <div class="container py-5">
 
-    <!-- 🔹 Notifikasi Alert (Floating) -->
-    <div id="page-alert" class="alert alert-danger d-none text-center d-flex align-items-center justify-content-center gap-2 shadow-lg rounded-lg" role="alert">
+    <!-- ðŸ”¹ Notifikasi Alert (Floating) -->
+    <div id="page-alert"
+         class="alert alert-danger d-none text-center d-flex align-items-center justify-content-center gap-2 shadow rounded-pill"
+         role="alert">
       <i class="bi bi-exclamation-triangle-fill fs-5"></i>
       <span id="page-alert-text"></span>
     </div>
 
     <div class="row g-4">
-      <!-- Kiri: Poster & Kategori Tiket -->
+      <!-- Kiri -->
       <div class="col-lg-5">
-        <!-- Poster Event -->
-        <div class="card shadow-sm border-0 mb-3 overflow-hidden rounded-3">
-          <img src="{{ asset($event->poster) }}" class="card-img-top" style="max-height: 250px; object-fit: cover;" alt="Poster Event">
-          <div class="card-body">
-            <h4 class="card-title fw-bold text-orange-600 mb-2">{{ $event->title }}</h4>
-            <p class="card-text text-white mb-1">
-              <i class="bi bi-geo-alt me-1"></i> {{ $event->location }}  
-              — <i class="bi bi-calendar-event me-1"></i> {{ \Carbon\Carbon::parse($event->date)->translatedFormat('d F Y') }}
-            </p>
-            <p class="card-text small text-gray-500">{{ $event->description }}</p>
-          </div>
 
+        <!-- Poster Event -->
+        <div class="card shadow-sm border-0 mb-3 rounded-4 overflow-hidden bg-white">
+          <img src="{{ asset('images/events/' . $event->poster) }}"
+               class="card-img-top"
+               style="max-height: 250px; object-fit: cover;"
+               alt="Poster Event">
+
+          <div class="card-body">
+            <h4 class="fw-bold text-orange mb-2">{{ $event->title }}</h4>
+
+            <p class="text-muted mb-1">
+              <i class="bi bi-geo-alt me-1 text-orange"></i> {{ $event->location }}
+              â€” <i class="bi bi-calendar-event me-1 text-orange"></i>
+              {{ \Carbon\Carbon::parse($event->date)->translatedFormat('d F Y') }}
+            </p>
+
+            <p class="small text-muted mb-0">
+              {{ $event->description }}
+            </p>
+          </div>
         </div>
 
         <!-- Kategori Tiket -->
-        <div class="card shadow-sm border-0 rounded-3">
-          <div class="card-header bg-grey fw-semibold fs-5">Kategori Tiket</div>
+        <div class="card shadow-sm border-0 rounded-4 bg-white">
+          <div class="card-header bg-light fw-semibold fs-5">
+            Kategori Tiket
+          </div>
+
           <div class="card-body">
             @foreach ($tickets as $ticket)
-            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
-              <div>
-                <div class="fw-bold">{{ $ticket->name }}</div>
-                <div class="text-gray-500">Rp {{ number_format($ticket->price, 0, ',', '.') }}</div>
+              <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                <div>
+                  <div class="fw-bold text-dark">{{ $ticket->name }}</div>
+                  <div class="text-muted">
+                    Rp {{ number_format($ticket->price, 0, ',', '.') }}
+                  </div>
+                </div>
+
+                <div class="ticket-control"
+                     id="ticket-control-{{ $ticket->id }}"
+                     data-price="{{ $ticket->price }}"
+                     data-stock="{{ $ticket->stock }}">
+                  @if ($ticket->stock > 0)
+                    <button type="button"
+                            class="btn btn-sm btn-orange-pill"
+                            onclick="addTicket({{ $ticket->id }})">
+                      <i class="bi bi-plus-lg me-1"></i>Tambah
+                    </button>
+                  @else
+                    <span class="badge bg-danger text-white fw-bold px-3 py-2">SOLD</span>
+                  @endif
+                </div>
               </div>
-              <div class="ticket-control" id="ticket-control-{{ $ticket->id }}" data-price="{{ $ticket->price }}" data-stock="{{ $ticket->stock }}">
-                @if ($ticket->stock > 0)
-                  <button type="button" class="btn btn-sm btn-orange-pill" onclick="addTicket({{ $ticket->id }}, {{ $ticket->price }}, {{ $ticket->stock }})">
-                    <i class="bi bi-plus-lg me-1"></i>Tambah
-                  </button>
-                @else
-                  <span class="badge bg-danger px-3 py-2">SOLD</span>
-                @endif
-              </div>
-            </div>
             @endforeach
           </div>
         </div>
-
       </div>
 
-      <!-- Kanan: Detail & Form -->
+      <!-- Kanan -->
       <div class="col-lg-7">
+
         <!-- Detail Pesanan -->
-        <div class="card shadow-sm border-0 mb-3 rounded-3">
-          <div class="card-header bg-grey fw-semibold fs-5">Detail Pesanan</div>
-          <div class="card-body">
-            <p class="mb-2"><span id="ticket-count">0</span> Tiket Dipesan</p>
+        <div class="card shadow-sm border-0 mb-3 rounded-4 bg-white">
+          <div class="card-header bg-light fw-semibold fs-5">
+            Detail Pesanan
+          </div>
+
+          <div class="card-body text-dark">
+            <p class="mb-2">
+              <span id="ticket-count">0</span> Tiket Dipesan
+            </p>
+
             <p class="fw-bold border-top pt-2 mb-0">
-              Total Bayar 
-              <span class="float-end">Rp <span id="total-final">0</span></span>
+              Total Bayar
+              <span class="float-end">
+                Rp <span id="total-final">0</span>
+              </span>
             </p>
           </div>
         </div>
 
         <!-- Form Pemesanan -->
-        <div class="card shadow-sm border-0 rounded-3">
-          <div class="card-header bg-grey fw-semibold fs-5">Form Pemesanan</div>
-          <div class="card-body">
+        <div class="card shadow-sm border-0 rounded-4 bg-white">
+          <div class="card-header bg-light fw-semibold fs-5">
+            Form Pemesanan
+          </div>
+
+          <div class="card-body text-dark">
+
             @if(session('error'))
               <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
@@ -94,41 +128,51 @@
             @if($activeTicket)
             <form action="{{ route('ticket.store') }}" method="POST" id="ticket-form">
               @csrf
+
               <div class="mb-3">
-                <label class="form-label">Email Pembeli 
-                  <small class="text-white d-block">
-                    <i class="bi bi-envelope me-1"></i> Tiket online akan dikirim ke email ini
+                <label class="form-label fw-semibold">
+                  Email Pembeli
+                  <small class="text-muted d-block">
+                    <i class="bi bi-envelope me-1"></i>
+                    Tiket online akan dikirim ke email ini
                   </small>
                 </label>
 
-                <input type="email" name="email" class="form-control rounded-pill" required placeholder="nama@gmail.com" value="{{ old('email') }}" />
+                <input type="email"
+                       name="email"
+                       class="form-control rounded-pill"
+                       required
+                       placeholder="nama@gmail.com"
+                       value="{{ old('email') }}">
               </div>
+
               <input type="hidden" name="qty" id="ticketQty" value="0">
-              <div id="ticket-hidden-inputs"><!-- JS akan men-generate ticket_id[] & qty[] di sini --></div>
+              <div id="ticket-hidden-inputs"></div>
 
-
-              <!-- List Data Pengunjung -->
+              <!-- Pengunjung -->
               <div id="pengunjung-list"></div>
 
               <div class="text-end">
-                <button type="submit" 
-                    class="bg-gradient-to-r from-orange-500 to-yellow-400 hover:from-orange-600 hover:to-yellow-500 
-                          text-white font-semibold px-5 py-2 rounded-pill shadow-md 
-                          transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                    id="checkout-btn" disabled>
-                    Checkout
+                <button type="submit"
+                        id="checkout-btn"
+                        disabled
+                        class="btn btn-orange-pill px-5 py-2 shadow-sm">
+                  Checkout
                 </button>
               </div>
             </form>
             @else
-              <div class="alert alert-warning">Tiket belum tersedia saat ini.</div>
+              <div class="alert alert-warning">Tiket belum tersedia.</div>
             @endif
+
           </div>
         </div>
+
       </div>
     </div>
   </div>
 </div>
+
 
 @if($activeTicket)
   <script>
@@ -157,7 +201,7 @@
       control.dataset.stock = stock;
 
       if (stock === 0) {
-        control.innerHTML = `<span class="badge bg-danger px-3 py-2">SOLD</span>`;
+        control.innerHTML = `<span class="badge bg-danger text-white fw-bold px-3 py-2">SOLD</span>`;
         return;
       }
 
@@ -272,7 +316,7 @@
           <button type="button" class="btn btn-sm position-absolute top-0 end-0 m-2 rounded-circle bg-danger text-white shadow-sm trash-btn" title="Hapus pengunjung">
             <i class="bi bi-trash"></i>
           </button>
-          <p class="fw-semibold mb-3 text-white">Data Pengunjung ${i + 1}</p>
+          <p class="fw-semibold mb-3 text-black">Data Pengunjung ${i + 1}</p>
           <div class="mb-3">
             <label class="form-label">Nama Lengkap:</label>
             <input type="text" name="name[]" required class="form-control rounded-pill" placeholder="Nama sesuai KTP" />
@@ -354,7 +398,7 @@
           message = `Nomor telepon pengunjung ${i+1} hanya boleh berisi angka.`;
         } else if (val.length < 9 || val.length > 15) {
           valid = false;
-          message = `Nomor telepon pengunjung ${i+1} tidak valid (9–15 digit).`;
+          message = `Nomor telepon pengunjung ${i+1} tidak valid (9Ã¢â‚¬â€œ15 digit).`;
         }
       });
 

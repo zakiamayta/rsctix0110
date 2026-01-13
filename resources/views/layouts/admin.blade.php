@@ -2,11 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Admin Dashboard')</title>
-    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
+
+    {{-- Fonts & Tailwind --}}
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+
+    {{-- Custom Admin CSS --}}
+    <link rel="stylesheet" href="{{ asset('css/admin_dashboard.css') }}">
+
+    {{-- Optional custom styles per page --}}
+    @stack('styles')
 </head>
+
 <body class="bg-gray-100 font-[Inter,sans-serif] min-h-screen text-gray-800">
 
     {{-- Header --}}
@@ -17,78 +27,74 @@
         </div>
         <form action="{{ route('logout') }}" method="POST">
             @csrf
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold text-sm transition-colors duration-200 shadow-sm">
+            <button type="submit" 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold text-sm transition-colors duration-200 shadow-sm">
                 Logout
             </button>
         </form>
     </header>
 
     {{-- Navbar --}}
-<nav class="bg-white border-b border-gray-100 px-6 py-3 shadow-sm">
-    <ul class="flex gap-4 items-center">
-        {{-- Tiket --}}
-<li class="relative group">
-    <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
-        Tiket
-    </button>
-    {{-- Dropdown Tiket --}}
-    <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
-        <li>
-            <a href="{{ route('admin.dashboard') }}" 
-               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                Transaksi Tiket
-            </a>
-        </li>
-        <li>
-            <a href="{{ route('admin.absensi') }}" 
-               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                Absensi
-            </a>
-        </li>
-        <li>
-            <a href="{{ route('admin.event.index') }}" 
-               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                Kelola Event
-            </a>
-        </li>
-    </ul>
-</li>
+    <nav class="bg-white border-b border-gray-100 px-6 py-3 shadow-sm">
+        <ul class="flex gap-4 items-center">
 
+            {{-- Tiket --}}
+            <li class="relative group">
+                <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
+                    Tiket
+                </button>
+                <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
+                    <li>
+                        <a href="{{ route('admin.dashboard') }}" 
+                           class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                            Transaksi Tiket
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('admin.absensi') }}" 
+                           class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                            Absensi
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('admin.event.index') }}" 
+                           class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                            Kelola Event
+                        </a>
+                    </li>
+                </ul>
+            </li>
 
-        {{-- Merch --}}
-       {{-- Merch --}}
-<li class="relative group">
-    <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
-        Merch
-    </button>
-    {{-- Dropdown Merch --}}
-    <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
-        <li>
-            <a href="{{ route('admin.merch.dashboard') }}" 
-               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                Transaksi Merch
-            </a>
-        </li>
-        <li>
-            <a href="{{ route('admin.merch.index') }}" 
-               class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
-                Kelola Merchandise
-            </a>
-        </li>
-    </ul>
-</li>
+            {{-- Merch --}}
+            <li class="relative group">
+                <button class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200">
+                    Merch
+                </button>
+                <ul class="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
+                    <li>
+                        <a href="{{ route('admin.merch.dashboard') }}" 
+                           class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                            Transaksi Merch
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('admin.merch.index') }}" 
+                           class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 text-sm">
+                            Kelola Merchandise
+                        </a>
+                    </li>
+                </ul>
+            </li>
 
-    </ul>
-</nav>
+        </ul>
+    </nav>
 
-
-
-    {{-- Content --}}
+    {{-- Main Content --}}
     <main class="container mx-auto px-6 py-6">
         @yield('content')
     </main>
 
+    {{-- Optional scripts per page --}}
     @yield('scripts')
-
 </body>
 </html>

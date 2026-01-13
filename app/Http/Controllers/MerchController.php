@@ -8,6 +8,7 @@ use App\Models\TransactionMerch;
 use App\Models\TransactionMerchDetail;
 use Xendit\Xendit;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 
 class MerchController extends Controller
@@ -122,7 +123,7 @@ public function showQr($kode_unik)
         ->with('details.product')
         ->firstOrFail();
 
-    \Log::info('Menampilkan QR untuk transaksi merch', [
+    Log::info('Menampilkan QR untuk transaksi merch', [
         'transaction_kode_unik' => $transaction->kode_unik,
         'email'                 => $transaction->email,
         'status'                => $transaction->payment_status,

@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   
-  <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+  <link rel="icon" type="image/svg" href="{{ asset('logoplain.svg') }}">
 
-  <title>@yield('title', 'RSCTix') </title>
+  <title>@yield('title', 'RSCtix') </title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
@@ -16,13 +16,16 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
   <!-- Font & Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
   <!-- icon sampah -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-  <link href="{{ asset('css/dark-theme.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="{{ asset('css/light-theme.css') }}?v={{ time() }}">
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -32,7 +35,7 @@
   <style>
     body {
       
-      font-family: 'Inter', sans-serif;
+      font-family: 'Poppins', sans-serif;
       background-color: #f8fafc;
     }
   </style>
@@ -48,50 +51,78 @@
     @yield('content')
   </main>
 
-  <!-- Footer -->
-  <footer class="bg-gray-800 text-white pt-8 pb-4 mt-12">
-    <div class="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
-      
+  <footer class="bg-white pt-10 pb-4 mt-12 border-top shadow-sm">
+  <div class="container px-4">
+    <div class="row g-4">
+
       <!-- Logo & Deskripsi -->
-      <div>
-        <h3 class="text-xl font-bold mb-2">
-          <a href="{{ url('/') }}" >RSCTix</a>
+      <div class="col-md-4">
+        <h3 class="fw-bold text-orange mb-2">
+          <a href="{{ url('/') }}" class="text-decoration-none text-orange">RSCtix</a>
         </h3>
 
-        <p class="text-sm text-gray-400 mb-2">Platform pembelian tiket konser terpercaya dan mudah digunakan.</p>
-        <p class="text-sm text-gray-400">📧 <a href="mailto:rscsosmed@gmail.com" class="hover:text-white">rscsosmed@gmail.com</a></p>
-        <p class="text-sm text-gray-400">📞 <a href="tel:+6285230088828" class="hover:text-white">+6285230088828</a></p>
+        <p class="text-muted small mb-2">
+          Platform pembelian tiket konser terpercaya dan mudah digunakan.
+        </p>
+
+        <p class="small mb-1">
+          ðŸ“§ <a href="mailto:rscsosmed@gmail.com" class="text-decoration-none text-muted hover-orange">
+            rscsosmed@gmail.com
+          </a>
+        </p>
+
+        <p class="small">
+          ðŸ“ž <a href="tel:+6285230088828" class="text-decoration-none text-muted hover-orange">
+            +62 852-3008-8828
+          </a>
+        </p>
       </div>
 
       <!-- Navigasi -->
-      <div>
-        <h4 class="font-semibold mb-2">Informasi</h4>
-        <ul class="space-y-1 text-sm text-gray-400">
-          <li><a href="{{ url('/about-us') }}" class="hover:text-white">Tentang Kami</a></li>
-          <li><a href="{{ url('/privacy-policy') }}" class="hover:text-white">Kebijakan Privasi</a></li>
-          <li><a href="{{ url('/terms') }}" class="hover:text-white">Syarat & Ketentuan</a></li>
+      <div class="col-md-4">
+        <h5 class="fw-semibold mb-3">Informasi</h5>
+        <ul class="list-unstyled small">
+          <li class="mb-1">
+            <a href="{{ url('/about-us') }}" class="text-muted text-decoration-none hover-orange">
+              Tentang Kami
+            </a>
+          </li>
+          <li class="mb-1">
+            <a href="{{ url('/privacy-policy') }}" class="text-muted text-decoration-none hover-orange">
+              Kebijakan Privasi
+            </a>
+          </li>
+          <li>
+            <a href="{{ url('/terms') }}" class="text-muted text-decoration-none hover-orange">
+              Syarat & Ketentuan
+            </a>
+          </li>
         </ul>
       </div>
 
       <!-- Sosial Media -->
-      <div>
-        <h4 class="font-semibold mb-2">Ikuti Kami</h4>
-        <div class="flex space-x-4">
-          <a href="https://instagram.com/rupasuaracahaya" target="_blank" class="hover:text-orange-400">
-            <i class="fab fa-instagram text-xl"></i>
+      <div class="col-md-4">
+        <h5 class="fw-semibold mb-3">Ikuti Kami</h5>
+        <div class="d-flex gap-3">
+          <a href="https://instagram.com/rupasuaracahaya" target="_blank" class="text-muted hover-orange fs-5">
+            <i class="fab fa-instagram"></i>
           </a>
-          <a href="https://facebook.com/rupasuaracahaya" target="_blank" class="hover:text-orange-400">
-            <i class="fab fa-facebook text-xl"></i>
+          <a href="https://facebook.com/rupasuaracahaya" target="_blank" class="text-muted hover-orange fs-5">
+            <i class="fab fa-facebook"></i>
           </a>
         </div>
       </div>
 
     </div>
 
-    <div class="text-center text-sm text-gray-500 mt-8 border-t border-gray-700 pt-4">
-      &copy; {{ date('Y') }} RSCTix. All rights reserved.
+    <hr class="my-4">
+
+    <div class="text-center small text-muted">
+      &copy; {{ date('Y') }} <span class="fw-semibold text-orange">RSCtix</span>. All rights reserved.
     </div>
-  </footer>
+  </div>
+</footer>
+
 
 
   @stack('scripts')
