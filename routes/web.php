@@ -22,6 +22,21 @@ use App\Http\Controllers\DashboardMerchController;
 | WEB ROUTES
 |--------------------------------------------------------------------------
 */
+use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\ProfileController;
+
+Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])
+    ->name('google.login');
+
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+
+Route::middleware('auth')->group(function () {
+    Route::get('/complete-profile', [ProfileController::class, 'edit'])
+        ->name('profile.complete');
+
+    Route::post('/complete-profile', [ProfileController::class, 'update'])
+        ->name('profile.complete.store');
+});
 
 // ====================
 // FRONTEND ROUTES

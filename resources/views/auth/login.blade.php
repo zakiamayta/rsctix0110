@@ -1,97 +1,138 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Login</title>
-    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
-    <link
-      rel="stylesheet"
-      as="style"
-      onload="this.rel='stylesheet'"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans:wght@400;500;700;900&display=swap"
-    />
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  </head>
-  <body class="bg-slate-50 font-[Inter,'Noto Sans',sans-serif] min-h-screen">
-    <div class="flex flex-col items-center justify-center min-h-screen px-4">
-      <form method="POST" action="{{ route('login') }}" class="w-full max-w-[512px] bg-white p-6 rounded-lg shadow">
-        @csrf
-        <h2 class="text-[#0e141b] text-[28px] font-bold text-center mb-6">Admin Login</h2>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masuk | RSCtix</title>
 
-        {{-- Alert if login failed --}}
-        @if (session('error'))
-          <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <strong>Login gagal:</strong> {{ session('error') }}
-          </div>
-        @endif
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-        {{-- Email Field --}}
-        <div class="mb-4">
-          <label class="block text-[#0e141b] text-base font-medium mb-2">Email</label>
-          <div class="flex items-center rounded-lg overflow-hidden border border-[#d0dbe7] bg-slate-50">
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter your email"
-              value="{{ old('email') }}"
-              class="form-input w-full h-14 p-[15px] pr-2 text-[#0e141b] placeholder:text-[#4e7397] border-r-0 focus:ring-0 focus:outline-0"
-              required
-            />
-            <div class="pr-[15px] text-[#4e7397]">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
-                <path d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48Zm-96,85.15L52.57,64H203.43ZM98.71,128,40,181.81V74.19Zm11.84,10.85,12,11.05a8,8,0,0,0,10.82,0l12-11.05,58,53.15H52.57ZM157.29,128,216,74.18V181.82Z"/>
-              </svg>
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons (MONOKROM) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom Theme -->
+    <link rel="stylesheet" href="{{ asset('css/light-theme.css') }}">
+</head>
+
+<body class="bg-light">
+
+<div class="container-fluid min-vh-100 d-flex align-items-center">
+    <div class="row w-100 justify-content-center">
+
+        <div class="col-xl-10">
+            <div class="row shadow-lg rounded-4 overflow-hidden bg-white">
+
+                <!-- LEFT HERO -->
+                <div class="col-lg-6 d-none d-lg-flex flex-column justify-content-center p-5"
+                     style="background: linear-gradient(135deg,#f97316,#facc15); color:white;">
+
+                    <h1 class="fw-bold mb-3" style="font-size:2.4rem;">
+                        Platform Tiket Event<br>
+                        <span style="opacity:.95;">Modern & Terintegrasi</span>
+                    </h1>
+
+                    <p class="mb-4" style="font-size:1rem; opacity:.95;">
+                        Kelola event, penjualan tiket, merchandise, refund,
+                        dan laporan keuangan dalam satu sistem terpadu.
+                    </p>
+
+                    <div class="mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-ticket-perforated"></i>
+                        Penjualan tiket cepat & aman
+                    </div>
+
+                    <div class="mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-bar-chart-line"></i>
+                        Monitoring penjualan real-time
+                    </div>
+
+                    <div class="mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-wallet2"></i>
+                        Penarikan dana transparan
+                    </div>
+
+                    <div class="mb-4 d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-repeat"></i>
+                        Manajemen refund terkontrol
+                    </div>
+
+                    <div class="fw-semibold">
+                        Dipercaya oleh Event Organizer & Manajemen Event
+                    </div>
+                </div>
+
+                <!-- RIGHT LOGIN -->
+                <div class="col-lg-6 p-5 d-flex align-items-center">
+                    <div class="w-100" style="max-width:420px; margin:auto;">
+
+                        <div class="mb-4 text-center">
+                            <h2 class="fw-bold mb-1">Masuk ke RSCtix</h2>
+                            <p class="text-muted">
+                                User · EO · Admin · Owner
+                            </p>
+                        </div>
+
+                        @if (session('error'))
+                            <div class="alert alert-danger">
+                                {{ session('error') }}
+                            </div>
+                        @endif
+
+                        <form method="POST" action="{{ route('login') }}">
+                            @csrf
+
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email"
+                                       value="{{ old('email') }}"
+                                       class="form-control"
+                                       placeholder="email@example.com"
+                                       required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Password</label>
+                                <input type="password" name="password"
+                                       class="form-control"
+                                       placeholder="••••••••"
+                                       required>
+                            </div>
+
+                            <button type="submit" class="w-100 btn-gradient-orange">
+                                Masuk Sekarang
+                            </button>
+                        </form>
+
+                        <div class="text-center mt-4 text-muted" style="font-size:.85rem;">
+                            © {{ date('Y') }} RSCtix · Platform Tiket Event
+                        </div>
+
+                    </div>
+                </div>
+
             </div>
-          </div>
-          @error('email')
-            <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
-          @enderror
         </div>
 
-        {{-- Password Field --}}
-        <div class="mb-4">
-          <label class="block text-[#0e141b] text-base font-medium mb-2">Password</label>
-          <div class="flex items-center rounded-lg overflow-hidden border border-[#d0dbe7] bg-slate-50">
-            <input
-              type="password"
-              name="password"
-              placeholder="Enter your password"
-              class="form-input w-full h-14 p-[15px] pr-2 text-[#0e141b] placeholder:text-[#4e7397] border-r-0 focus:ring-0 focus:outline-0"
-              required
-            />
-            <div class="pr-[15px] text-[#4e7397]">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
-                <path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/>
-              </svg>
-            </div>
-          </div>
-          @error('password')
-            <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
-          @enderror
-        </div>
-
-        {{-- Remember Me --}}
-        {{-- <div class="flex items-center justify-between mb-6">
-          <label class="flex items-center text-[#0e141b] text-base">
-            <input
-              type="checkbox"
-              name="remember"
-              class="h-5 w-5 rounded border-2 border-[#d0dbe7] text-[#197fe5] focus:ring-0"
-            />
-            <span class="ml-2">Remember Me</span>
-          </label>
-          <a href="{{ route('password.request') }}" class="text-sm text-[#4e7397] underline">Forgot Password?</a>
-        </div> --}}
-
-        {{-- Submit --}}
-        <button
-          type="submit"
-          class="w-full h-10 bg-[#197fe5] text-white rounded-lg font-bold tracking-wide"
-        >
-          Sign In
-        </button>
-      </form>
     </div>
-  </body>
+</div>
+
+<!-- FONT OVERRIDE BOOTSTRAP -->
+<style>
+  :root {
+    --bs-body-font-family: 'Poppins', system-ui, -apple-system,
+      BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+
+  body {
+    font-family: 'Poppins', system-ui, -apple-system,
+      BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+</style>
+
+</body>
 </html>
