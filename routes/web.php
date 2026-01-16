@@ -42,6 +42,9 @@ Route::get('/cara-memesan', function () {
 
 // Band Info
 Route::get('/info/{id}', [InfoController::class, 'show'])->name('info.show');
+Route::get('/layanan-event', function () {
+    return view('layanan_event');
+});
 
 // Static Pages
 Route::get('/band/negatifa', fn() => view('band.negatifa'))->name('band.negatifa');

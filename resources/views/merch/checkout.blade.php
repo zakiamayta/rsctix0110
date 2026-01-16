@@ -9,7 +9,7 @@
     
     {{-- Header --}}
     <div class="card-header text-center">
-      <h2 class="text-white fs-2 mb-0 fw-bold">Review Pesanan</h2>
+      <h2 class="text-black fs-2 mb-0 fw-bold">Review Pesanan</h2>
     </div>
 
     <div class="card-body p-4">
@@ -45,10 +45,10 @@
           </div>
           <div class="w-100">
             <p class="fw-semibold mb-1">{{ $item['name'] }}</p>
-            <small class="text-white d-block">
+            <small class="text-black d-block">
               <i class="bi bi-rulers me-1"></i> {{ $item['ukuran'] }}
             </small>
-            <small class="text-white d-block">
+            <small class="text-black d-block">
               <i class="bi bi-123 me-1"></i> x{{ $item['quantity'] }}
             </small>
             <p class="fw-semibold text-orange-500 text-end mb-0">

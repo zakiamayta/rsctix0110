@@ -34,10 +34,7 @@
 
         <!-- 🔹 Tombol Get Tickets -->
         <a href="{{ route('ticket.form') }}"
-           class="px-5 py-2 bg-gradient-to-r from-orange-500 to-yellow-400
-                  hover:from-orange-600 hover:to-yellow-500
-                  text-white font-semibold rounded-full shadow-md
-                  transition-transform transform hover:scale-105">
+           class="btn-gradient-orange">
           Get Tickets
         </a>
       </nav>

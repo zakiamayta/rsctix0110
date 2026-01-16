@@ -5,7 +5,35 @@
 @section('content')
 <div class="px-6 lg:px-16 xl:px-24 2xl:px-32 py-8 bg-gray-50 text-gray-800 fade-in">
 
-  <!-- ðŸ”¹ SLIDER BANNER -->
+  <!-- 🔒 CTA TAMBAH EVENT (PALING ATAS - PAGAR) -->
+  <div class="mb-10" data-aos="fade-down" data-aos-duration="800">
+    <div class="bg-gradient-to-r from-orange-400 to-orange-500 rounded-xl shadow-lg p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-white">
+      
+      <div>
+        <h2 class="text-xl sm:text-2xl font-extrabold mb-1">
+          Punya event seru?
+        </h2>
+        <p class="text-sm sm:text-base opacity-90">
+          Buat & publikasikan event Anda sekarang dan jangkau lebih banyak penonton.
+        </p>
+      </div>
+
+      {{-- PAGAR: HALAMAN TAMBAH EVENT BELUM DIBUAT --}}
+      <a href="{{ url('/layanan-event') }}"
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-full
+                bg-white text-orange-500 text-sm font-bold
+                hover:bg-orange-50 transition
+                shadow-md opacity-90">
+        <i class="fa-solid fa-plus"></i>
+        Buat Event
+      </a>
+
+
+    </div>
+  </div>
+
+
+  <!-- 🔹 SLIDER BANNER -->
   <div class="mb-12" data-aos="fade-up" data-aos-duration="800">
     <div class="swiper mySwiper rounded-xl overflow-hidden shadow-lg bg-white">
       <div class="swiper-wrapper">
@@ -24,7 +52,7 @@
     </div>
   </div>
 
-  <!-- ðŸ”¸ CTA -->
+  <!-- 🔸 CTA CARA MEMESAN -->
   <div class="mb-12" data-aos="fade-up" data-aos-duration="900" data-aos-delay="200">
     <a href="{{ url('/cara-memesan') }}" class="block transition duration-500 hover:scale-[1.02]">
       <img src="{{ asset('banner-cara-memesan.png') }}"
@@ -33,7 +61,7 @@
     </a>
   </div>
 
-  <!-- ðŸ”¹ UPCOMING SHOWS -->
+  <!-- 🔹 UPCOMING SHOWS -->
   <div id="upcoming-events" class="mb-6" data-aos="fade-right">
     <h1 class="text-2xl sm:text-3xl font-extrabold flex items-center gap-2 text-gray-900">
       <i class="fa-solid fa-calendar-days text-orange-500"></i>
@@ -42,7 +70,7 @@
     <div class="h-1 w-24 bg-orange-500 mt-2 rounded"></div>
   </div>
 
-  <!-- ðŸ”¹ GRID EVENT -->
+  <!-- 🔹 GRID EVENT -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
 
     @forelse($events as $event)
@@ -79,7 +107,7 @@
       <p class="text-gray-500 col-span-full">Belum ada event yang tersedia.</p>
     @endforelse
 
-
+  </div>
 </div>
 
 <!-- Swiper Init Script -->
@@ -88,7 +116,6 @@
     loop: true,
     slidesPerView: 2,
     spaceBetween: 16,
-    slidesPerGroup: 1,
     autoplay: {
       delay: 4000,
     },

@@ -1,16 +1,19 @@
 @extends('layouts.admin')
 
-@section('title', 'Dashboard Admin')
+@push('styles')
+<link href="{{ asset('css/admin_dashboard.css') }}" rel="stylesheet">
+@endpush
+
 @section('content')
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
+    <title>Owner Dashboard</title>
     <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-    <link href="{{ asset('css/admin_dashboard.css') }}" rel="stylesheet">
+    
 
     <style>
 

@@ -109,7 +109,7 @@
 
         <form action="{{ route('ticket.pay', $transaction->id) }}" method="POST">
           @csrf
-          <button type="submit" class="btn btn-orange rounded-pill px-4 text-white">
+          <button type="submit" class="btn-orange-pill">
             Bayar Sekarang
           </button>
         </form>
