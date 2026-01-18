@@ -13,30 +13,43 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MerchController;
 use App\Http\Controllers\InfoController;
 use App\Http\Controllers\AdminMerchController;
-use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\DashboardMerchController;
+
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Auth\GoogleAuthController;
+use Illuminate\Support\Facades\Auth;
 
 
 /*
 |--------------------------------------------------------------------------
-| WEB ROUTES
+| GOOGLE AUTH ROUTES (USER)
 |--------------------------------------------------------------------------
 */
-use App\Http\Controllers\Auth\GoogleAuthController;
-use App\Http\Controllers\ProfileController;
 
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])
     ->name('google.login');
 
-Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
+    ->name('google.callback');
 
-Route::middleware('auth')->group(function () {
+Route::middleware('auth:user')->group(function () {
+
+    // halaman form
     Route::get('/complete-profile', [ProfileController::class, 'edit'])
         ->name('profile.complete');
 
+    // simpan data profile
     Route::post('/complete-profile', [ProfileController::class, 'update'])
         ->name('profile.complete.store');
 });
+
+Route::post('/user/logout', function () {
+    Auth::guard('user')->logout();
+    return redirect('/');
+})->name('user.logout');
+
+
+
 
 // ====================
 // FRONTEND ROUTES

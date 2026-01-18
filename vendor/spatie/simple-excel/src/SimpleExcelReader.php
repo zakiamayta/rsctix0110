@@ -187,6 +187,21 @@ class SimpleExcelReader
         return $this;
     }
 
+    public function getSheetNames(): array
+    {
+        $this->setReader();
+
+        $this->reader->open($this->path);
+
+        $sheets = [];
+
+        foreach ($this->reader->getSheetIterator() as $sheet) {
+            $sheets[] = $sheet->getName();
+        }
+
+        return $sheets;
+    }
+
     public function hasSheet(string $sheetName): bool
     {
         $this->setReader();

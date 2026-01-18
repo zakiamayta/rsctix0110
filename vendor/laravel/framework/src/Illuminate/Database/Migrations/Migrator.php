@@ -11,6 +11,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\ConnectionResolverInterface as Resolver;
 use Illuminate\Database\Events\MigrationEnded;
 use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Database\Events\MigrationSkipped;
 use Illuminate\Database\Events\MigrationsStarted;
 use Illuminate\Database\Events\MigrationStarted;
 use Illuminate\Database\Events\NoPendingMigrations;
@@ -245,6 +246,8 @@ class Migrator
             : true;
 
         if (! $shouldRunMigration) {
+            $this->fireMigrationEvent(new MigrationSkipped($name));
+
             $this->write(Task::class, $name, fn () => MigrationResult::Skipped->value);
         } else {
             $this->write(Task::class, $name, fn () => $this->runMigration($migration, 'up'));
@@ -662,7 +665,11 @@ class Migrator
 
         $this->setConnection($name);
 
-        return tap($callback(), fn () => $this->setConnection($previousConnection));
+        try {
+            return $callback();
+        } finally {
+            $this->setConnection($previousConnection);
+        }
     }
 
     /**
