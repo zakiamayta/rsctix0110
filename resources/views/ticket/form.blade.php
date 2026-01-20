@@ -20,7 +20,7 @@
 
         <!-- Poster Event -->
         <div class="card shadow-sm border-0 mb-3 rounded-4 overflow-hidden bg-white">
-          <img src="{{ asset('images/events/' . $event->poster) }}"
+          <img src="{{ asset($event->poster) }}"
                class="card-img-top"
                style="max-height: 250px; object-fit: cover;"
                alt="Poster Event">

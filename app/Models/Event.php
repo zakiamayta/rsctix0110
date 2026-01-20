@@ -8,17 +8,30 @@ class Event extends Model
 {
     protected $table = 'events';
 
-protected $fillable = [
-    'title',
-    'description',
-    'lineup',
-    'organizer',
-    'instagram',
-    'date',
-    'location',
-    'poster',
-    'max_tickets_per_email',
-];
+    protected $fillable = [
+        'title',
+        'event_url',
+        'description',
+        'lineup',
+        'organizer',
+        'instagram',
+        'date',
+        'ticket_sale_start',
+        'ticket_redeem_start',
+        'min_age',
+        'location',
+        'poster',
+        'max_tickets_per_email',
+        'status',
+    ];
+
+    protected $casts = [
+        'date' => 'datetime',
+        'ticket_sale_start' => 'datetime',
+        'ticket_redeem_start' => 'datetime',
+    ];
+
+
 
 
     public function products()

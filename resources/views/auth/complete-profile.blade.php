@@ -32,27 +32,43 @@
 
             <div class="mb-3">
                 <label class="form-label">Email</label>
-                <input type="email" class="form-control" value="{{ auth()->user()->email }}" readonly>
+                <input
+                    type="email"
+                    class="form-control"
+                    value="{{ auth('user')->user()->email }}"
+                    readonly
+                >
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Nama Depan</label>
-                <input type="text" name="first_name" class="form-control" required>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Nama Belakang</label>
-                <input type="text" name="last_name" class="form-control" required>
+                <label class="form-label">Nama Lengkap</label>
+                <input
+                    type="text"
+                    name="name"
+                    class="form-control"
+                    value="{{ auth('user')->user()->name }}"
+                    required
+                >
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Nomor Telepon</label>
-                <input type="text" name="phone" class="form-control" required>
+                <input
+                    type="text"
+                    name="phone"
+                    class="form-control"
+                    required
+                >
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Tanggal Lahir</label>
-                <input type="date" name="birth_date" class="form-control" required>
+                <input
+                    type="date"
+                    name="birth_date"
+                    class="form-control"
+                    required
+                >
             </div>
 
             <div class="mb-4">
@@ -68,6 +84,7 @@
                 Simpan & Lanjutkan
             </button>
         </form>
+
 
     </div>
 </div>

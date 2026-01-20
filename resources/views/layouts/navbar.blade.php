@@ -32,11 +32,64 @@
           </svg>
         </div>
 
-        <!-- 🔹 Tombol Get Tickets -->
-        <a href="{{ route('ticket.form') }}"
-           class="btn-gradient-orange">
-          Get Tickets
-        </a>
+    @if(auth('user')->check())
+
+    <div class="relative">
+
+        <!-- AVATAR -->
+        <button
+            id="user-menu-button"
+            class="flex items-center focus:outline-none"
+        >
+            <img
+                src="{{ auth('user')->user()->avatar }}"
+                alt="Avatar"
+                class="w-10 h-10 rounded-full object-cover border border-gray-300"
+                referrerpolicy="no-referrer"
+            >
+        </button>
+
+        <!-- DROPDOWN -->
+        <div
+            id="user-dropdown"
+            class="hidden absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-lg border z-50"
+        >
+
+            <div class="px-4 py-3 border-b">
+                <p class="text-sm font-semibold text-gray-800">
+                    {{ auth('user')->user()->name }}
+                </p>
+                <p class="text-xs text-gray-500">
+                    {{ auth('user')->user()->email }}
+                </p>
+            </div>
+
+            <form method="POST" action="{{ route('user.logout') }}">
+                @csrf
+                <button
+                    type="submit"
+                    class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-b-xl"
+                >
+                    Logout
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    @else
+
+    <a href="{{ route('google.login') }}" class="btn-gradient-orange">
+        Login
+    </a>
+
+    @endif
+
+
+
+
+</a>
+
       </nav>
 
       <!-- 🔹 Mobile Menu Button -->
@@ -92,6 +145,25 @@
       Get Tickets
     </a>
   </div>
+
+  <script>
+document.addEventListener("DOMContentLoaded", function () {
+    const button = document.getElementById("user-menu-button");
+    const dropdown = document.getElementById("user-dropdown");
+
+    if (!button) return;
+
+    button.addEventListener("click", function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", function () {
+        dropdown.classList.add("hidden");
+    });
+});
+</script>
+
 
   <!-- 🔹 Script -->
   <script>

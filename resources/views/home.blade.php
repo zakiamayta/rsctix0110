@@ -77,7 +77,8 @@
     <div class="bg-white rounded-xl shadow-sm hover:shadow-lg w-full max-w-sm flex flex-col overflow-hidden transition transform hover:-translate-y-1"
          data-aos="fade-up" data-aos-delay="{{ $loop->index * 100 }}">
 
-      <img src="{{ asset('images/events/' . $event->poster) }}"
+      <img src="{{ asset($event->poster) }}"
+                     alt="Poster Event"
            class="w-full aspect-square object-cover bg-gray-200">
 
       <div class="flex flex-col flex-1 p-4 sm:p-6">

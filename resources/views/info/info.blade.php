@@ -12,8 +12,8 @@
                 
                 {{-- Poster --}}
                 @if($event->poster)
-                <img src="{{ asset('images/events/' . $event->poster) }}"
-                     alt="Poster {{ $event->title }}"
+                <img src="{{ asset($event->poster) }}"
+                     alt="Poster Event"
                      class="img-fluid w-100"
                      style="max-height: 420px; object-fit: cover;">
                 @endif

@@ -270,3 +270,64 @@ p, span, label {
   color: #f97316 !important;
   font-weight: 600 !important;
 }
+
+/* ===============================
+   GENDER CARD OPTION
+   =============================== */
+
+.gender-wrapper {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.gender-input {
+  display: none;
+}
+
+.gender-card {
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  height: 110px;
+  cursor: pointer;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  transition: all 0.25s ease;
+  background-color: #ffffff;
+}
+
+.gender-card svg {
+  width: 34px;
+  height: 34px;
+  color: #9ca3af;
+  transition: all 0.25s ease;
+}
+
+.gender-card span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Hover */
+.gender-card:hover {
+  border-color: #f97316;
+  background-color: #fff7ed;
+}
+
+/* Checked */
+.gender-input:checked + .gender-card {
+  border-color: #f97316;
+  background-color: #fff7ed;
+  box-shadow: 0 10px 20px rgba(249, 115, 22, 0.25);
+}
+
+.gender-input:checked + .gender-card svg,
+.gender-input:checked + .gender-card span {
+  color: #f97316;
+}

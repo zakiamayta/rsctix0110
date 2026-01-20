@@ -13,11 +13,32 @@ class User extends Authenticatable
     protected $primaryKey = 'id';
     public $timestamps = false;
 
-    protected $fillable = ['email', 'PASSWORD', 'created_at'];
+    /**
+     * Kolom yang boleh diisi (WAJIB)
+     */
+    protected $fillable = [
+        'email',
+        'google_id',
+        'name',
+        'phone',
+        'birth_date',
+        'gender',
+        'avatar',
+        'profile_complete',
+        'PASSWORD',
+        'created_at',
+    ];
 
-    protected $hidden = ['PASSWORD'];
+    /**
+     * Kolom sensitif
+     */
+    protected $hidden = [
+        'PASSWORD',
+    ];
 
-    // Override getAuthPassword untuk pakai kolom PASSWORD (uppercase)
+    /**
+     * Supaya auth admin tetap pakai PASSWORD (uppercase)
+     */
     public function getAuthPassword()
     {
         return $this->PASSWORD;
