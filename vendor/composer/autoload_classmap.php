@@ -11,8 +11,6 @@ return array(
     'App\\Http\\Controllers\\AdminController' => $baseDir . '/app/Http/Controllers/AdminController.php',
     'App\\Http\\Controllers\\AdminEventController' => $baseDir . '/app/Http/Controllers/AdminEventController.php',
     'App\\Http\\Controllers\\AdminMerchController' => $baseDir . '/app/Http/Controllers/AdminMerchController.php',
-    'App\\Http\\Controllers\\Api\\EventController' => $baseDir . '/app/Http/Controllers/Api/EventController.php',
-    'App\\Http\\Controllers\\Auth\\GoogleAuthController' => $baseDir . '/app/Http/Controllers/Auth/GoogleAuthController.php',
     'App\\Http\\Controllers\\Controller' => $baseDir . '/app/Http/Controllers/Controller.php',
     'App\\Http\\Controllers\\DashboardController' => $baseDir . '/app/Http/Controllers/DashboardController.php',
     'App\\Http\\Controllers\\DashboardMerchController' => $baseDir . '/app/Http/Controllers/DashboardMerchController.php',

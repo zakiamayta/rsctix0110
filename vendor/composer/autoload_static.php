@@ -515,11 +515,6 @@ class ComposerStaticInit1595a57ed19bfcff4b1f5b2716878312
         array (
             0 => __DIR__ . '/..' . '/nunomaduro/collision/src',
         ),
-        'Nette\\' => 
-        array (
-            0 => __DIR__ . '/..' . '/nette/schema/src',
-            1 => __DIR__ . '/..' . '/nette/utils/src',
-        ),
         'Monolog\\' => 
         array (
             0 => __DIR__ . '/..' . '/monolog/monolog/src/Monolog',
@@ -534,8 +529,8 @@ class ComposerStaticInit1595a57ed19bfcff4b1f5b2716878312
         ),
         'League\\Uri\\' => 
         array (
-            0 => __DIR__ . '/..' . '/league/uri',
-            1 => __DIR__ . '/..' . '/league/uri-interfaces',
+            0 => __DIR__ . '/..' . '/league/uri-interfaces',
+            1 => __DIR__ . '/..' . '/league/uri',
         ),
         'League\\OAuth1\\Client\\' => 
         array (
@@ -721,8 +716,6 @@ class ComposerStaticInit1595a57ed19bfcff4b1f5b2716878312
         'App\\Http\\Controllers\\AdminController' => __DIR__ . '/../..' . '/app/Http/Controllers/AdminController.php',
         'App\\Http\\Controllers\\AdminEventController' => __DIR__ . '/../..' . '/app/Http/Controllers/AdminEventController.php',
         'App\\Http\\Controllers\\AdminMerchController' => __DIR__ . '/../..' . '/app/Http/Controllers/AdminMerchController.php',
-        'App\\Http\\Controllers\\Api\\EventController' => __DIR__ . '/../..' . '/app/Http/Controllers/Api/EventController.php',
-        'App\\Http\\Controllers\\Auth\\GoogleAuthController' => __DIR__ . '/../..' . '/app/Http/Controllers/Auth/GoogleAuthController.php',
         'App\\Http\\Controllers\\Controller' => __DIR__ . '/../..' . '/app/Http/Controllers/Controller.php',
         'App\\Http\\Controllers\\DashboardController' => __DIR__ . '/../..' . '/app/Http/Controllers/DashboardController.php',
         'App\\Http\\Controllers\\DashboardMerchController' => __DIR__ . '/../..' . '/app/Http/Controllers/DashboardMerchController.php',

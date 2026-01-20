@@ -13,7 +13,6 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MerchController;
 use App\Http\Controllers\InfoController;
 use App\Http\Controllers\AdminMerchController;
-use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\DashboardMerchController;
 use App\Http\Controllers\Eo\EventController;
 use App\Http\Controllers\ProfileController;
@@ -43,11 +42,6 @@ Route::middleware('auth:user')->group(function () {
     Route::post('/complete-profile', [ProfileController::class, 'update'])
         ->name('profile.complete.store');
 });
-
-Route::post('/user/logout', function () {
-    Auth::guard('user')->logout();
-    return redirect('/');
-})->name('user.logout');
 
 // ====================
 // FRONTEND ROUTES
