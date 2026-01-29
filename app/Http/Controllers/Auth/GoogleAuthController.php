@@ -56,8 +56,4 @@ class GoogleAuthController extends Controller
 
         return redirect('/');
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> a5bfabf997dceb9a63f42ee30fe04f1b8e2cdc20

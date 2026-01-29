@@ -139,11 +139,12 @@
                 </label>
 
                 <input type="email"
-                       name="email"
-                       class="form-control rounded-pill"
-                       required
-                       placeholder="nama@gmail.com"
-                       value="{{ old('email') }}">
+                    name="email"
+                    class="form-control rounded-pill"
+                    required
+                    placeholder="nama@gmail.com"
+                    value="{{ old('email', $user->email ?? '') }}">
+
               </div>
 
               <input type="hidden" name="qty" id="ticketQty" value="0">

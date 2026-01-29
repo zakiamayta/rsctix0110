@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 use Xendit\Xendit;
 use Xendit\Invoice;
 
@@ -27,7 +28,9 @@ class TicketController extends Controller
 
         $tickets = DB::table('tickets')->where('event_id', $eventId)->get();
 
-        return view('ticket.form', compact('event', 'tickets'));
+        $user = Auth::guard('user')->user();
+
+        return view('ticket.form', compact('event', 'tickets', 'user'));
     }
 
     public function store(Request $request)

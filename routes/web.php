@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\DashboardController;
@@ -42,6 +41,11 @@ Route::middleware('auth:user')->group(function () {
     Route::post('/complete-profile', [ProfileController::class, 'update'])
         ->name('profile.complete.store');
 });
+
+Route::post('/user/logout', function () {
+    Auth::guard('user')->logout();
+    return redirect('/');
+})->name('user.logout');
 
 // ====================
 // FRONTEND ROUTES
