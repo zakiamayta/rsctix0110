@@ -43,6 +43,11 @@ Route::middleware('auth:user')->group(function () {
         ->name('profile.complete.store');
 });
 
+    Route::post('/user/logout', function () {
+        Auth::guard('user')->logout();
+        return redirect('/');
+    })->name('user.logout');
+
 // ====================
 // FRONTEND ROUTES
 // ====================

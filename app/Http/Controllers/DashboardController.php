@@ -81,8 +81,6 @@ public function index(Request $request)
     ));
 }
 
-
-
     public function getAllTransactionData(Request $request)
     {
         $sortBy = $request->input('sort_by');
