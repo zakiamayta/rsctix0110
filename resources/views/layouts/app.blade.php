@@ -73,8 +73,8 @@
           </p>
 
           <p class="small">
-            📞 <a href="tel:+6285230088828" class="text-decoration-none text-muted hover-orange">
-              +62 852-3008-8828
+            📞 <a href="tel:085111372005" class="text-decoration-none text-muted hover-orange">
+              085111372005
             </a>
           </p>
         </div>

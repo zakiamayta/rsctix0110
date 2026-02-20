@@ -12,10 +12,11 @@
                 
                 {{-- Poster --}}
                 @if($event->poster)
-                <img src="{{ asset($event->poster) }}"
-                     alt="Poster Event"
-                     class="img-fluid w-100"
-                     style="max-height: 420px; object-fit: cover;">
+                <div style="width:100%; aspect-ratio:16/9; overflow:hidden;">
+                    <img src="{{ asset($event->poster) }}"
+                        alt="Poster Event"
+                        style="width:100%; height:100%; object-fit:cover;">
+                </div>
                 @endif
 
                 <div class="card-body p-4">

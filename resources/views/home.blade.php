@@ -78,8 +78,8 @@
          data-aos="fade-up" data-aos-delay="{{ $loop->index * 100 }}">
 
       <img src="{{ asset($event->poster) }}"
-                     alt="Poster Event"
-           class="w-full aspect-square object-cover bg-gray-200">
+        alt="Poster Event"
+        class="w-full aspect-video object-cover bg-gray-200">
 
       <div class="flex flex-col flex-1 p-4 sm:p-6">
         <h2 class="text-base sm:text-lg font-bold text-gray-900 mb-1">
