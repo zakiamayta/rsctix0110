@@ -30,9 +30,15 @@
 
             <p class="text-muted mb-1">
               <i class="bi bi-geo-alt me-1 text-orange"></i> {{ $event->location }}
-              â€” <i class="bi bi-calendar-event me-1 text-orange"></i>
-              {{ \Carbon\Carbon::parse($event->date)->translatedFormat('d F Y') }}
             </p>
+
+            @if(isset($jadwal))
+            <p class="text-muted mb-1">
+              <i class="bi bi-calendar-event me-1 text-orange"></i>
+              {{ $jadwal->info }} —
+              {{ \Carbon\Carbon::parse($jadwal->tanggal)->translatedFormat('d F Y H:i') }}
+            </p>
+            @endif
 
             <p class="small text-muted mb-0">
               {{ $event->description }}
@@ -41,6 +47,11 @@
         </div>
 
         <!-- Kategori Tiket -->
+         @if(isset($jadwal))
+          <div class="alert alert-info">
+              Jadwal: <strong>{{ $jadwal->info }}</strong>
+          </div>
+          @endif
         <div class="card shadow-sm border-0 rounded-4 bg-white">
           <div class="card-header bg-light fw-semibold fs-5">
             Kategori Tiket
@@ -127,7 +138,11 @@
 
             @if($activeTicket)
             <form action="{{ route('ticket.store') }}" method="POST" id="ticket-form">
-              @csrf
+                @csrf
+
+                @if(isset($jadwal))
+                    <input type="hidden" name="jadwal_id" value="{{ $jadwal->id }}">
+                @endif
 
               <div class="mb-3">
                 <label class="form-label fw-semibold">

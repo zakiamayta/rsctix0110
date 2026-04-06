@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;
 use Xendit\Xendit;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,5 +25,12 @@ class AppServiceProvider extends ServiceProvider
     // {
     //     \URL::forceScheme('https');
     // }
+public function boot(): void
+    {
+        // Kode untuk memaksa HTTPS agar CSS muncul di ngrok
+        if (str_contains(config('app.url'), 'ngrok-free.dev')) {
+            URL::forceScheme('https');
+        }
+    }
 
 }

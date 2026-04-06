@@ -84,8 +84,28 @@
                 <div class="card-body p-4">
                     
                     <h5 class="fw-bold mb-3 text-uppercase text-orange">
-                        Informasi Event
-                    </h5>
+    Jadwal Event
+</h5>
+
+<ul class="list-unstyled mb-4 small text-dark">
+    @forelse($jadwals as $jadwal)
+        <li class="mb-3">
+            <a href="{{ route('ticket.form', ['event_id' => $event->id, 'jadwal_id' => $jadwal->id]) }}"
+               class="text-decoration-none d-block p-2 rounded hover-bg-light">
+
+                <div class="fw-semibold text-dark">
+                    {{ $jadwal->info }}
+                </div>
+
+                <div class="text-muted small">
+                    {{ \Carbon\Carbon::parse($jadwal->tanggal)->translatedFormat('d F Y H:i') }}
+                </div>
+            </a>
+        </li>
+    @empty
+        <li class="text-muted">Jadwal belum tersedia</li>
+    @endforelse
+</ul>
                     
                     <ul class="list-unstyled mb-4 small text-dark">
                         <li class="mb-2">
@@ -111,7 +131,7 @@
                                 - Rp{{ number_format($maxPrice ?? 0, 0, ',', '.') }}
                             @endif
                         </h4>
-
+<!-- 
                         {{-- Tombol --}}
                         <div class="d-grid gap-2">
                             <a href="{{ route('ticket.form', ['event_id' => $event->id]) }}"
@@ -123,7 +143,7 @@
                                class="btn btn-outline-orange btn-lg">
                                 <i class="bi bi-bag"></i> Beli Merchandise
                             </a>
-                        </div>
+                        </div> -->
                     </div>
 
                 </div>

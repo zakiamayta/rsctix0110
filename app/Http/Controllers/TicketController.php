@@ -13,25 +13,37 @@ use Xendit\Invoice;
 
 class TicketController extends Controller
 {
-    public function form(Request $request)
-    {
-        $eventId = $request->query('event_id');
+public function form(Request $request)
+{
+    $eventId = $request->query('event_id');
+    $jadwalId = $request->query('jadwal_id'); // ✅ tambah ini
 
-        if (!$eventId) {
-            abort(404, 'Event tidak ditemukan.');
-        }
-
-        $event = DB::table('events')->where('id', $eventId)->first();
-        if (!$event) {
-            abort(404, 'Event tidak ditemukan.');
-        }
-
-        $tickets = DB::table('tickets')->where('event_id', $eventId)->get();
-
-        $user = Auth::guard('user')->user();
-
-        return view('ticket.form', compact('event', 'tickets', 'user'));
+    if (!$eventId) {
+        abort(404, 'Event tidak ditemukan.');
     }
+
+    $event = DB::table('events')->where('id', $eventId)->first();
+    if (!$event) {
+        abort(404, 'Event tidak ditemukan.');
+    }
+
+    // ✅ FILTER BERDASARKAN JADWAL
+    $tickets = DB::table('tickets')
+        ->where('event_id', $eventId)
+        ->when($jadwalId, function ($query) use ($jadwalId) {
+            return $query->where('jadwal_id', $jadwalId);
+        })
+        ->get();
+
+    $jadwal = null;
+    if ($jadwalId) {
+        $jadwal = DB::table('jadwal')->where('id', $jadwalId)->first();
+    }
+
+    $user = Auth::guard('user')->user();
+
+    return view('ticket.form', compact('event', 'tickets', 'user', 'jadwal'));
+}
 
     public function store(Request $request)
     {
@@ -41,7 +53,18 @@ class TicketController extends Controller
             return back()->with('error', 'Tiket tidak ditemukan.')->withInput();
         }
 
-        $event = DB::table('events')->where('id', $firstTicket->event_id)->first();
+        $jadwal = DB::table('jadwal')
+            ->where('id', $firstTicket->jadwal_id)
+            ->first();
+
+        if (!$jadwal) {
+            return back()->with('error', 'Jadwal tidak ditemukan.')->withInput();
+        }
+
+        $event = DB::table('events')
+            ->where('id', $jadwal->event_id)
+            ->first();
+
         if (!$event) {
             return back()->with('error', 'Event tidak ditemukan.')->withInput();
         }
@@ -55,7 +78,8 @@ class TicketController extends Controller
                         $exists = DB::table('transactions')
                             ->join('ticket_attendees', 'transactions.id', '=', 'ticket_attendees.transaction_id')
                             ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
-                            ->where('tickets.event_id', $event->id)
+                            ->join('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
+                            ->where('jadwal.event_id', $event->id)
                             ->where('transactions.email', $value)
                             ->exists();
 

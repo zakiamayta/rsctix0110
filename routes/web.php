@@ -83,6 +83,8 @@ Route::get('/terms', fn() => view('terms'))->name('terms');
 // Form tiket
 Route::get('/tiket', [TicketController::class, 'form'])->name('ticket.form');
 Route::post('/tiket', [TicketController::class, 'store'])->name('ticket.store');
+Route::get('/ticket/form', [TicketController::class, 'form'])
+    ->name('ticket.form');
 
 // Halaman pembayaran
 Route::get('/ticket/payment/{id}', [TicketController::class, 'payment'])->name('ticket.payment');
