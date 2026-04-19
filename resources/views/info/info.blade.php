@@ -90,8 +90,9 @@
 <ul class="list-unstyled mb-4 small text-dark">
     @forelse($jadwals as $jadwal)
         <li class="mb-3">
-            <a href="{{ route('ticket.form', ['event_id' => $event->id, 'jadwal_id' => $jadwal->id]) }}"
-               class="text-decoration-none d-block p-2 rounded hover-bg-light">
+            <a href="#"
+   onclick="handleJadwalClick(event, '{{ route('ticket.form', ['event_id' => $event->id, 'jadwal_id' => $jadwal->id]) }}')"
+   class="text-decoration-none d-block p-2 rounded hover-bg-light">
 
                 <div class="fw-semibold text-dark">
                     {{ $jadwal->info }}
@@ -151,5 +152,51 @@
         </div>
 
     </div>
+</div>
+
+<script>
+    const isLoggedIn = @json(auth()->guard('user')->check());
+
+    function handleJadwalClick(e, url) {
+        e.preventDefault();
+
+        if (!isLoggedIn) {
+            const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+            modal.show();
+        } else {
+            window.location.href = url;
+        }
+    }
+</script>
+<!-- Modal Login Required -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0 shadow">
+      
+      <div class="modal-body text-center p-4">
+        
+        <div class="mb-3">
+          <i class="bi bi-lock-fill text-orange" style="font-size:40px;"></i>
+        </div>
+
+        <h5 class="fw-bold mb-2">Login Diperlukan</h5>
+        <p class="text-muted mb-4">
+          Anda harus login terlebih dahulu untuk membeli tiket.
+        </p>
+
+        <div class="d-flex justify-content-center gap-2">
+          <button class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">
+            Batal
+          </button>
+
+          <a href="{{ route('google.login') }}" class="btn btn-orange-pill px-4">
+            Login Sekarang
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
 </div>
 @endsection

@@ -173,6 +173,24 @@
                     Persetujuan Refund
                 </a>
             </div>
+            {{-- Event --}}
+<div class="mt-4">
+    <p class="px-3 text-xs font-semibold text-gray-400 uppercase">
+        Manajemen Event
+    </p>
+
+    <a href="{{ route('admin.event.index') }}"
+       class="flex items-center gap-3 px-3 py-2 mt-1 rounded-md
+              hover:bg-purple-50 hover:text-purple-600
+              {{ request()->routeIs('admin.event.*') ? 'bg-purple-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+        
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z"/>
+        </svg>
+
+        Manajemen Event
+    </a>
+</div>
 
         </nav>
     </aside>

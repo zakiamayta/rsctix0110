@@ -63,7 +63,16 @@
             <i class="bi bi-ticket-perforated"></i>
           </div>
           <div>
-            <p class="fw-semibold mb-0">{{ $d->name ?? 'Tanpa Nama' }}</p>
+            <p class="fw-semibold mb-0">
+                {{ $d->ticket_name ?? 'Tiket' }} - {{ $d->name ?? 'Tanpa Nama' }}
+            </p>
+
+            <small class="text-muted d-block">
+                <i class="bi bi-calendar-event me-1"></i>
+                {{ $d->jadwal_info ?? '-' }} —
+                {{ \Carbon\Carbon::parse($d->jadwal_tanggal)->translatedFormat('d F Y H:i') }}
+            </small>
+            </p>
             <small class="text-muted">
               <i class="bi bi-telephone me-1"></i> {{ $d->phone_number ?? '-' }}
             </small>
@@ -74,21 +83,35 @@
       @endforelse
 
       {{-- Ringkasan Pembayaran --}}
-      <h5 class="fw-bold mt-4 mb-3">Ringkasan Pembayaran</h5>
-      <div class="p-3 rounded bg-light border">
+    <h5 class="fw-bold mt-4 mb-3">Ringkasan Pembayaran</h5>
+    <div class="p-3 rounded bg-light border">
+
+      @foreach($ticketSummary as $name => $item)
         <div class="d-flex justify-content-between mb-2">
-          <span>Harga per Tiket</span>
-          <span>Rp{{ number_format($hargaTiket, 0, ',', '.') }}</span>
+          <span>{{ $name }} (x{{ $item['qty'] }})</span>
+          <span>Rp{{ number_format($item['total'], 0, ',', '.') }}</span>
         </div>
-        <div class="d-flex justify-content-between mb-2">
-          <span>Jumlah Tiket</span>
-          <span>{{ count($details) }}</span>
+
+        <div class="d-flex justify-content-between mb-2 text-muted small">
+          <span>Harga satuan</span>
+          <span>Rp{{ number_format($item['price'], 0, ',', '.') }}</span>
         </div>
-        <div class="border-top pt-2 mt-2 d-flex justify-content-between fw-bold text-orange">
+
+        <div class="d-flex justify-content-between mt-2 text-muted">
+            <span>Biaya Layanan ({{ $servicePercent }}%)</span>
+            <span>Rp{{ number_format($serviceFee, 0, ',', '.') }}</span>
+        </div>
+
+        <hr class="my-2">
+      @endforeach
+
+      <div class="d-flex justify-content-between fw-bold text-orange mt-3">
           <span>Total Bayar</span>
           <span>Rp{{ number_format($totalBayar, 0, ',', '.') }}</span>
-        </div>
       </div>
+
+
+    </div>
 
       {{-- Error --}}
       @if(isset($errorMessage))

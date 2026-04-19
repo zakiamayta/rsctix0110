@@ -121,6 +121,18 @@ public function form(Request $request)
                     ->update(['stock' => $ticket->stock - $qty]);
 
                 $total += $ticket->price * $qty;
+
+                // hitung total qty semua tiket
+                $totalQty = array_sum($request->qty);
+
+                // tentukan persen biaya layanan
+                $servicePercent = $totalQty == 1 ? 10 : 7;
+
+                // hitung biaya layanan
+                $serviceFee = ($total * $servicePercent) / 100;
+
+                // total akhir
+                $grandTotal = $total + $serviceFee;
             }
 
             // simpan transaksi
@@ -130,19 +142,27 @@ public function form(Request $request)
                 'checkout_time'  => now(),
                 'payment_status' => $total == 0 ? 'paid' : 'unpaid',
                 'kode_unik'      => strtoupper(Str::random(10)), // 👈 generate kode unik
-                'total_amount'   => $total,
+                'total_amount'   => $grandTotal,
                 'created_at'     => now(),
                 'updated_at'     => now()
             ]);
 
-            // simpan data peserta (pakai urutan order visitor)
-            foreach ($request->name as $i => $name) {
-                DB::table('ticket_attendees')->insert([
-                    'transaction_id' => $transactionId,
-                    'ticket_id'      => $request->ticket_id[$i],
-                    'name'           => $name,
-                    'phone_number'   => $request->phone[$i] ?? null,
-                ]);
+            // simpan data peserta (mapping sesuai qty tiket)
+            $attendeeIndex = 0;
+
+            foreach ($request->ticket_id as $i => $ticketId) {
+                $qty = $request->qty[$i];
+
+                for ($j = 0; $j < $qty; $j++) {
+                    DB::table('ticket_attendees')->insert([
+                        'transaction_id' => $transactionId,
+                        'ticket_id'      => $ticketId,
+                        'name'           => $request->name[$attendeeIndex] ?? null,
+                        'phone_number'   => $request->phone[$attendeeIndex] ?? null,
+                    ]);
+
+                    $attendeeIndex++;
+                }
             }
 
             if ($total == 0) {
@@ -167,7 +187,7 @@ public function form(Request $request)
                 'external_id'         => $externalId,
                 'payer_email'         => $request->email,
                 'description'         => 'Pembelian Tiket ' . $event->title,
-                'amount'              => $total,
+                'amount'              => $grandTotal,
                 'success_redirect_url'=> route('ticket.success', ['id' => $transactionId]),
                 'failure_redirect_url'=> route('ticket.failed', ['id' => $transactionId]),
                 'currency'            => 'IDR',
@@ -195,22 +215,58 @@ public function form(Request $request)
     public function payment($id)
     {
         $transaction = DB::table('transactions')->find($id);
-        $details = DB::table('ticket_attendees')->where('transaction_id', $id)->get();
+        $details = DB::table('ticket_attendees')
+            ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
+            ->join('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
+            ->where('ticket_attendees.transaction_id', $id)
+            ->select(
+                'ticket_attendees.*',
+                'tickets.name as ticket_name',
+                'tickets.price',
+                'jadwal.info as jadwal_info',
+                'jadwal.tanggal as jadwal_tanggal'
+            )
+            ->get();
 
         if (!$transaction) {
             abort(404, 'Transaksi tidak ditemukan');
         }
 
-        $ticket = null;
-        if ($details->isNotEmpty()) {
-            $ticketId = $details->first()->ticket_id;
-            $ticket = DB::table('tickets')->where('id', $ticketId)->first();
-        }
+        $ticketSummary = $details->groupBy('ticket_name')->map(function ($items) {
+    return [
+        'qty' => $items->count(),
+        'price' => $items->first()->price,
+        'total' => $items->count() * $items->first()->price
+    ];
+});
 
-        $hargaTiket = $ticket ? $ticket->price : 0;
-        $totalBayar = $transaction->total_amount;
+        // $ticket = null;
+        // if ($details->isNotEmpty()) {
+        //     $ticketId = $details->first()->ticket_id;
+        //     $ticket = DB::table('tickets')->where('id', $ticketId)->first();
+        // }
 
-        return view('ticket.payment', compact('transaction', 'details', 'hargaTiket', 'totalBayar'));
+        // $hargaTiket = $ticket ? $ticket->price : 0;
+        $totalTiket = $details->sum(function ($item) {
+            return $item->price;
+        });
+
+        $totalQty = $details->count();
+
+        $servicePercent = $totalQty == 1 ? 10 : 7;
+        $serviceFee = ($totalTiket * $servicePercent) / 100;
+
+        $totalBayar = $totalTiket + $serviceFee;
+
+        return view('ticket.payment', compact(
+            'transaction',
+            'details',
+            'ticketSummary',
+            'totalBayar',
+            'serviceFee',
+            'servicePercent',
+            'totalTiket'
+        ));
     }
 
     public function processPayment($id)

@@ -63,6 +63,11 @@
                     {{ auth('user')->user()->email }}
                 </p>
             </div>
+                      <!-- 🔥 MENU USER -->
+          <a href="{{ route('user.tickets') }}"
+            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              🎟️ My Tickets
+          </a>
 
             <form method="POST" action="{{ route('user.logout') }}">
                 @csrf
@@ -84,11 +89,6 @@
     </a>
 
     @endif
-
-
-
-
-</a>
 
       </nav>
 

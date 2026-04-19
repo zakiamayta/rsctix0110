@@ -32,6 +32,8 @@ class Transaction extends Model
         return $this->hasMany(TicketAttendee::class, 'transaction_id');
     }
 
+    
+
     // Aktifkan timestamp jika kamu pakai created_at & updated_at di tabel
     public $timestamps = true;
 }

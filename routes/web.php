@@ -12,10 +12,12 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MerchController;
 use App\Http\Controllers\InfoController;
 use App\Http\Controllers\AdminMerchController;
+use App\Http\Controllers\AdminEventController;
 use App\Http\Controllers\DashboardMerchController;
 use App\Http\Controllers\Eo\EventController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -46,6 +48,12 @@ Route::middleware('auth:user')->group(function () {
         Auth::guard('user')->logout();
         return redirect('/');
     })->name('user.logout');
+
+    
+    Route::get('/riwayat-pembelian', [UserController::class, 'myTickets'])
+        ->name('user.tickets');
+
+
 
 // ====================
 // FRONTEND ROUTES
@@ -174,12 +182,28 @@ Route::middleware('auth')->group(function () {
     // ====================
 // ADMIN EVENT ROUTES
 // ====================
-    Route::get('/admin/event', [\App\Http\Controllers\AdminEventController::class, 'index'])->name('admin.event.index');
-    Route::post('/admin/event', [\App\Http\Controllers\AdminEventController::class, 'store'])->name('admin.event.store');
-    Route::get('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'show'])->name('admin.event.show'); // detail (JSON/modal)
-    Route::put('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'update'])->name('admin.event.update');
-    Route::delete('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'destroy'])->name('admin.event.destroy');
-    Route::get('/admin/event/{id}/edit', [\App\Http\Controllers\AdminEventController::class, 'edit'])->name('admin.event.edit');
+    // Route::get('/admin/event', [\App\Http\Controllers\AdminEventController::class, 'index'])->name('admin.event.index');
+    // Route::post('/admin/event', [\App\Http\Controllers\AdminEventController::class, 'store'])->name('admin.event.store');
+    // Route::get('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'show'])->name('admin.event.show'); // detail (JSON/modal)
+    // Route::put('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'update'])->name('admin.event.update');
+    // Route::delete('/admin/event/{id}', [\App\Http\Controllers\AdminEventController::class, 'destroy'])->name('admin.event.destroy');
+    // Route::get('/admin/event/{id}/edit', [\App\Http\Controllers\AdminEventController::class, 'edit'])->name('admin.event.edit');
+    // Route::get('/admin/event/create', [AdminEventController::class, 'create'])->name('admin.event.create');
+    // LIST EVENT
+    Route::get('/admin/event', [AdminEventController::class, 'index'])
+        ->name('admin.event.index');
+
+    // HALAMAN CREATE
+    Route::get('/admin/event/create', [AdminEventController::class, 'create'])
+        ->name('admin.event.create');
+
+    // SIMPAN EVENT
+    Route::post('/admin/event', [AdminEventController::class, 'store'])
+        ->name('admin.event.store');
+
+    // DELETE
+    Route::delete('/admin/event/{id}', [AdminEventController::class, 'destroy'])
+        ->name('admin.event.destroy');
 
 
     // Admin Merch
@@ -211,6 +235,8 @@ Route::prefix('eo')
     ->group(function () {
         Route::resource('event', EventController::class);
     });
+
+
 
 
 });

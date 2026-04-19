@@ -122,8 +122,28 @@
                 </p>
                 <hr>
                 @foreach($guest->attendees as $attendee)
+
+                    @php
+                        $ticket = $attendee->ticket ?? null;
+                        $jadwal = $ticket ? $ticket->jadwal : null;
+                    @endphp
+
                     <p><strong>Nama:</strong> {{ $attendee->name ?? '-' }}</p>
                     <p><strong>No. HP:</strong> {{ $attendee->phone_number ?? '-' }}</p>
+
+                    <p>
+                        <strong>Jenis Tiket:</strong> 
+                        {{ $ticket->name ?? '-' }}
+                    </p>
+
+                    <p>
+                        <strong>Jadwal:</strong> 
+                        {{ $jadwal->info ?? '-' }} —
+                        {{ $jadwal && $jadwal->tanggal 
+                            ? \Carbon\Carbon::parse($jadwal->tanggal)->translatedFormat('d F Y H:i') 
+                            : '-' }}
+                    </p>
+
                     @if(!$loop->last)
                         <hr>
                     @endif

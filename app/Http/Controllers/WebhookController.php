@@ -120,10 +120,17 @@ $qrFileName = 'merch_' . $transaction->kode_unik . '.png';
         }
     }
 
-    public function sendTicketEmail($transaction)
+public function sendTicketEmail($transaction)
 {
     try {
+        // 🔥 LOAD RELASI LENGKAP
+        $transaction = \App\Models\Transaction::with([
+            'event',
+            'attendees.ticket.jadwal'
+        ])->find($transaction->id);
+
         Mail::to($transaction->email)->send(new \App\Mail\TicketWithPDF($transaction));
+
         Log::info('Ticket email sent successfully', [
             'transaction_id' => $transaction->id
         ]);

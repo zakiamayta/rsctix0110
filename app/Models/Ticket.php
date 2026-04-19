@@ -30,4 +30,9 @@ class Ticket extends Model
     {
         return $this->belongsTo(Event::class);
     }
+
+    public function jadwal()
+    {
+        return $this->belongsTo(Jadwal::class, 'jadwal_id');
+    }
 }

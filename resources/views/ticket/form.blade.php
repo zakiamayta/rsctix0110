@@ -309,65 +309,99 @@
       updateFormFields(totalQty);
     }
 
-    function updateFormFields(qty) {
-      const wrapper = document.getElementById('pengunjung-list');
-      // tangkap nilai lama
-      const old = [];
-      wrapper.querySelectorAll('.pengunjung-entry').forEach((entry, i) => {
-        const nm = entry.querySelector('input[name="name[]"]')?.value || '';
-        const ph = entry.querySelector('input[name="phone[]"]')?.value || '';
-        old[i] = { name: nm, phone: ph };
-      });
+function updateFormFields(qty) {
+  const wrapper = document.getElementById('pengunjung-list');
 
-      wrapper.innerHTML = '';
-      // sesuaikan savedValues length
-      savedValues = savedValues.slice(0, qty);
+  // ambil data lama
+  const old = [];
+  wrapper.querySelectorAll('.pengunjung-entry').forEach((entry, i) => {
+    const nm = entry.querySelector('input[name="name[]"]')?.value || '';
+    const ph = entry.querySelector('input[name="phone[]"]')?.value || '';
+    old[i] = { name: nm, phone: ph };
+  });
 
-      for (let i = 0; i < qty; i++) {
-        const div = document.createElement('div');
-        div.className = 'border rounded-4 p-3 mb-3 position-relative pengunjung-entry shadow-sm fade-in';
-        div.dataset.index = i;
+  wrapper.innerHTML = '';
+  savedValues = savedValues.slice(0, qty);
 
-        div.innerHTML = `
-          <button type="button" class="btn btn-sm position-absolute top-0 end-0 m-2 rounded-circle bg-danger text-white shadow-sm trash-btn" title="Hapus pengunjung">
-            <i class="bi bi-trash"></i>
-          </button>
-          <p class="fw-semibold mb-3 text-black">Data Pengunjung ${i + 1}</p>
-          <div class="mb-3">
-            <label class="form-label">Nama Lengkap:</label>
-            <input type="text" name="name[]" required class="form-control rounded-pill" placeholder="Nama sesuai KTP" />
-          </div>
-          <div>
-            <label class="form-label">No. Telepon:</label>
-            <input type="text" name="phone[]" class="form-control rounded-pill" placeholder="08xxxxxxxxxx" />
-          </div>`;
+  for (let i = 0; i < qty; i++) {
 
-        wrapper.appendChild(div);
+    // ✅ SAFE ambil ticket name
+    let ticketName = 'Tiket';
 
-        const nameInput = div.querySelector('input[name="name[]"]');
-        const phoneInput = div.querySelector('input[name="phone[]"]');
-        const trashBtn = div.querySelector('.trash-btn');
+    try {
+      const ticketId = order[i];
 
-        // restore old values
-        if (old[i]) {
-          nameInput.value = old[i].name;
-          phoneInput.value = old[i].phone;
-          savedValues[i] = { name: old[i].name, phone: old[i].phone };
-        } else if (!savedValues[i]) {
-          savedValues[i] = { name: '', phone: '' };
+      if (ticketId) {
+        const control = document.getElementById(`ticket-control-${ticketId}`);
+
+        if (control) {
+          const parent = control.closest('.d-flex');
+          if (parent) {
+            const nameEl = parent.querySelector('.fw-bold');
+            if (nameEl) {
+              ticketName = nameEl.innerText;
+            }
+          }
         }
-
-        const syncSaved = () => { savedValues[i] = { name: nameInput.value, phone: phoneInput.value }; };
-        nameInput.addEventListener('input', syncSaved);
-        phoneInput.addEventListener('input', syncSaved);
-
-        // per tombol hapus: panggil removePengunjung dengan index sekarang dari dataset
-        trashBtn.addEventListener('click', () => {
-          const idx = Number(div.dataset.index);
-          removePengunjung(idx);
-        });
       }
+    } catch (e) {
+      console.log('error ambil nama tiket', e);
     }
+
+    const div = document.createElement('div');
+    div.className = 'border rounded-4 p-3 mb-3 position-relative pengunjung-entry shadow-sm fade-in';
+    div.dataset.index = i;
+
+    div.innerHTML = `
+      <button type="button" class="btn btn-sm position-absolute top-0 end-0 m-2 rounded-circle bg-danger text-white shadow-sm trash-btn">
+        <i class="bi bi-trash"></i>
+      </button>
+
+      <p class="fw-semibold mb-3 text-black">
+        ${ticketName} - Pengunjung ${i + 1}
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Nama Lengkap:</label>
+        <input type="text" name="name[]" required class="form-control rounded-pill" placeholder="Nama sesuai KTP" />
+      </div>
+
+      <div>
+        <label class="form-label">No. Telepon:</label>
+        <input type="text" name="phone[]" class="form-control rounded-pill" placeholder="08xxxxxxxxxx" />
+      </div>
+    `;
+
+    wrapper.appendChild(div);
+
+    const nameInput = div.querySelector('input[name="name[]"]');
+    const phoneInput = div.querySelector('input[name="phone[]"]');
+    const trashBtn = div.querySelector('.trash-btn');
+
+    // restore data lama
+    if (old[i]) {
+      nameInput.value = old[i].name;
+      phoneInput.value = old[i].phone;
+      savedValues[i] = old[i];
+    } else {
+      savedValues[i] = { name: '', phone: '' };
+    }
+
+    const syncSaved = () => {
+      savedValues[i] = {
+        name: nameInput.value,
+        phone: phoneInput.value
+      };
+    };
+
+    nameInput.addEventListener('input', syncSaved);
+    phoneInput.addEventListener('input', syncSaved);
+
+    trashBtn.addEventListener('click', () => {
+      removePengunjung(i);
+    });
+  }
+}
 
     // Hapus pengunjung pada index tertentu -> juga hapus mapping ticket dari order & kurangi cart
     function removePengunjung(index) {
