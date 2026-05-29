@@ -9,13 +9,14 @@ class HomeController extends Controller
 {
     public function index()
     {
-        $events = Event::orderBy('date')->get();
+        // ✅ HANYA tampilkan event yang sudah di-approve
+        $events = Event::where('status', 'approved')
+            ->orderBy('date')
+            ->get();
+
         $tickets = Product::where('type', 'ticket')->get();
         $merchandise = Product::where('type', 'merch')->get();
 
         return view('home', compact('events', 'tickets', 'merchandise'));
     }
 }
-
-
-

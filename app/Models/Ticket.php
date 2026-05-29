@@ -21,9 +21,12 @@ class Ticket extends Model
 
     protected $fillable = [
         'event_id',
+        'jadwal_id', // ✅ WAJIB
         'name',
         'price',
         'stock',
+        'start_sale',
+        'end_sale',
     ];
 
     public function event()

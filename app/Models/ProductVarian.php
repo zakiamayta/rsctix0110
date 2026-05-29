@@ -11,7 +11,6 @@ class ProductVarian extends Model
     protected $fillable = [
         'event_id',
         'varian',
-        'image',
         'product_id',
     ];
 
@@ -30,5 +29,9 @@ class ProductVarian extends Model
     {
         return $this->hasMany(ProductUkuran::class, 'varian_id');
     }
+    public function images()
+{
+    return $this->hasMany(Image::class, 'product_varian_id');
+}
 }
 

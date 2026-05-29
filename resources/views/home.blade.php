@@ -19,7 +19,7 @@
       </div>
 
       {{-- PAGAR: HALAMAN TAMBAH EVENT BELUM DIBUAT --}}
-      <a href="{{ url('/layanan-event') }}"
+      <a href="{{ route('eo.register') }}"
         class="inline-flex items-center gap-2 px-6 py-3 rounded-full
                 bg-white text-orange-500 text-sm font-bold
                 hover:bg-orange-50 transition

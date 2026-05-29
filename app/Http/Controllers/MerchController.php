@@ -10,21 +10,31 @@ use Xendit\Xendit;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
-
 class MerchController extends Controller
 {
     public function index()
     {
-        $varians = ProductVarian::with(['product', 'ukurans'])->get();
-        return view('merch.index', compact('varians'));
+        $varians = ProductVarian::with([
+            'product',
+            'ukurans'
+        ])->get();
+
+        $user = auth()->user();
+
+        return view('merch.index', [
+            'varians' => $varians,
+            'user'    => $user
+        ]);
     }
+
     public function preview(Request $request)
     {
         $orderData = $request->all();
-        $orderData['buyer_name'] = $orderData['buyer_name'] ?? '';
-        $orderData['email']      = $orderData['email'] ?? '';
-        $orderData['buyer_phone']= $orderData['buyer_phone'] ?? '';
-        $orderData['items']      = $orderData['items'] ?? [];
+
+        $orderData['buyer_name']  = $orderData['buyer_name'] ?? '';
+        $orderData['email']       = $orderData['email'] ?? '';
+        $orderData['buyer_phone'] = $orderData['buyer_phone'] ?? '';
+        $orderData['items']       = $orderData['items'] ?? [];
 
         session(['orderData' => $orderData]);
 
@@ -37,99 +47,189 @@ class MerchController extends Controller
             'email'       => 'required|email',
             'buyer_name'  => 'required|string|max:255',
             'buyer_phone' => 'required|string|max:20',
-            'items'       => 'required|array|min:1',
+
+            'items' => 'required|array|min:1',
+
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.varian_id'  => 'required|integer|exists:products_varian,id',
             'items.*.ukuran_id'  => 'nullable|integer|exists:products_ukuran,id',
+
             'items.*.quantity'   => 'required|integer|min:1',
             'items.*.price'      => 'required|integer|min:0',
             'items.*.subtotal'   => 'required|integer|min:0',
         ]);
 
-        $total = collect($validated['items'])->sum('subtotal');
+        /*
+        |--------------------------------------------------------------------------
+        | HITUNG TOTAL
+        |--------------------------------------------------------------------------
+        */
 
-        // 🔹 Simpan transaksi utama (tanpa product_id karena tabelnya sudah tidak pakai)
+        // subtotal seluruh barang
+        $totalAmount = collect($validated['items'])->sum(function ($item) {
+            return (int) $item['subtotal'];
+        });
+
+        // total qty barang
+        $totalQty = collect($validated['items'])->sum(function ($item) {
+            return (int) $item['quantity'];
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | BIAYA LAYANAN
+        |--------------------------------------------------------------------------
+        */
+
+        // sama seperti tiket:
+        // 1 item = 10%
+        // >1 item = 7%
+        $servicePercent = $totalQty == 1 ? 10 : 7;
+
+        $serviceTax = ($totalAmount * $servicePercent) / 100;
+
+        /*
+        |--------------------------------------------------------------------------
+        | GRAND TOTAL
+        |--------------------------------------------------------------------------
+        */
+
+        $grandTotal = $totalAmount + $serviceTax;
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIMPAN TRANSAKSI
+        |--------------------------------------------------------------------------
+        */
+
         $transaction = TransactionMerch::create([
-            'email'          => $validated['email'],
-            'total_amount'   => $total,
+            'email' => $validated['email'],
+
+            // subtotal barang
+            'total_amount' => $totalAmount,
+
+            // biaya layanan
+            'service_tax' => $serviceTax,
+
+            // total akhir dibayar
+            'grand_total' => $grandTotal,
+
             'payment_status' => 'unpaid',
-            'kode_unik'      => strtoupper(Str::random(10))
+
+            'kode_unik' => strtoupper(Str::random(10)),
         ]);
 
-        // 🔹 Simpan detail item
+        /*
+        |--------------------------------------------------------------------------
+        | SIMPAN DETAIL ITEM
+        |--------------------------------------------------------------------------
+        */
+
         foreach ($validated['items'] as $item) {
+
             TransactionMerchDetail::create([
                 'transaction_merch_id' => $transaction->id,
-                'buyer_name'           => $validated['buyer_name'],
-                'buyer_phone'          => $validated['buyer_phone'],
-                'product_id'           => $item['product_id'],
-                'varian_id'            => $item['varian_id'],
-                'ukuran_id'            => $item['ukuran_id'] ?? null,
-                'quantity'             => $item['quantity'],
-                'price'                => $item['price'],
-                'subtotal'             => $item['subtotal'],
+
+                'buyer_name'  => $validated['buyer_name'],
+                'buyer_phone' => $validated['buyer_phone'],
+
+                'product_id' => $item['product_id'],
+                'varian_id'  => $item['varian_id'],
+                'ukuran_id'  => $item['ukuran_id'] ?? null,
+
+                'quantity' => $item['quantity'],
+                'price'    => $item['price'],
+                'subtotal' => $item['subtotal'],
             ]);
         }
 
-        // 🔹 Integrasi Xendit
+        /*
+        |--------------------------------------------------------------------------
+        | XENDIT
+        |--------------------------------------------------------------------------
+        */
+
         Xendit::setApiKey(env('XENDIT_API_KEY'));
 
         $params = [
             'external_id' => 'merch-' . $transaction->id,
+
             'payer_email' => $validated['email'],
+
             'description' => 'Pembelian Merchandise',
-            'amount'      => $total,
+
+            // WAJIB pakai grand total
+            'amount' => $grandTotal,
+
             'success_redirect_url' => route('merch.success', $transaction->id),
+
             'failure_redirect_url' => route('merch.failed', $transaction->id),
+
+            'currency' => 'IDR',
+
+            'invoice_duration' => 15 * 60,
+
+            'payment_methods' => ['QRIS'],
         ];
 
         $invoice = \Xendit\Invoice::create($params);
 
-        // simpan invoice_id & url ke DB
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE XENDIT DATA
+        |--------------------------------------------------------------------------
+        */
+
         $transaction->update([
-            'xendit_invoice_id' => $invoice['id'],
-            'xendit_invoice_url'=> $invoice['invoice_url'],
+            'xendit_invoice_id'  => $invoice['id'],
+            'xendit_invoice_url' => $invoice['invoice_url'],
         ]);
 
         return redirect($invoice['invoice_url']);
     }
 
-public function success($id)
-{
-    $transaction = TransactionMerch::findOrFail($id);
+    public function success($id)
+    {
+        $transaction = TransactionMerch::findOrFail($id);
 
-    if ($transaction->payment_status !== 'paid') {
-        // Webhook belum masuk, jadi jangan dianggap berhasil
-        return view('merch.failed', compact('transaction'))
-            ->with('message', 'Menunggu verifikasi pembayaran dari Xendit...');
+        if ($transaction->payment_status !== 'paid') {
+
+            return view('merch.failed', compact('transaction'))
+                ->with(
+                    'message',
+                    'Menunggu verifikasi pembayaran dari Xendit...'
+                );
+        }
+
+        return view('merch.success', compact('transaction'));
     }
-
-    return view('merch.success', compact('transaction'));
-}
-
-
 
     public function failed($id)
     {
         $transaction = TransactionMerch::findOrFail($id);
-        $transaction->update(['payment_status' => 'failed']);
+
+        $transaction->update([
+            'payment_status' => 'failed'
+        ]);
+
         return view('merch.failed', compact('transaction'));
     }
 
-
-public function showQr($kode_unik)
-{
-    $transaction = \App\Models\TransactionMerch::where('kode_unik', $kode_unik)
+    public function showQr($kode_unik)
+    {
+        $transaction = TransactionMerch::where(
+            'kode_unik',
+            $kode_unik
+        )
         ->with('details.product')
         ->firstOrFail();
 
-    Log::info('Menampilkan QR untuk transaksi merch', [
-        'transaction_kode_unik' => $transaction->kode_unik,
-        'email'                 => $transaction->email,
-        'status'                => $transaction->payment_status,
-    ]);
+        Log::info('Menampilkan QR untuk transaksi merch', [
+            'transaction_kode_unik' => $transaction->kode_unik,
+            'email'                 => $transaction->email,
+            'status'                => $transaction->payment_status,
+        ]);
 
-    return view('admin.merch-qr', compact('transaction'));
-}
-
+        return view('admin.merch-qr', compact('transaction'));
+    }
 }

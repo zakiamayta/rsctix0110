@@ -132,19 +132,15 @@
                                 - Rp{{ number_format($maxPrice ?? 0, 0, ',', '.') }}
                             @endif
                         </h4>
-<!-- 
+
                         {{-- Tombol --}}
                         <div class="d-grid gap-2">
-                            <a href="{{ route('ticket.form', ['event_id' => $event->id]) }}"
-                               class="btn btn-orange-pill btn-lg">
-                                <i class="bi bi-ticket-perforated"></i> Beli Tiket
-                            </a>
 
                             <a href="{{ route('merchandise.index', ['event_id' => $event->id]) }}"
                                class="btn btn-outline-orange btn-lg">
                                 <i class="bi bi-bag"></i> Beli Merchandise
                             </a>
-                        </div> -->
+                        </div>
                     </div>
 
                 </div>

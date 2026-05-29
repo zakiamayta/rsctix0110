@@ -2,6 +2,20 @@
 
 All notable changes to `simple-excel` will be documented in this file
 
+## 3.8.1 - 2025-09-24
+
+### What's Changed
+
+* Update issue template by @AlexVanderbist in https://github.com/spatie/simple-excel/pull/191
+* Added getSheets function to get a list of avilabel sheet names. by @amit-roy1999 in https://github.com/spatie/simple-excel/pull/192
+
+### New Contributors
+
+* @AlexVanderbist made their first contribution in https://github.com/spatie/simple-excel/pull/191
+* @amit-roy1999 made their first contribution in https://github.com/spatie/simple-excel/pull/192
+
+**Full Changelog**: https://github.com/spatie/simple-excel/compare/3.8.0...3.8.1
+
 ## 3.8.0 - 2025-07-17
 
 ### What's Changed

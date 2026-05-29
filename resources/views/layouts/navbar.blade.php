@@ -52,9 +52,9 @@
         <!-- DROPDOWN -->
         <div
             id="user-dropdown"
-            class="hidden absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-lg border z-50"
-        >
+            class="hidden absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-lg border z-50">
 
+            {{-- Header: Nama & Email --}}
             <div class="px-4 py-3 border-b">
                 <p class="text-sm font-semibold text-gray-800">
                     {{ auth('user')->user()->name }}
@@ -63,21 +63,36 @@
                     {{ auth('user')->user()->email }}
                 </p>
             </div>
-                      <!-- 🔥 MENU USER -->
-          <a href="{{ route('user.tickets') }}"
-            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-              🎟️ My Tickets
-          </a>
 
+            {{-- Menu: My Tickets --}}
+            <a href="{{ route('user.tickets') }}"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                🎟️ Riwayat Pembelian
+            </a>
+
+            {{-- Menu: Dashboard EO (hanya jika role eo & approved) --}}
+            @php
+                $user = auth('user')->user();
+                $eo = \App\Models\Eo::where('user_id', $user->id)->first();
+            @endphp
+
+            @if($user->role === 'eo' && $eo && $eo->status === 'approved')
+                <a href="{{ route('eo.dashboard') }}"
+                    class="block px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 font-semibold">
+                    🚀 Dashboard EO
+                </a>
+            @endif
+
+            {{-- Menu: Logout --}}
             <form method="POST" action="{{ route('user.logout') }}">
                 @csrf
                 <button
                     type="submit"
-                    class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-b-xl"
-                >
+                    class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-b-xl">
                     Logout
                 </button>
             </form>
+
         </div>
 
     </div>

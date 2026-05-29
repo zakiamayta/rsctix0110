@@ -9,6 +9,7 @@ class Event extends Model
     protected $table = 'events';
 
     protected $fillable = [
+        'eo_id',
         'title',
         'event_url',
         'description',
@@ -23,6 +24,7 @@ class Event extends Model
         'poster',
         'max_tickets_per_email',
         'status',
+        'eo_note',
     ];
 
     protected $casts = [
@@ -52,5 +54,14 @@ class Event extends Model
     {
         return $this->hasMany(Ticket::class);
     }
+    public function eo()
+{
+    return $this->belongsTo(\App\Models\Eo::class);
+}
+
+public function jadwals()
+{
+    return $this->hasMany(Jadwal::class, 'event_id');
+}
 
 }

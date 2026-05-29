@@ -10,10 +10,10 @@
         <p class="text-sm text-gray-500">Semua event yang tersedia</p>
     </div>
 
-    <a href="{{ route('admin.event.create') }}"
+    <!-- <a href="{{ route('admin.event.create') }}"
        class="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700">
         + Tambah Event
-    </a>
+    </a> -->
 </div>
 
 <div class="bg-white rounded-xl shadow overflow-hidden">

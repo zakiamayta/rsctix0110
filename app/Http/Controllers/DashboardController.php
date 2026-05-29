@@ -13,6 +13,22 @@ use App\Models\Event; // pastikan di atas ada ini
 
 class DashboardController extends Controller
 {
+public function __construct()
+{
+    $this->middleware(function ($request, $next) {
+
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Akses hanya untuk admin');
+        }
+
+        return $next($request);
+    });
+}
+
     public function absensi(Request $request)
     {
         $attendees = TicketAttendee::with(['transaction.event'])
