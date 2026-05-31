@@ -794,4 +794,5 @@ class TicketController extends Controller
             'details'     => $details
         ]);
     }
+    
 }

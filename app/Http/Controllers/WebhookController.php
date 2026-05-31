@@ -15,7 +15,7 @@ class WebhookController extends Controller
     public function generateTicketQRCode($transaction)
     {
         try {
-            $qrPath = base_path('public_html/qrcodes');
+            $qrPath = base_path('qrcodes');
             if (!File::exists($qrPath)) {
                 File::makeDirectory($qrPath, 0755, true);
             }
@@ -92,7 +92,7 @@ class WebhookController extends Controller
     public function generateMerchQRCode($transaction)
     {
         try {
-            $qrPath = base_path('public_html/qrcodes_merch');
+            $qrPath = base_path('qrcodes_merch');
             if (!File::exists($qrPath)) {
                 File::makeDirectory($qrPath, 0755, true);
             }
@@ -122,6 +122,7 @@ $qrFileName = 'merch_' . $transaction->kode_unik . '.png';
 
 public function sendTicketEmail($transaction)
 {
+    ini_set('memory_limit', '-1');
     try {
         // 🔥 LOAD RELASI LENGKAP
         $transaction = \App\Models\Transaction::with([
