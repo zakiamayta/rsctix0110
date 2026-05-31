@@ -60,15 +60,10 @@ class Event extends Model
         return $this->hasMany(\App\Models\Jadwal::class, 'event_id');
     }
 
-    }
     public function eo()
 {
     return $this->belongsTo(\App\Models\Eo::class);
 }
 
-public function jadwals()
-{
-    return $this->hasMany(Jadwal::class, 'event_id');
-}
 
 }

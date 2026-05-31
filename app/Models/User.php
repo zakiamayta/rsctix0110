@@ -2,20 +2,18 @@
 
 namespace App\Models;
 
+use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use Notifiable;
+    use HasApiTokens, Notifiable;
 
     protected $table = 'users';
     protected $primaryKey = 'id';
     public $timestamps = false;
 
-    /**
-     * Kolom yang boleh diisi (WAJIB)
-     */
     protected $fillable = [
         'email',
         'google_id',
@@ -29,16 +27,10 @@ class User extends Authenticatable
         'created_at',
     ];
 
-    /**
-     * Kolom sensitif
-     */
     protected $hidden = [
         'PASSWORD',
     ];
 
-    /**
-     * Supaya auth admin tetap pakai PASSWORD (uppercase)
-     */
     public function getAuthPassword()
     {
         return $this->PASSWORD;

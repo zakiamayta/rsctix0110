@@ -88,6 +88,8 @@ class GoogleMobileController extends Controller
             'eo_id' => $eo?->id,
             'eo_status' => $eo?->status,
         ]);
+        print("FULL RESPONSE:");
+        print_r($data);
     }
 
     /// GET PROFILE
@@ -138,4 +140,6 @@ class GoogleMobileController extends Controller
             'message' => 'Logout berhasil'
         ]);
     }
+
+    
 }
