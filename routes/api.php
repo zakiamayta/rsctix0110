@@ -2,13 +2,194 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Response;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\HomeApiController;
 use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\Api\GoogleMobileController;
+use App\Http\Controllers\Api\EODashboardController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\DetailEventController;
+use App\Http\Controllers\Api\MerchController;
+use App\Http\Controllers\Api\EOTicketController;
+use App\Http\Controllers\Api\EOMerchController;
 
-Route::post('/xendit/webhook', [WebhookController::class, 'handleCallback']);
-Route::get('/events', [EventController::class, 'index']);
-Route::get('/events/{id}', [EventController::class, 'show']);
-Route::post('/checkout', [TicketController::class, 'checkout']);
-Route::get('/home', [HomeApiController::class, 'index']);
+/*
+|--------------------------------------------------------------------------
+| PUBLIC API
+|--------------------------------------------------------------------------
+*/
+
+/// LOGO
+Route::get(
+    '/logo',
+    [GoogleMobileController::class, 'logo']
+);
+
+/// GOOGLE LOGIN
+Route::post(
+    '/google-login',
+    [GoogleMobileController::class, 'login']
+);
+
+/// XENDIT WEBHOOK
+Route::post(
+    '/xendit/webhook',
+    [WebhookController::class, 'handleCallback']
+);
+
+/// HOME
+Route::get(
+    '/home',
+    [HomeApiController::class, 'index']
+);
+
+/// EVENTS
+Route::get(
+    '/events',
+    [EventController::class, 'index']
+);
+
+/// EVENT DETAIL
+Route::get(
+    '/event-detail/{id}',
+    [DetailEventController::class, 'show']
+);
+
+/// TRANSACTION DETAIL
+Route::get(
+    '/transaction/{id}',
+    [TicketController::class, 'detail']
+);
+
+/// MERCH LIST
+Route::get(
+    '/merch/{eventId}',
+    [MerchController::class, 'index']
+);
+
+/// MERCH TRANSACTION DETAIL
+Route::get(
+    '/transaction-merch/{id}',
+    [MerchController::class, 'detail']
+);
+
+/*
+|--------------------------------------------------------------------------
+| AUTHENTICATED API
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROFILE
+    |--------------------------------------------------------------------------
+    */
+
+    /// GET PROFILE
+    Route::get(
+        '/profile',
+        [GoogleMobileController::class, 'profile']
+    );
+
+    /// UPDATE PROFILE
+    Route::post(
+        '/update-profile',
+        [GoogleMobileController::class, 'updateProfile']
+    );
+
+    /// LOGOUT
+    Route::post(
+        '/logout',
+        [GoogleMobileController::class, 'logout']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | EO DASHBOARD
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/eo/dashboard',
+        [EODashboardController::class, 'index']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECKOUT
+    |--------------------------------------------------------------------------
+    */
+
+    /// TICKET CHECKOUT
+    Route::post(
+        '/checkout',
+        [TicketController::class, 'checkout']
+    );
+
+    /// MERCH CHECKOUT
+    Route::post(
+        '/merch/checkout',
+        [MerchController::class, 'checkout']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER ORDER
+    |--------------------------------------------------------------------------
+    */
+
+    /// ORDER HISTORY
+    Route::get(
+        '/order-history',
+        [HomeApiController::class, 'orderHistory']
+    );
+
+    /// MY TICKETS
+    Route::get(
+        '/my-tickets',
+        [TicketController::class, 'myTickets']
+    );
+
+    /// MY MERCH
+    Route::get(
+        '/my-merch',
+        [MerchController::class, 'myMerch']
+    );
+
+    Route::get('/ticket-sales', [EODashboardController::class, 'ticketSales']);
+    Route::get('/ticket-sales/{id}', [EODashboardController::class, 'ticketSalesDetail']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | EO WITHDRAWAL SYSTEM (SINKRON FRONT-END)
+    |--------------------------------------------------------------------------
+    */
+    // Ambil daftar wallets berdasarkan EO ID
+    Route::get('/eo/{eoId}/event-wallets', [EOTicketController::class, 'eventWallets']);
+    
+    // Dashboard withdrawal
+    Route::get('/eo-withdrawal-dashboard/{eoId}', [EOTicketController::class, 'dashboard']);
+    
+    // Ambil Riwayat Withdrawal Tiket
+    Route::get('/withdrawals', [EOTicketController::class, 'index']); 
+    
+    // Kirim pengajuan withdrawal tiket baru
+    Route::post('/request-withdraw', [EOTicketController::class, 'requestWithdraw']); 
+
+/*
+    |--------------------------------------------------------------------------
+    | EO MERCHANDISE WITHDRAWAL SYSTEM
+    |--------------------------------------------------------------------------
+    */
+    // 1. Endpoint Statistik Dompet Merch (Menggunakan URL lama agar Flutter tidak perlu diubah)
+    Route::get('/merch-stats/{eoId}', [EOMerchController::class, 'merchWallets']);
+    // 2. Endpoint Riwayat Penarikan Dana Merchandise
+    Route::get('/merch-withdrawals', [EOMerchController::class, 'index']);
+    // 3. Endpoint Eksekusi Pengajuan Tarik Dana Merch + Upload Invoice
+    Route::post('/merch/withdraw', [EOMerchController::class, 'requestMerchWithdraw']);
+    Route::get('/merch-sales', [EOMerchController::class, 'getMerchSales']); 
+});
