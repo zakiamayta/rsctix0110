@@ -287,6 +287,9 @@ class MerchController extends Controller
                         'payment_status' =>
                             'paid',
 
+                        'payment_method' => 
+                            'Free', // 🔥 Ditambahkan info pembayaran gratis
+
                         'total_amount' =>
                             $totalAmount,
 
@@ -365,7 +368,10 @@ class MerchController extends Controller
                         $email,
 
                     'payment_status' =>
-                        'unpaid',
+                        'unpaid', // 🔥 Diperbaiki dari $unpaid (sebelumnya undefined variable) menjadi string
+
+                    'payment_method' => 
+                        'Xendit Gateway', // 🔥 Ditambahkan info gerbang pembayaran awal
 
                     'total_amount' =>
                         $totalAmount,
@@ -438,6 +444,9 @@ class MerchController extends Controller
 
                 'payment_status' =>
                     $trx->payment_status,
+
+                'payment_method' => 
+                    $trx->payment_method ?? ($trx->grand_total == 0 ? 'Free' : 'Xendit Gateway'), // 🔥 Mengambil dari DB jika ada, jika tidak otomatis fallback sesuai harga
 
                 /// FIELD BARU
                 'total_amount' =>
@@ -554,6 +563,9 @@ class MerchController extends Controller
 
                 'payment_status' =>
                     $trx->payment_status,
+
+                'payment_method' => 
+                    $trx->payment_method ?? ($trx->grand_total == 0 ? 'Free' : 'Xendit Gateway'), // 🔥 Mengambil dari DB jika ada, jika tidak otomatis fallback sesuai harga
 
                 'email' =>
                     $trx->email,

@@ -26,6 +26,10 @@ class HomeApiController extends Controller
                     'organizer' => $event->organizer,
                     'instagram' => $event->instagram,
                     'date' => $event->date,
+                    
+                    // 📑 TAMBAHKAN BARIS INI: Agar end_date terkirim ke API mobile
+                    'end_date' => $event->end_date, 
+
                     'ticket_sale_start' => $event->ticket_sale_start,
                     'ticket_redeem_start' => $event->ticket_redeem_start,
                     'min_age' => $event->min_age,
@@ -57,122 +61,95 @@ class HomeApiController extends Controller
         /// 🎫 TICKET HISTORY
         /// =========================================
         $tickets = DB::table('transactions')
-
             ->leftJoin(
                 'events',
                 'transactions.event_id',
                 '=',
                 'events.id'
             )
-
             ->leftJoin(
                 'ticket_attendees',
                 'transactions.id',
                 '=',
                 'ticket_attendees.transaction_id'
             )
-
             ->leftJoin(
                 'tickets',
                 'ticket_attendees.ticket_id',
                 '=',
                 'tickets.id'
             )
-
             ->select(
-
                 'transactions.id',
-
                 'transactions.kode_unik',
-
                 'transactions.total_amount',
                 'transactions.service_tax',
                 'transactions.grand_total',
-
                 'transactions.payment_status',
                 'transactions.checkout_time',
                 'transactions.paid_time',
                 'transactions.qr_code',
                 'transactions.xendit_invoice_url',
-
                 'events.title as event_title',
                 'events.location',
                 'events.date as event_date',
                 'events.poster',
-
                 DB::raw(
                     'COUNT(ticket_attendees.id) as qty_ticket'
                 )
             )
-
             ->where(
                 'transactions.email',
                 $email
             )
-
             ->groupBy(
-
                 'transactions.id',
                 'transactions.kode_unik',
-
                 'transactions.total_amount',
                 'transactions.service_tax',
                 'transactions.grand_total',
-
                 'transactions.payment_status',
                 'transactions.checkout_time',
                 'transactions.paid_time',
                 'transactions.qr_code',
                 'transactions.xendit_invoice_url',
-
                 'events.title',
                 'events.location',
                 'events.date',
                 'events.poster'
             )
-
             ->orderByDesc('transactions.id')
-
             ->get()
-
             ->map(function ($item) {
 
                 $details = DB::table(
                     'ticket_attendees'
                 )
-
                     ->leftJoin(
                         'tickets',
                         'ticket_attendees.ticket_id',
                         '=',
                         'tickets.id'
                     )
-
                     ->select(
                         'tickets.name',
                         'tickets.price',
-
                         DB::raw(
                             'COUNT(ticket_attendees.id) as qty'
                         )
                     )
-
                     ->where(
                         'ticket_attendees.transaction_id',
                         $item->id
                     )
-
                     ->groupBy(
                         'tickets.name',
                         'tickets.price'
                     )
-
                     ->get()
-
                     ->map(function ($d) {
 
                         return [
-
                             'ticket_name' =>
                                 $d->name ?? 'Ticket',
 
@@ -188,7 +165,6 @@ class HomeApiController extends Controller
                     });
 
                 return [
-
                     'id' =>
                         $item->id,
 
@@ -258,127 +234,89 @@ class HomeApiController extends Controller
         /// 🛍 MERCH HISTORY
         /// =========================================
         $merchandise = DB::table('transaction_merch')
-
             ->leftJoin(
                 'transaction_merch_details',
                 'transaction_merch.id',
                 '=',
                 'transaction_merch_details.transaction_merch_id'
             )
-
             ->leftJoin(
                 'products',
                 'transaction_merch_details.product_id',
                 '=',
                 'products.id'
             )
-
             ->select(
-
                 'transaction_merch.id',
-
                 'transaction_merch.kode_unik',
-
                 'transaction_merch.total_amount',
                 'transaction_merch.service_tax',
                 'transaction_merch.grand_total',
-
                 'transaction_merch.payment_status',
-
                 'transaction_merch.checkout_time',
-
                 'transaction_merch.paid_time',
-
                 'transaction_merch.qr_code',
-
                 'transaction_merch.xendit_invoice_url',
-
                 DB::raw(
                     'MIN(products.name) as product_name'
                 ),
-
                 DB::raw(
                     'COALESCE(SUM(transaction_merch_details.quantity),0) as qty_merch'
                 )
             )
-
             ->where(
                 'transaction_merch.email',
                 $email
             )
-
             ->groupBy(
-
                 'transaction_merch.id',
-
                 'transaction_merch.kode_unik',
-
                 'transaction_merch.total_amount',
                 'transaction_merch.service_tax',
                 'transaction_merch.grand_total',
-
                 'transaction_merch.payment_status',
-
                 'transaction_merch.checkout_time',
-
                 'transaction_merch.paid_time',
-
                 'transaction_merch.qr_code',
-
                 'transaction_merch.xendit_invoice_url'
             )
-
             ->orderByDesc('transaction_merch.id')
-
             ->get()
-
             ->map(function ($item) {
 
                 $items = DB::table(
                     'transaction_merch_details'
                 )
-
                     ->leftJoin(
                         'products',
                         'transaction_merch_details.product_id',
                         '=',
                         'products.id'
                     )
-
                     ->leftJoin(
                         'products_varian',
                         'transaction_merch_details.varian_id',
                         '=',
                         'products_varian.id'
                     )
-
                     ->leftJoin(
                         'products_ukuran',
                         'transaction_merch_details.ukuran_id',
                         '=',
                         'products_ukuran.id'
                     )
-
                     ->select(
-
                         'products.name as product_name',
-
                         'products_varian.varian as varian_name',
-
                         'products_ukuran.ukuran as ukuran_name',
-
                         'transaction_merch_details.quantity',
-
                         'transaction_merch_details.subtotal'
                     )
-
                     ->where(
                         'transaction_merch_details.transaction_merch_id',
                         $item->id
                     )
-
                     ->get()
-
                     ->map(function ($d) {
 
                         $name =
@@ -400,7 +338,6 @@ class HomeApiController extends Controller
                         }
 
                         return [
-
                             'product_name' =>
                                 $name,
 
@@ -413,7 +350,6 @@ class HomeApiController extends Controller
                     });
 
                 return [
-
                     'id' =>
                         $item->id,
 

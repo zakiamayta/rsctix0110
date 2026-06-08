@@ -8,6 +8,8 @@ class TicketAttendee extends Model
 {
     protected $table = 'ticket_attendees';
 
+    public $timestamps = false;
+
     protected $fillable = [
         'transaction_id',
         'name',

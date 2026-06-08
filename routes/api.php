@@ -3,9 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Response;
-
 use App\Http\Controllers\WebhookController;
-
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\HomeApiController;
 use App\Http\Controllers\Api\TicketController;
@@ -14,7 +12,9 @@ use App\Http\Controllers\Api\EODashboardController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\DetailEventController;
 use App\Http\Controllers\Api\MerchController;
-use App\Http\Controllers\Api\EOWithdrawalController;
+use App\Http\Controllers\Api\EOTicketController;
+use App\Http\Controllers\Api\EOMerchController;
+
 /*
 |--------------------------------------------------------------------------
 | PUBLIC API
@@ -161,9 +161,35 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
     Route::get('/ticket-sales', [EODashboardController::class, 'ticketSales']);
-    Route::get('/ticket-sales/{id}',[EODashboardController::class, 'ticketSalesDetail']);
-    Route::get(
-        '/eo/{eoId}/event-wallets',
-        [EOWithdrawalController::class, 'eventWallets']
-    );
+    Route::get('/ticket-sales/{id}', [EODashboardController::class, 'ticketSalesDetail']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | EO WITHDRAWAL SYSTEM (SINKRON FRONT-END)
+    |--------------------------------------------------------------------------
+    */
+    // Ambil daftar wallets berdasarkan EO ID
+    Route::get('/eo/{eoId}/event-wallets', [EOTicketController::class, 'eventWallets']);
+    
+    // Dashboard withdrawal
+    Route::get('/eo-withdrawal-dashboard/{eoId}', [EOTicketController::class, 'dashboard']);
+    
+    // Ambil Riwayat Withdrawal Tiket
+    Route::get('/withdrawals', [EOTicketController::class, 'index']); 
+    
+    // Kirim pengajuan withdrawal tiket baru
+    Route::post('/request-withdraw', [EOTicketController::class, 'requestWithdraw']); 
+
+/*
+    |--------------------------------------------------------------------------
+    | EO MERCHANDISE WITHDRAWAL SYSTEM
+    |--------------------------------------------------------------------------
+    */
+    // 1. Endpoint Statistik Dompet Merch (Menggunakan URL lama agar Flutter tidak perlu diubah)
+    Route::get('/merch-stats/{eoId}', [EOMerchController::class, 'merchWallets']);
+    // 2. Endpoint Riwayat Penarikan Dana Merchandise
+    Route::get('/merch-withdrawals', [EOMerchController::class, 'index']);
+    // 3. Endpoint Eksekusi Pengajuan Tarik Dana Merch + Upload Invoice
+    Route::post('/merch/withdraw', [EOMerchController::class, 'requestMerchWithdraw']);
+    Route::get('/merch-sales', [EOMerchController::class, 'getMerchSales']); 
 });

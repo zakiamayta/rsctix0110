@@ -241,8 +241,6 @@ class TicketController extends Controller
                             'phone_number' =>
                                 $item['phone'],
 
-                            'created_at' => now(),
-                            'updated_at' => now(),
                         ]);
                 }
             }
