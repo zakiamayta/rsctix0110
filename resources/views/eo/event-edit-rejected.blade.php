@@ -5,7 +5,7 @@
     font-family: 'DM Sans', 'Inter', sans-serif;
     box-sizing: border-box;
   }
-  #resubmitForm { display:flex; flex-direction:column; gap:24px; }
+  #resubmitForm { display:flex; flex-direction:column; gap:24px; padding: 20px; }
 
   /* section title */
   #resubmitForm .rs-section-title {
@@ -29,7 +29,7 @@
     text-transform:uppercase; letter-spacing:.6px; margin:0;
   }
 
-  /* inputs — !important to override Bootstrap modal resets */
+  /* inputs */
   #resubmitForm .rs-input {
     background:#F2EEE9 !important;
     border:1px solid #E2DBD4 !important;
@@ -173,8 +173,8 @@
   @csrf
   @method('PUT')
 
-  {{-- Admin note --}}
-  @if($event->owner_note)
+  {{-- Admin note / Rejection Reason --}}
+  @if($event->rejection_reason || $event->owner_note)
   <div class="rs-note">
     <div class="rs-note-icon">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -185,8 +185,10 @@
       </svg>
     </div>
     <div>
-      <div class="rs-note-tag">Catatan dari Admin</div>
-      <p class="rs-note-text">{{ $event->owner_note }}</p>
+      <div class="rs-note-tag">Catatan Penolakan Admin</div>
+      <p class="rs-note-text">
+        {{ $event->rejection_reason ?? $event->owner_note }}
+      </p>
     </div>
   </div>
   @endif
@@ -199,13 +201,13 @@
       <div class="rs-field">
         <label>Judul Event</label>
         <input type="text" name="title" class="rs-input"
-               value="{{ $event->title }}" placeholder="Nama event">
+               value="{{ $event->title }}" placeholder="Nama event" required>
       </div>
 
       <div class="rs-field">
         <label>Tanggal Event</label>
         <input type="datetime-local" name="date" class="rs-input"
-               value="{{ \Carbon\Carbon::parse($event->date)->format('Y-m-d\TH:i') }}">
+               value="{{ \Carbon\Carbon::parse($event->date)->format('Y-m-d\TH:i') }}" required>
       </div>
 
       <div class="rs-field">
@@ -229,30 +231,30 @@
       <div class="rs-field">
         <label>Maks Tiket / Email</label>
         <input type="number" name="max_tickets_per_email" class="rs-input"
-               value="{{ $event->max_tickets_per_email }}">
+               value="{{ $event->max_tickets_per_email }}" required>
       </div>
 
       <div class="rs-field">
         <label>Mulai Penjualan Tiket</label>
         <input type="datetime-local" name="ticket_sale_start" class="rs-input"
-               value="{{ optional($event->ticket_sale_start)->format('Y-m-d\TH:i') }}">
+               value="{{ $event->ticket_sale_start ? \Carbon\Carbon::parse($event->ticket_sale_start)->format('Y-m-d\TH:i') : '' }}">
       </div>
 
       <div class="rs-field">
         <label>Mulai Redeem Tiket</label>
         <input type="datetime-local" name="ticket_redeem_start" class="rs-input"
-               value="{{ optional($event->ticket_redeem_start)->format('Y-m-d\TH:i') }}">
+               value="{{ $event->ticket_redeem_start ? \Carbon\Carbon::parse($event->ticket_redeem_start)->format('Y-m-d\TH:i') : '' }}">
       </div>
 
       <div class="rs-field rs-span2">
         <label>Lokasi</label>
         <input type="text" name="location" class="rs-input"
-               value="{{ $event->location }}" placeholder="Venue lengkap">
+               value="{{ $event->location }}" placeholder="Venue lengkap" required>
       </div>
 
       <div class="rs-field rs-span2">
         <label>Deskripsi</label>
-        <textarea name="description" class="rs-input">{{ $event->description }}</textarea>
+        <textarea name="description" class="rs-input" required>{{ $event->description }}</textarea>
       </div>
 
       <div class="rs-field rs-span2">
@@ -283,7 +285,7 @@
     </div>
   </div>
 
-  {{-- Jadwal --}}
+  {{-- Jadwal & Tiket --}}
   <div>
     <div class="rs-section-title">Jadwal Event</div>
 
@@ -302,14 +304,14 @@
                    name="jadwal[{{ $i }}][info]"
                    class="rs-input"
                    value="{{ $jadwal->info }}"
-                   placeholder="Misal: Hari 1 / Stage A">
+                   placeholder="Misal: Hari 1 / Stage A" required>
           </div>
           <div class="rs-field">
             <label>Tanggal & Waktu</label>
             <input type="datetime-local"
                    name="jadwal[{{ $i }}][tanggal]"
                    class="rs-input"
-                   value="{{ \Carbon\Carbon::parse($jadwal->tanggal)->format('Y-m-d\TH:i') }}">
+                   value="{{ \Carbon\Carbon::parse($jadwal->tanggal)->format('Y-m-d\TH:i') }}" required>
           </div>
         </div>
 
@@ -332,7 +334,7 @@
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][name]"
                        value="{{ $ticket->name }}"
                        class="rs-input"
-                       placeholder="Reguler / VIP">
+                       placeholder="Reguler / VIP" required>
               </div>
               <div>
                 <div class="rs-ticket-lbl">Harga (Rp)</div>
@@ -340,7 +342,7 @@
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][price]"
                        value="{{ $ticket->price }}"
                        class="rs-input"
-                       placeholder="0">
+                       placeholder="0" required>
               </div>
               <div>
                 <div class="rs-ticket-lbl">Stok</div>
@@ -348,7 +350,7 @@
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][stock]"
                        value="{{ $ticket->stock }}"
                        class="rs-input"
-                       placeholder="0">
+                       placeholder="0" required>
               </div>
             </div>
           </div>
@@ -360,7 +362,7 @@
     </div>
   </div>
 
-  {{-- Submit --}}
+  {{-- Action Submit --}}
   <div style="display:flex;justify-content:flex-end;">
     <button type="submit" class="rs-btn-submit">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -368,7 +370,7 @@
         <line x1="22" y1="2" x2="11" y2="13"/>
         <polygon points="22 2 15 22 11 13 2 9 22 2"/>
       </svg>
-      Re-Submit Event
+      Re-Submit Perbaikan Event
     </button>
   </div>
 
@@ -378,6 +380,9 @@
 function rsPreview(e) {
   const f = e.target.files[0];
   const p = document.getElementById('rsPosterPreview');
-  if (f) { p.src = URL.createObjectURL(f); p.style.display = 'block'; }
+  if (f) { 
+    p.src = URL.createObjectURL(f); 
+    p.style.display = 'block'; 
+  }
 }
 </script>

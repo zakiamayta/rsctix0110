@@ -32,15 +32,26 @@
                 <td class="p-3">{{ $event->eo->nama_badan_usaha ?? '-' }}</td>
                 <td class="p-3">{{ $event->date }}</td>
                 <td class="p-3">
-                    <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">
-                        Pending
-                    </span>
+                    {{-- KONDISI BADGE STATUS YANG DIPERBARUI --}}
+                    @if($event->status == 'pending')
+                        <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">
+                            Pending
+                        </span>
+                    @elseif($event->status == 'pending_cancel')
+                        <span class="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded font-semibold">
+                            Minta Batal (Pending Cancel)
+                        </span>
+                    @elseif($event->status == 'canceled')
+                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                            Canceled
+                        </span>
+                    @endif
                 </td>
                 <td class="p-3 space-x-2">
 
                     <a href="{{ route('owner.events.show', $event->id) }}"
                        class="px-3 py-1 bg-blue-500 text-white rounded text-xs">
-                        Detail
+                         Detail
                     </a>
 
                 </td>
@@ -48,7 +59,7 @@
             @empty
             <tr>
                 <td colspan="5" class="p-4 text-center text-gray-500">
-                    Tidak ada event pending
+                    Tidak ada event pending atau pengajuan pembatalan
                 </td>
             </tr>
             @endforelse

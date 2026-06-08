@@ -74,8 +74,9 @@
             </div>
 
             <div>
-                <label class="text-sm text-gray-500">Status</label>
+                <label class="text-sm text-gray-500 mb-1 block">Status</label>
 
+                {{-- REVISI KOMPONEN STATUS BADGE --}}
                 @if($event->status == 'pending')
                     <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs">
                         Pending
@@ -83,6 +84,14 @@
                 @elseif($event->status == 'approved')
                     <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs">
                         Approved
+                    </span>
+                @elseif($event->status == 'pending_cancel')
+                    <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold">
+                        Pending Cancel (Menunggu Persetujuan Batal)
+                    </span>
+                @elseif($event->status == 'canceled')
+                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">
+                        Canceled (Dibatalkan)
                     </span>
                 @else
                     <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs">
@@ -171,36 +180,48 @@
 
     </div>
 
-    {{-- ACTION --}}
-    @if($event->status == 'pending')
-
+    {{-- REVISI ACTION BUTTON UNTUK OWNER --}}
     <div class="flex gap-3 mt-6">
+        
+        {{-- Kondisi 1: Jika Event Baru masuk (Pending) --}}
+        @if($event->status == 'pending')
 
-        <form method="POST"
-              action="{{ route('owner.events.approve', $event->id) }}">
+            <form method="POST" action="{{ route('owner.events.approve', $event->id) }}">
+                @csrf
+                <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Approve Event
+                </button>
+            </form>
 
-            @csrf
+            <form method="POST" action="{{ route('owner.events.reject', $event->id) }}">
+                @csrf
+                <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Reject Event
+                </button>
+            </form>
 
-            <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl">
-                Approve Event
-            </button>
+        {{-- Kondisi 2: Jika Event sedang Mengajukan Pembatalan (Pending Cancel) --}}
+        @elseif($event->status == 'pending_cancel')
 
-        </form>
+            <form method="POST" action="{{ route('owner.events.confirm-cancel', $event->id) }}">
+                @csrf
+                @method('PUT') {{-- Menggunakan PUT sesuai best practice update data --}}
+                <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Setujui Pembatalan Event
+                </button>
+            </form>
 
-        <form method="POST"
-              action="{{ route('owner.events.reject', $event->id) }}">
+            <form method="POST" action="{{ route('owner.events.reject-cancel', $event->id) }}">
+                @csrf
+                @method('PUT')
+                <button class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-xl text-sm font-semibold">
+                    Tolak Pembatalan (Tetap Aktif)
+                </button>
+            </form>
 
-            @csrf
-
-            <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl">
-                Reject Event
-            </button>
-
-        </form>
+        @endif
 
     </div>
-
-    @endif
 
 </div>
 

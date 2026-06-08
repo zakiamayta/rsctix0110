@@ -21,7 +21,7 @@ use App\Http\Controllers\DashboardMerchController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Eo\EoController;
-use App\Http\Controllers\Eo\EventController;
+use App\Http\Controllers\Eo\EoEventController;
 use App\Http\Controllers\Eo\EoDashboardController;
 use App\Http\Controllers\Eo\EoMerchController;
 use App\Http\Controllers\Owner\EventApprovalController;
@@ -34,10 +34,9 @@ use App\Http\Controllers\Owner\OwnerController;
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC / FRONTEND ROUTES
+| 1. PUBLIC / FRONTEND ROUTES
 |--------------------------------------------------------------------------
 */
-
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/about-us', fn() => view('about-us'))->name('about.us');
 Route::get('/privacy-policy', fn() => view('privacy-policy'))->name('privacy.policy');
@@ -49,12 +48,12 @@ Route::get('/layanan-event', fn() => view('layanan_event'));
 Route::get('/info/{id}', [InfoController::class, 'show'])->name('info.show');
 Route::get('/band/negatifa', fn() => view('band.negatifa'))->name('band.negatifa');
 
+
 /*
 |--------------------------------------------------------------------------
-| USER AUTHENTICATION & PROFILE (GOOGLE)
+| 2. GUEST & AUTHENTICATION ROUTES (GOOGLE)
 |--------------------------------------------------------------------------
 */
-
 // Login User Frontend
 Route::get('/loginuser', fn() => view('auth.loginuser'))->name('loginuser');
 
@@ -68,124 +67,192 @@ Route::post('/user/logout', function () {
     return redirect('/');
 })->name('user.logout');
 
-// Protected User Routes
-Route::middleware('auth:user')->group(function () {
-    // Profile Completion
-    Route::get('/complete-profile', [ProfileController::class, 'edit'])->name('profile.complete');
-    Route::post('/complete-profile', [ProfileController::class, 'update'])->name('profile.complete.store');
-    
-    // Purchase History
-    Route::get('/riwayat-tiket', [UserController::class, 'myTickets'])->name('user.tickets');
-    Route::get('/riwayat-merch', [UserController::class, 'myMerch'])
-        ->name('user.merch');
-
-    // EO Registration Logic
-    Route::get('/eo/register', function () {
-        $userId = Auth::guard('user')->id();
-        $eo = DB::table('eo')->where('user_id', $userId)->first();
-
-        if (!$eo) return view('eo.register');
-        if ($eo->status === 'pending') return redirect()->route('eo.waiting');
-        if ($eo->status === 'approved') return redirect()->route('eo.dashboard');
-        if ($eo->status === 'rejected') {
-            return view('eo.register')->with('error', 'Pengajuan sebelumnya ditolak, silakan daftar ulang');
-        }
-        return view('eo.register');
-    })->name('eo.register');
-
-    Route::post('/eo/register', [EoController::class, 'store'])->name('eo.store');
-    Route::get('/eo/waiting', fn() => view('eo.waiting'))->name('eo.waiting');
-
-        Route::get('/eo/dashboard', [EoDashboardController::class, 'index'])
-        ->name('eo.dashboard');
-        Route::get('/eo/transactions', [TransactionController::class, 'index'])
-            ->name('eo.transactions');
-
-        Route::get('/eo/transactions/export-excel', [TransactionController::class, 'exportSimpleExcel'])
-            ->name('eo.transactions.export.excel');
-
-        Route::get('/eo/transactions/export-pdf', [TransactionController::class, 'exportPDF'])
-            ->name('eo.transactions.export.pdf');
-
-        Route::get('/eo/profile', [EoController::class, 'profile'])
-    ->name('eo.profile');
-
-Route::post('/eo/profile', [EoController::class, 'updateProfile'])
-    ->name('eo.profile.update');
-Route::get('/eo/event/{event}/edit-rejected', [EventController::class, 'editRejected']);
-Route::put('/eo/event/{event}/resubmit', [EventController::class, 'resubmit'])
-    ->name('eo.event.resubmit');
-
-
-        
-
-    Route::prefix('eo')->name('eo.')->group(function () {
-        Route::resource('event', EventController::class);
-    });
-    Route::get('/eo/status', function () {
-    $user = auth('user')->user();
-    $eo = DB::table('eo')->where('user_id', $user->id)->first();
-
-    $events = \App\Models\Event::where('eo_id', $eo->id)->get();
-
-    return view('eo.status', compact('events'));
-})->name('eo.status');
-
-
-});
-Route::prefix('eo')
-->middleware('auth:user')
-->group(function () {
-
-    Route::get('/saldo', [SaldoController::class, 'index'])
-        ->name('eo.saldo');
-
-    Route::post('/withdraw', [SaldoController::class, 'store'])
-        ->name('eo.withdraw.store');
-
-});
-Route::middleware(['auth:user'])->prefix('eo')->name('eo.')->group(function () {
-
-    Route::resource('merch', EoMerchController::class);
-
-});
-Route::prefix('eo')->group(function () {
-
-    Route::get('/merch-transactions', [MerchTransactionController::class, 'index'])
-        ->name('eo.merch.transactions');
-
-    Route::get('/merch-transactions/export/pdf', [MerchTransactionController::class, 'exportPDF'])
-        ->name('eo.merch.transactions.export.pdf');
-
-    Route::get('/merch-transactions/export/excel', [MerchTransactionController::class, 'exportSimpleExcel'])
-        ->name('eo.merch.transactions.export.excel');
-});
 
 /*
 |--------------------------------------------------------------------------
-| TICKET & TRANSACTION ROUTES
+| 3. PROTECTED USER ROUTES (Harus Login Akun User)
 |--------------------------------------------------------------------------
 */
+Route::middleware('auth:user')->group(function () {
 
+    // ==========================
+    // PROFILE USER
+    // ==========================
+    Route::get('/complete-profile', [ProfileController::class, 'edit'])
+        ->name('profile.complete');
+
+    Route::post('/complete-profile', [ProfileController::class, 'update'])
+        ->name('profile.complete.store');
+
+    // ==========================
+    // RIWAYAT PEMBELIAN
+    // ==========================
+    Route::get('/riwayat-tiket', [UserController::class, 'myTickets'])
+        ->name('user.tickets');
+
+    Route::get('/riwayat-merch', [UserController::class, 'myMerch'])
+        ->name('user.merch');
+
+    // ==========================
+    // REGISTRASI EO
+    // ==========================
+    Route::get('/eo/register', function () {
+
+        $userId = Auth::guard('user')->id();
+
+        $eo = DB::table('eo')
+            ->where('user_id', $userId)
+            ->first();
+
+        if (!$eo) {
+            return view('eo.register');
+        }
+
+        if ($eo->status === 'pending') {
+            return redirect()->route('eo.waiting');
+        }
+
+        if ($eo->status === 'approved') {
+            return redirect()->route('eo.dashboard');
+        }
+
+        if ($eo->status === 'rejected') {
+            return view('eo.register')
+                ->with(
+                    'error',
+                    'Pengajuan sebelumnya ditolak, silakan daftar ulang'
+                );
+        }
+
+        return view('eo.register');
+
+    })->name('eo.register');
+
+    Route::post('/eo/register', [EoController::class, 'store'])
+        ->name('eo.store');
+
+    Route::get('/eo/waiting', fn() => view('eo.waiting'))
+        ->name('eo.waiting');
+
+    // ==========================
+    // EO AREA
+    // ==========================
+    Route::prefix('eo')->name('eo.')->group(function () {
+
+        // Dashboard
+        Route::get('/dashboard', [EoDashboardController::class, 'index'])
+            ->name('dashboard');
+
+        // Profile
+        Route::get('/profile', [EoController::class, 'profile'])
+            ->name('profile');
+
+        Route::post('/profile', [EoController::class, 'updateProfile'])
+            ->name('profile.update');
+
+        // =================================
+        // TRANSAKSI TIKET
+        // =================================
+        Route::get('/transactions', [TransactionController::class, 'index'])
+            ->name('transactions');
+
+        Route::get('/transactions/export-excel', [TransactionController::class, 'exportSimpleExcel'])
+            ->name('transactions.export.excel');
+
+        Route::get('/transactions/export-pdf', [TransactionController::class, 'exportPDF'])
+            ->name('transactions.export.pdf');
+
+        // =================================
+        // SALDO
+        // =================================
+        Route::get('/saldo', [SaldoController::class, 'index'])
+            ->name('saldo');
+
+        Route::post('/withdraw', [SaldoController::class, 'store'])
+            ->name('withdraw.store');
+
+        // =================================
+        // MERCH EO
+        // =================================
+        Route::resource('merch', EoMerchController::class);
+
+        Route::get('/merch-transactions', [MerchTransactionController::class, 'index'])
+            ->name('merch.transactions');
+
+        Route::get('/merch-transactions/export/pdf', [MerchTransactionController::class, 'exportPDF'])
+            ->name('merch.transactions.export.pdf');
+
+        Route::get('/merch-transactions/export/excel', [MerchTransactionController::class, 'exportSimpleExcel'])
+            ->name('merch.transactions.export.excel');
+
+        // =================================
+        // STATUS EVENT
+        // =================================
+        Route::get('/status', [EoEventController::class, 'status'])
+            ->name('status');
+
+        // =================================
+        // EVENT KHUSUS
+        // =================================
+
+        Route::get(
+            'event/{event}/edit-rejected',
+            [EoEventController::class, 'editRejected']
+        )->name('event.edit-rejected');
+
+        Route::put(
+            'event/{event}/resubmit',
+            [EoEventController::class, 'resubmit']
+        )->name('event.resubmit');
+
+        // CANCEL
+        Route::put(
+            'event/{event}/request-cancel',
+            [EoEventController::class, 'requestCancel']
+        )->name('event.request-cancel');
+
+
+        // RESCHEDULE FORM (GET MODAL)
+        Route::get(
+            'event/{event}/reschedule',
+            [EoEventController::class, 'showRescheduleForm']
+        )->name('event.reschedule.form');
+
+
+        // RESCHEDULE SUBMIT (PUT)
+        Route::put(
+            'event/{event}/request-reschedule',
+            [EoEventController::class, 'requestReschedule']
+        )->name('event.request-reschedule');
+
+
+            
+
+
+        // =================================
+        // RESOURCE EVENT
+        // =================================
+        Route::resource('event', EoEventController::class);
+    });
+});
+
+
+
+/*
+|--------------------------------------------------------------------------
+| 4. TICKET & MERCHANDISE TRANSACTION ROUTES (Proses Pembelian & Payment Gateway)
+|--------------------------------------------------------------------------
+*/
 Route::controller(TicketController::class)->group(function () {
     Route::get('/tiket', 'form')->name('ticket.form');
     Route::post('/tiket', 'store')->name('ticket.store');
-    Route::get('/ticket/form', 'form')->name('ticket.form.alt'); // Alias rute kedua
+    Route::get('/ticket/form', 'form')->name('ticket.form.alt');
     Route::get('/ticket/payment/{id}', 'payment')->name('ticket.payment');
     Route::post('/ticket/pay/{id}', 'processPayment')->name('ticket.pay');
     Route::post('/ticket/cancel/{id}', 'cancel')->name('ticket.cancel');
     Route::get('/tiket/success/{id}', 'success')->name('ticket.success');
     Route::get('/tiket/failed/{id}', 'failed')->name('ticket.failed');
 });
-
-// Webhook / Detail Ticket
-Route::get('/tickets/{id}', [WebhookController::class, 'show'])->name('tickets.show');
-
-/*
-|--------------------------------------------------------------------------
-| MERCHANDISE ROUTES
-|--------------------------------------------------------------------------
-*/
 
 Route::controller(MerchController::class)->group(function () {
     Route::get('/merch', 'index')->name('merch.index');
@@ -197,22 +264,24 @@ Route::controller(MerchController::class)->group(function () {
     Route::get('/merch/failed/{id}', 'failed')->name('merch.failed');
 });
 
+// Webhook / Detail Ticket Callback
+Route::get('/tickets/{id}', [WebhookController::class, 'show'])->name('tickets.show');
+
+
 /*
 |--------------------------------------------------------------------------
-| ABSENSI / ATTENDANCE ROUTES
+| 5. ABSENSI / ATTENDANCE ROUTES (Sisi Gatekeeper / Scanner)
 |--------------------------------------------------------------------------
 */
-
 Route::get('/absen/{kode}', [AbsensiController::class, 'showPasswordForm'])->name('absen.form');
 Route::post('/absen/{kode}', [AbsensiController::class, 'handleScan'])->name('absen.submit');
 
+
 /*
 |--------------------------------------------------------------------------
-| ADMIN ROUTES (AUTHENTICATED)
+| 6. ADMIN ROUTES (Manajemen Internal / Super Admin)
 |--------------------------------------------------------------------------
 */
-
-// Admin Login
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.post');
 
@@ -271,86 +340,50 @@ Route::middleware('auth')->group(function () {
     Route::get('/guest/qr/{kode}', [GuestController::class, 'showQr'])->name('guests.qr');
     Route::get('/guest/{kode}/export-qr', [GuestController::class, 'exportGuestQR'])->name('guest.export.qr');
     Route::get('/guest/merch/qr/{kode_unik}', [MerchController::class, 'showQr'])->name('guests.merch.qr');
-
-    // EO Resource
-
 });
 
-Route::middleware('auth')->group(function () {
-
-    Route::get('/owner/dashboard', [OwnerController::class, 'dashboard'])
-    ->name('owner.dashboard');
-
-    /*
-    |--------------------------------------------------------------------------
-    | EO APPROVAL
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/owner/eo', [OwnerController::class, 'eoIndex'])
-        ->name('owner.eo.index');
-
-    Route::post('/owner/eo/{id}/approve', [OwnerController::class, 'approve'])
-        ->name('owner.eo.approve');
-
-    Route::post('/owner/eo/{id}/reject', [OwnerController::class, 'reject'])
-        ->name('owner.eo.reject');
-
-    /*
-    |--------------------------------------------------------------------------
-    | EVENT APPROVAL
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/owner/events', [OwnerController::class, 'eventIndex'])
-        ->name('owner.events.index');
-
-    Route::post('/owner/event/{id}/approve', [OwnerController::class, 'approveEvent'])
-        ->name('owner.event.approve');
-
-    Route::post('/owner/event/{id}/reject', [OwnerController::class, 'rejectEvent'])
-        ->name('owner.event.reject');
-
-   
-    Route::prefix('owner')->name('owner.')->group(function () {
-
-        Route::get('/events', [EventApprovalController::class, 'index'])
-            ->name('events.index');
-
-        Route::get('/events/{event}', [EventApprovalController::class, 'show'])
-            ->name('events.show');
-
-        Route::post('/events/{event}/approve', [EventApprovalController::class, 'approve'])
-            ->name('events.approve');
-
-        Route::post('/events/{event}/reject', [EventApprovalController::class, 'reject'])
-            ->name('events.reject');
-    });
-
-        Route::prefix('owner')->name('owner.')->group(function () {
-
-            Route::get('/withdrawals', [WithdrawalApprovalController::class, 'index'])
-                ->name('withdrawals.index');
-
-            Route::get('/withdrawals/{withdrawal}', [WithdrawalApprovalController::class, 'show'])
-                ->name('withdrawals.show');
-
-            Route::post('/withdrawals/{withdrawal}/approve', [WithdrawalApprovalController::class, 'approve'])
-                ->name('withdrawals.approve');
-
-            Route::post('/withdrawals/{withdrawal}/reject', [WithdrawalApprovalController::class, 'reject'])
-                ->name('withdrawals.reject');
-
-        });
-
-});
 
 /*
 |--------------------------------------------------------------------------
-| FILE SERVING ROUTES
+| 7. OWNER ROUTES (Persetujuan Level Tertinggi / Owner Platform)
 |--------------------------------------------------------------------------
 */
+Route::middleware('auth')->group(function () {
 
+    Route::get('/owner/dashboard', [OwnerController::class, 'dashboard'])->name('owner.dashboard');
+
+    // EO Approval (OwnerController)
+    Route::get('/owner/eo', [OwnerController::class, 'eoIndex'])->name('owner.eo.index');
+    Route::post('/owner/eo/{id}/approve', [OwnerController::class, 'approve'])->name('owner.eo.approve');
+    Route::post('/owner/eo/{id}/reject', [OwnerController::class, 'reject'])->name('owner.eo.reject');
+
+    // Event Approval & Cancel Management Group
+    Route::prefix('owner')->name('owner.')->group(function () {
+        Route::get('/events', [EventApprovalController::class, 'index'])->name('events.index');
+        Route::get('/events/{event}', [EventApprovalController::class, 'show'])->name('events.show');
+        Route::post('/events/{event}/approve', [EventApprovalController::class, 'approve'])->name('events.approve');
+        Route::post('/events/{event}/reject', [EventApprovalController::class, 'reject'])->name('events.reject');
+        
+        // Persetujuan Pembatalan Event oleh Owner
+        Route::put('/events/{event}/confirm-cancel', [EventApprovalController::class, 'confirmCancel'])->name('events.confirm-cancel');
+        Route::put('/events/{event}/reject-cancel', [EventApprovalController::class, 'rejectCancel'])->name('events.reject-cancel');
+    });
+
+    // Withdrawal Approval Group
+    Route::prefix('owner')->name('owner.')->group(function () {
+        Route::get('/withdrawals', [WithdrawalApprovalController::class, 'index'])->name('withdrawals.index');
+        Route::get('/withdrawals/{withdrawal}', [WithdrawalApprovalController::class, 'show'])->name('withdrawals.show');
+        Route::post('/withdrawals/{withdrawal}/approve', [WithdrawalApprovalController::class, 'approve'])->name('withdrawals.approve');
+        Route::post('/withdrawals/{withdrawal}/reject', [WithdrawalApprovalController::class, 'reject'])->name('withdrawals.reject');
+    });
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| 8. FILE SERVING ROUTES
+|--------------------------------------------------------------------------
+*/
 Route::get('/qrcodes/{filename}', function ($filename) {
     $path = base_path('public_html/qrcodes/' . $filename);
     if (!file_exists($path)) abort(404);
