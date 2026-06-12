@@ -24,12 +24,6 @@
 
 </div>
 
-{{-- FLASH --}}
-@if(session('success'))
-<div class="mb-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">
-    {{ session('success') }}
-</div>
-@endif
 
 @if(session('error'))
 <div class="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -181,10 +175,12 @@
 
         @if($event->status == 'approved')
 
+            @if($event->can_adjust_schedule)
             <a href="{{ route('eo.event.edit', $event->id) }}"
-               class="flex-1 py-2 rounded-lg bg-orange-600 text-white text-center text-xs font-semibold hover:bg-orange-700">
-                Kelola
+            class="btn btn-warning">
+            Edit Jadwal Event
             </a>
+            @endif
 
         @elseif($event->status == 'rejected')
 
@@ -311,6 +307,27 @@ window.addEventListener('click', function(e) {
         closeEventModal();
     }
 });
+</script>
+
+<script>
+function openRescheduleModal(eventId)
+{
+    console.log('RESCHEDULE', eventId);
+
+    fetch(`/eo/event/${eventId}/reschedule`)
+        .then(res => {
+            console.log('STATUS', res.status);
+            return res.text();
+        })
+        .then(html => {
+            console.log(html);
+
+            document.getElementById('eventModalContent').innerHTML = html;
+        })
+        .catch(err => {
+            console.error(err);
+        });
+}
 </script>
 
 @endsection

@@ -6,11 +6,6 @@
 
 <h2 class="text-2xl font-bold mb-4">Approval Event</h2>
 
-@if(session('success'))
-<div class="bg-green-100 text-green-700 p-3 rounded mb-4">
-    {{ session('success') }}
-</div>
-@endif
 
 <div class="bg-white shadow rounded-xl overflow-hidden">
 
@@ -32,21 +27,46 @@
                 <td class="p-3">{{ $event->eo->nama_badan_usaha ?? '-' }}</td>
                 <td class="p-3">{{ $event->date }}</td>
                 <td class="p-3">
-                    {{-- KONDISI BADGE STATUS YANG DIPERBARUI --}}
-                    @if($event->status == 'pending')
-                        <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">
-                            Pending
-                        </span>
-                    @elseif($event->status == 'pending_cancel')
-                        <span class="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded font-semibold">
-                            Minta Batal (Pending Cancel)
-                        </span>
-                    @elseif($event->status == 'canceled')
-                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                            Canceled
-                        </span>
-                    @endif
-                </td>
+
+    @if($event->status == 'pending')
+
+        <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">
+            Pending Event
+        </span>
+
+    @elseif($event->status == 'pending_cancel')
+
+        <span class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded font-semibold">
+            Pending Cancel
+        </span>
+
+    @elseif($event->status == 'pending_reschedule')
+
+        <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded font-semibold">
+            Pending Reschedule
+        </span>
+
+    @elseif($event->status == 'approved')
+
+        <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+            Approved
+        </span>
+
+    @elseif($event->status == 'cancelled')
+
+        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+            Cancelled
+        </span>
+
+    @elseif($event->status == 'rejected')
+
+        <span class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
+            Rejected
+        </span>
+
+    @endif
+
+</td>
                 <td class="p-3 space-x-2">
 
                     <a href="{{ route('owner.events.show', $event->id) }}"

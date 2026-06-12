@@ -88,8 +88,150 @@ public function status()
             'poster' => 'nullable|image|max:2048',
         ]);
 
+        $this->validateEventSchedule(
+            $request
+        );
+
         $user = auth('user')->user();
         $eo = DB::table('eo')->where('user_id', $user->id)->first();
+
+//         $eventDate = \Carbon\Carbon::parse($request->date);
+        
+
+//         if ($request->ticket_sale_start) {
+
+//     $saleStart = \Carbon\Carbon::parse(
+//         $request->ticket_sale_start
+//     );
+
+//     $latestStartSale =
+//         $eventDate->copy()->subDays(2);
+
+
+//     if ($saleStart->gt($latestStartSale)) {
+
+//         return back()
+//             ->withInput()
+//             ->withErrors([
+//                 'Mulai penjualan tiket harus minimal H-2 sebelum event.'
+//             ]);
+//     }
+// }
+
+//         if ($request->ticket_redeem_start) {
+
+//     $redeemDate = \Carbon\Carbon::parse(
+//         $request->ticket_redeem_start
+//     );
+
+//     if (
+//         $redeemDate->gt($eventDate)
+//     ) {
+
+//         return back()
+//             ->withInput()
+//             ->withErrors([
+//                 'Penukaran tiket tidak boleh melebihi tanggal event.'
+//             ]);
+//     }
+// }
+
+
+
+// foreach ($request->jadwal ?? [] as $jadwal) {
+
+//     $jadwalDate = \Carbon\Carbon::parse(
+//         $jadwal['tanggal']
+//     );
+
+//     if ($jadwalDate->lt($eventDate)) {
+
+//         return back()
+//             ->withInput()
+//             ->withErrors([
+//                 'Tanggal jadwal tidak boleh sebelum tanggal event.'
+//             ]);
+//     }
+
+//     if (
+//         $jadwalDate->gt(
+//             $eventDate->copy()->addDays(14)
+//         )
+//     ) {
+
+//         return back()
+//             ->withInput()
+//             ->withErrors([
+//                 'Jadwal maksimal 14 hari setelah tanggal event.'
+//             ]);
+//     }
+
+//     foreach (($jadwal['tickets'] ?? []) as $ticket) {
+
+//         if (!empty($ticket['start_sale'])) {
+
+//             $startSale =
+//                 \Carbon\Carbon::parse(
+//                     $ticket['start_sale']
+//                 );
+
+//         $latestStartSale =
+//             $eventDate->copy()->subDays(2);
+//         if (
+//             $startSale->greaterThan($latestStartSale)
+//         ) {
+
+//             return back()
+//                 ->withInput()
+//                 ->withErrors([
+//                     'Penjualan tiket harus dimulai minimal H-2 sebelum event.'
+//                 ]);
+//         }
+//         }
+
+//             if (
+//         !empty($ticket['start_sale']) &&
+//         !empty($ticket['end_sale'])
+//     ) {
+
+//         $startSale = \Carbon\Carbon::parse(
+//             $ticket['start_sale']
+//         );
+
+//         $endSale = \Carbon\Carbon::parse(
+//             $ticket['end_sale']
+//         );
+
+//         if ($endSale->lt($startSale)) {
+
+//             return back()
+//                 ->withInput()
+//                 ->withErrors([
+//                     'Akhir penjualan tiket tidak boleh sebelum mulai penjualan.'
+//                 ]);
+//         }
+//     }
+
+//         if (!empty($ticket['end_sale'])) {
+
+//             $endSale =
+//                 \Carbon\Carbon::parse(
+//                     $ticket['end_sale']
+//                 );
+
+//             if (
+//                 $endSale->gt($eventDate)
+//             ) {
+
+//                 return back()
+//                     ->withInput()
+//                     ->withErrors([
+//                         'Akhir penjualan tiket tidak boleh melebihi tanggal event.'
+//                     ]);
+//             }
+//         }
+//     }
+// }
 
         DB::transaction(function () use ($request, $eo, $user) {
 
@@ -155,56 +297,183 @@ public function status()
     /**
      * 📌 Edit
      */
-    public function edit(Event $event)
-    {
-        return view('eo.edit', compact('event'));
+public function edit(Event $event)
+{
+    $user = auth('user')->user();
+
+$eo = DB::table('eo')
+    ->where('user_id', $user->id)
+    ->first();
+
+if (!$eo || $event->eo_id != $eo->id) {
+    abort(403);
+}
+    if (!$event->can_adjust_schedule) {
+        abort(403, 'Hak penyesuaian jadwal sudah digunakan.');
     }
+
+    $event->load('jadwals.tickets');
+
+    return view('eo.event-edit', compact('event'));
+}
 
     /**
      * 📌 Update
      */
     public function update(Request $request, Event $event)
-    {
-        $request->validate([
-            'title'     => 'required|string|max:255',
-            'location'  => 'required|string|max:255',
-            'date'      => 'required|date',
-        ]);
+{
 
-        DB::transaction(function () use ($request, $event) {
+    $user = auth('user')->user();
 
-            if ($request->hasFile('poster')) {
+    $eo = DB::table('eo')
+        ->where('user_id', $user->id)
+        ->first();
 
-                if ($event->poster && file_exists(public_path($event->poster))) {
-                    File::delete(public_path($event->poster));
-                }
+    if (!$eo || $event->eo_id != $eo->id) {
+        abort(403);
+    }
 
-                $file = $request->file('poster');
-                $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-                $file->move(public_path('images/events'), $filename);
+    $request->validate([
+        'title' => 'required|string|max:255',
+        'date' => 'required|date',
+        'location' => 'required|string|max:255',
+        'poster' => 'nullable|image|max:5120',
+    ]);
 
-                $event->poster = 'images/events/' . $filename;
+    $this->validateEventSchedule(
+        $request
+    );
+
+    DB::transaction(function () use ($request, $event) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE POSTER
+        |--------------------------------------------------------------------------
+        */
+        if ($request->hasFile('poster')) {
+
+            if (
+                $event->poster &&
+                file_exists(public_path($event->poster))
+            ) {
+                File::delete(public_path($event->poster));
             }
 
-            $event->update([
-                'title'    => $request->title,
-                'location' => $request->location,
-                'date'     => $request->date,
-                'status'   => 'pending', // 🔥 edit harus re-approve
-            ]);
+            $file = $request->file('poster');
 
-        });
+            $filename =
+                Str::uuid() . '.' .
+                $file->getClientOriginalExtension();
 
-        return redirect()
-            ->route('eo.event.index')
-            ->with('success', 'Event diperbarui & menunggu approval ulang');
-    }
+            $file->move(
+                public_path('images/events'),
+                $filename
+            );
+
+            $event->poster =
+                'images/events/' . $filename;
+        }
+
+  $updateData = [
+    'title' => $request->title,
+    'date' => $request->date,
+    'location' => $request->location,
+    'description' => $request->description,
+    'instagram' => $request->instagram,
+    'lineup' => $request->lineup,
+    'min_age' => $request->min_age,
+    'max_tickets_per_email' => $request->max_tickets_per_email,
+    'ticket_sale_start' => $request->ticket_sale_start,
+    'ticket_redeem_start' => $request->ticket_redeem_start,
+
+    'poster' => $event->poster,
+
+    // langsung aktif tanpa approval lagi
+    'status' => 'approved',
+
+    // hak edit reschedule habis setelah dipakai
+    'can_adjust_schedule' => false,
+
+    // bersihkan data request reschedule
+    'proposed_date' => null,
+    'owner_note' => null,
+    'reschedule_reason' => null,
+];
+
+$event->update($updateData);
+
+        /*
+        |--------------------------------------------------------------------------
+        | HAPUS JADWAL LAMA
+        |--------------------------------------------------------------------------
+        */
+        Ticket::where('event_id', $event->id)->delete();
+        $event->jadwals()->delete();
+
+        /*
+        |--------------------------------------------------------------------------
+        | INSERT ULANG JADWAL & TIKET
+        |--------------------------------------------------------------------------
+        */
+        if ($request->jadwal) {
+
+            foreach ($request->jadwal as $jadwalData) {
+
+                $jadwal = Jadwal::create([
+                    'event_id' => $event->id,
+                    'info' => $jadwalData['info'],
+                    'tanggal' => $jadwalData['tanggal'],
+                    'deskripsi'
+                        => $jadwalData['deskripsi'] ?? null,
+                ]);
+
+                if (!empty($jadwalData['tickets'])) {
+
+                    foreach (
+                        $jadwalData['tickets']
+                        as $ticketData
+                    ) {
+
+                        Ticket::create([
+                            'event_id' => $event->id,
+                            'jadwal_id' => $jadwal->id,
+                            'name' => $ticketData['name'],
+                            'price' => $ticketData['price'],
+                            'stock' => $ticketData['stock'],
+                            'start_sale'
+                                => $ticketData['start_sale'] ?? null,
+                            'end_sale'
+                                => $ticketData['end_sale'] ?? null,
+                        ]);
+                    }
+                }
+            }
+        }
+    });
+
+return redirect()
+    ->route('eo.event.index')
+    ->with(
+        'success',
+        'Jadwal event berhasil diperbarui.'
+    );
+}
 
     /**
      * 📌 Delete
      */
     public function destroy(Event $event)
     {
+        $user = auth('user')->user();
+
+$eo = DB::table('eo')
+    ->where('user_id', $user->id)
+    ->first();
+
+if (!$eo || $event->eo_id != $eo->id) {
+    abort(403);
+}
         if ($event->poster && file_exists(public_path($event->poster))) {
             File::delete(public_path($event->poster));
         }
@@ -218,6 +487,15 @@ public function status()
 
     public function show(Event $event)
     {
+        $user = auth('user')->user();
+
+$eo = DB::table('eo')
+    ->where('user_id', $user->id)
+    ->first();
+
+if (!$eo || $event->eo_id != $eo->id) {
+    abort(403);
+}
         $event->load([
             'jadwals.tickets'
         ]);
@@ -225,13 +503,39 @@ public function status()
         return view('eo.event-detail', compact('event'));
     }
 
-    public function editRejected(Event $event)
-    {
-        return view('eo.event-edit-rejected', compact('event'));
+public function editRejected(Event $event)
+{
+    $user = auth('user')->user();
+
+    $event->load([
+        'jadwals.tickets'
+    ]);
+
+    $eo = DB::table('eo')
+        ->where('user_id', $user->id)
+        ->first();
+
+    if (!$eo || $event->eo_id != $eo->id) {
+        abort(403);
     }
+
+    return view(
+        'eo.event-edit-rejected',
+        compact('event')
+    );
+}
 
     public function resubmit(Request $request, Event $event)
     {
+        $user = auth('user')->user();
+
+$eo = DB::table('eo')
+    ->where('user_id', $user->id)
+    ->first();
+
+if (!$eo || $event->eo_id != $eo->id) {
+    abort(403);
+}
         $request->validate([
             'title' => 'required',
             'date' => 'required',
@@ -239,11 +543,17 @@ public function status()
             'poster' => 'nullable|image|max:2048',
         ]);
 
+        $this->validateEventSchedule(
+            $request
+        );
+
         DB::transaction(function () use ($request, $event) {
 
             // =========================
             // POSTER UPDATE
             // =========================
+            $posterPath = $event->poster;
+
             if ($request->hasFile('poster')) {
 
                 if ($event->poster && file_exists(public_path($event->poster))) {
@@ -254,12 +564,14 @@ public function status()
                 $filename = \Str::uuid() . '.' . $file->getClientOriginalExtension();
                 $file->move(public_path('images/events'), $filename);
 
-                $event->poster = 'images/events/' . $filename;
+                // $event->poster = 'images/events/' . $filename;
+                $posterPath = 'images/events/' . $filename;
             }
 
             // =========================
             // UPDATE EVENT UTAMA
             // =========================
+
             $event->update([
                 'title' => $request->title,
                 'date' => $request->date,
@@ -271,7 +583,7 @@ public function status()
                 'max_tickets_per_email' => $request->max_tickets_per_email,
                 'ticket_sale_start' => $request->ticket_sale_start,
                 'ticket_redeem_start' => $request->ticket_redeem_start,
-
+                'poster' => $posterPath,
                 // penting: balik ke pending lagi
                 'status' => 'pending',
             ]);
@@ -279,6 +591,7 @@ public function status()
             // =========================
             // RESET JADWAL & TIKET (simple approach)
             // =========================
+            Ticket::where('event_id', $event->id)->delete();
             $event->jadwals()->delete();
 
             if ($request->jadwal) {
@@ -325,6 +638,7 @@ public function status()
      */
     public function requestCancel(Event $event)
     {
+        
         $user = auth('user')->user();
         $eo = DB::table('eo')->where('user_id', $user->id)->first();
 
@@ -351,17 +665,36 @@ public function status()
    
 public function showRescheduleForm(Event $event)
 {
+    $user = auth('user')->user();
+
+$eo = DB::table('eo')
+    ->where('user_id', $user->id)
+    ->first();
+
+if (!$eo || $event->eo_id != $eo->id) {
+    abort(403);
+}
     $event->load(['jadwals.tickets']);
 
     return response()->view('eo.event-reschedule', compact('event'));
 }
  public function editReschedule(Event $event)
 {
+    $user = auth('user')->user();
+
+$eo = DB::table('eo')
+    ->where('user_id', $user->id)
+    ->first();
+
+if (!$eo || $event->eo_id != $eo->id) {
+    abort(403);
+}
     return view('eo.event-reschedule', compact('event'));
 }
 
 public function requestReschedule(Request $request, Event $event)
 {
+
     $request->validate([
         'proposed_date' => 'required|date|after:now',
         'reschedule_reason' => 'required|string|max:1000',
@@ -378,7 +711,22 @@ public function requestReschedule(Request $request, Event $event)
     }
 
     if ($event->status !== 'approved') {
-        return back()->with('error', 'Hanya event approved yang bisa direschedule.');
+        return back()->with(
+            'error',
+            'Hanya event approved yang bisa direschedule.'
+        );
+    }
+
+    $currentDate = \Carbon\Carbon::parse($event->date);
+    $newDate = \Carbon\Carbon::parse($request->proposed_date);
+
+    if ($currentDate->equalTo($newDate)) {
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'Tanggal baru harus berbeda dengan tanggal event saat ini.'
+            );
     }
 
     $event->update([
@@ -387,7 +735,185 @@ public function requestReschedule(Request $request, Event $event)
         'reschedule_reason' => $request->reschedule_reason,
     ]);
 
-    return back()->with('success', 'Request reschedule berhasil dikirim.');
+    return back()->with(
+        'success',
+        'Request reschedule berhasil dikirim.'
+    );
+}
+
+private function validateEventSchedule(Request $request)
+{
+    $eventDate = \Carbon\Carbon::parse(
+        $request->date
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | EVENT
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->ticket_sale_start) {
+
+        $saleStart = \Carbon\Carbon::parse(
+            $request->ticket_sale_start
+        );
+
+        $latestStartSale =
+            $eventDate->copy()->subDays(2);
+
+        if ($saleStart->gt($latestStartSale)) {
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'Mulai penjualan tiket harus minimal H-2 sebelum event.'
+                ])->throwResponse();
+        }
+    }
+
+    if ($request->ticket_redeem_start) {
+
+        $redeemDate = \Carbon\Carbon::parse(
+            $request->ticket_redeem_start
+        );
+
+        if ($redeemDate->gt($eventDate)) {
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'Penukaran tiket tidak boleh melebihi tanggal event.'
+                ])->throwResponse();
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | JADWAL
+    |--------------------------------------------------------------------------
+    */
+
+    foreach ($request->jadwal ?? [] as $jadwal) {
+
+        $jadwalDate = \Carbon\Carbon::parse(
+            $jadwal['tanggal']
+        );
+
+        if ($jadwalDate->lt($eventDate)) {
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'Tanggal jadwal tidak boleh sebelum tanggal event.'
+                ])->throwResponse();
+        }
+
+        if (
+            $jadwalDate->gt(
+                $eventDate->copy()->addDays(14)
+            )
+        ) {
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'Jadwal maksimal 14 hari setelah tanggal event.'
+                ])->throwResponse();
+        }
+
+        foreach (
+            ($jadwal['tickets'] ?? [])
+            as $ticket
+        ) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | START SALE
+            |--------------------------------------------------------------------------
+            */
+
+            if (!empty($ticket['start_sale'])) {
+
+                $startSale =
+                    \Carbon\Carbon::parse(
+                        $ticket['start_sale']
+                    );
+
+                $latestStartSale =
+                    $eventDate->copy()->subDays(2);
+
+                if (
+                    $startSale->gt(
+                        $latestStartSale
+                    )
+                ) {
+
+                    return back()
+                        ->withInput()
+                        ->withErrors([
+                            'Penjualan tiket harus dimulai minimal H-2 sebelum event.'
+                        ])->throwResponse();
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | END SALE >= START SALE
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                !empty($ticket['start_sale']) &&
+                !empty($ticket['end_sale'])
+            ) {
+
+                $startSale =
+                    \Carbon\Carbon::parse(
+                        $ticket['start_sale']
+                    );
+
+                $endSale =
+                    \Carbon\Carbon::parse(
+                        $ticket['end_sale']
+                    );
+
+                if ($endSale->lt($startSale)) {
+
+                    return back()
+                        ->withInput()
+                        ->withErrors([
+                            'Akhir penjualan tiket tidak boleh sebelum mulai penjualan.'
+                        ])->throwResponse();
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | END SALE <= EVENT DATE
+            |--------------------------------------------------------------------------
+            */
+
+            if (!empty($ticket['end_sale'])) {
+
+                $endSale =
+                    \Carbon\Carbon::parse(
+                        $ticket['end_sale']
+                    );
+
+                if (
+                    $endSale->gt($eventDate)
+                ) {
+
+                    return back()
+                        ->withInput()
+                        ->withErrors([
+                            'Akhir penjualan tiket tidak boleh melebihi tanggal event.'
+                        ])->throwResponse();
+                }
+            }
+        }
+    }
 }
 
 

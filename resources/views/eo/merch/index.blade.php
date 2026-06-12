@@ -28,6 +28,14 @@
     color: var(--rsc-text);
   }
 
+  /* ── Alert Flash Message ── */
+  .rsc-alert {
+    padding: 14px 16px; border-radius: 10px; font-size: .85rem;
+    margin-bottom: 20px; font-weight: 500; display: flex; align-items: center; gap: 8px;
+  }
+  .rsc-alert-success { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+  .rsc-alert-error { background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; }
+
   /* ── Page header ── */
   .page-header {
     display: flex; justify-content: space-between; align-items: flex-end;
@@ -222,9 +230,7 @@
   .empty-state p { font-size: .88rem; font-weight: 600; margin: 0 0 4px; }
   .empty-state small { font-size: .78rem; }
 
-  /* ════════════════════════════════
-     MODALS
-  ════════════════════════════════ */
+  /* ── Modals Base ── */
   .rsc-modal-backdrop {
     position: fixed; inset: 0;
     background: rgba(26,18,8,.5);
@@ -279,12 +285,9 @@
     display: flex; justify-content: flex-end; gap: 10px;
   }
 
-  /* ── Modal field grid ── */
   .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .field-stack  { display: flex; flex-direction: column; gap: 14px; }
   .span2 { grid-column: span 2; }
 
-  /* ── Variant card in modal ── */
   .variant-card {
     background: var(--rsc-surface2);
     border: 1px solid var(--rsc-border);
@@ -302,7 +305,6 @@
     color: var(--rsc-accent); text-transform: uppercase; letter-spacing: 1px;
   }
 
-  /* ── Size box ── */
   .size-box {
     background: var(--rsc-surface);
     border: 1px solid var(--rsc-border);
@@ -322,29 +324,23 @@
     display: grid; grid-template-columns: 1fr 1fr 1fr auto;
     gap: 8px; margin-bottom: 8px; align-items: end;
   }
-  .size-row:last-child { margin-bottom: 0; }
 
-  /* ── File zone ── */
   .file-zone {
     border: 1.5px dashed var(--rsc-border);
     border-radius: 9px; padding: 14px 12px;
     background: var(--rsc-surface); cursor: pointer;
     text-align: center; position: relative;
-    transition: border-color .2s, background .2s;
   }
-  .file-zone:hover { border-color: var(--rsc-accent); background: var(--rsc-accent-dim); }
   .file-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
   .file-zone-text { font-size: .75rem; color: var(--rsc-muted); }
   .file-zone-text span { color: var(--rsc-accent); font-weight: 700; }
 
-  /* ── Detail modal image ── */
   #detailImage {
     width: 100%; max-height: 280px; object-fit: cover;
     border-radius: 10px; margin-bottom: 14px;
     border: 1px solid var(--rsc-border);
   }
 
-  /* ── Detail variant rows ── */
   .detail-variant-card {
     background: var(--rsc-surface2);
     border: 1px solid var(--rsc-border);
@@ -362,27 +358,16 @@
   }
   .detail-size-row:last-child { border-bottom: none; }
 
-  /* ── Delete confirm ── */
-  .delete-confirm-body {
-    text-align: center; padding: 28px 24px;
-  }
+  .delete-confirm-body { text-align: center; padding: 28px 24px; }
   .delete-icon {
     width: 52px; height: 52px; border-radius: 50%;
     background: #FEF2F2; display: flex; align-items: center; justify-content: center;
     margin: 0 auto 14px;
   }
-  .delete-confirm-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 1rem; font-weight: 800; margin-bottom: 6px;
-  }
+  .delete-confirm-title { font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 800; margin-bottom: 6px; }
   .delete-confirm-sub { font-size: .82rem; color: var(--rsc-muted); }
-  .delete-confirm-footer {
-    display: flex; gap: 10px; padding: 16px 24px;
-    border-top: 1px solid var(--rsc-border);
-    background: var(--rsc-surface2);
-  }
+  .delete-confirm-footer { display: flex; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--rsc-border); background: var(--rsc-surface2); }
 
-  /* ── Responsive ── */
   @media (max-width: 640px) {
     .filter-grid { grid-template-columns: 1fr; }
     .field-grid-2 { grid-template-columns: 1fr; }
@@ -399,6 +384,15 @@
 
 <div class="rsc-wrap">
 
+  {{-- Flash Messages Alert --}}
+
+  @if(session('error'))
+    <div class="rsc-alert rsc-alert-error">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      {{ session('error') }}
+    </div>
+  @endif
+
   {{-- Header --}}
   <div class="page-header">
     <div>
@@ -406,8 +400,7 @@
       <p>Tambah dan kelola produk merch untuk event kamu</p>
     </div>
     <button type="button" class="btn-primary" onclick="openModal('createMerchModal')">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2.8">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
       Tambah Merch
@@ -424,8 +417,7 @@
           <select name="event_id" class="rsc-input">
             <option value="">Semua Event</option>
             @foreach($events as $event)
-              <option value="{{ $event->id }}"
-                {{ request('event_id') == $event->id ? 'selected' : '' }}>
+              <option value="{{ $event->id }}" {{ request('event_id') == $event->id ? 'selected' : '' }}>
                 {{ $event->title }}
               </option>
             @endforeach
@@ -433,13 +425,10 @@
         </div>
         <div class="field-group">
           <label>Cari Produk</label>
-          <input type="text" name="search" class="rsc-input"
-                 placeholder="Nama merchandise…"
-                 value="{{ request('search') }}">
+          <input type="text" name="search" class="rsc-input" placeholder="Nama merchandise…" value="{{ request('search') }}">
         </div>
         <button type="submit" class="btn-primary" style="height:40px; align-self:end;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
           Filter
@@ -454,16 +443,15 @@
     @forelse($products as $product)
     @php $firstVarian = $product->varians->first(); @endphp
 
-    <div class="product-card" onclick='showDetail(@json($product))'>
+    {{-- Penyimpanan objek aman menggunakan data attribute HTML5 --}}
+    <div class="product-card" data-product="{{ json_encode($product) }}" onclick="showDetail(this)">
 
       <div class="product-poster">
         @if($firstVarian && $firstVarian->images->first())
-          <img src="{{ asset($firstVarian->images->first()->url) }}"
-               alt="{{ $product->name }}">
+          <img src="{{ asset($firstVarian->images->first()->url) }}" alt="{{ $product->name }}">
         @else
           <div class="poster-placeholder">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
-                 stroke="#E8470A" stroke-width="1.2" opacity=".25">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8470A" stroke-width="1.2" opacity=".25">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
@@ -474,12 +462,9 @@
 
       <div class="product-body">
         <div class="event-badge">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.5">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <rect x="3" y="4" width="18" height="18" rx="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
           {{ $product->event->title ?? '-' }}
         </div>
@@ -493,23 +478,17 @@
       </div>
 
       <div class="product-actions" onclick="event.stopPropagation()">
-        <button class="btn-sm btn-sm-dark"
-                onclick='openEditModal(@json($product))'>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.5">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-          Edit
-        </button>
-        <button class="btn-sm btn-sm-danger"
-                onclick='openDeleteModal({{ $product->id }})'>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.5">
+        <a href="{{ route('eo.merch.edit', $product->id) }}" class="btn-sm btn-sm-dark">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+        </a>
+        <button class="btn-sm btn-sm-danger" onclick="openDeleteModal({{ $product->id }})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
           </svg>
           Hapus
         </button>
@@ -518,11 +497,8 @@
     </div>
     @empty
     <div class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
-           stroke="#E8470A" stroke-width="1">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <polyline points="21 15 16 10 5 21"/>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E8470A" stroke-width="1">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
       </svg>
       <p>Belum ada merchandise</p>
       <small>Mulai dengan menambahkan produk pertama</small>
@@ -546,9 +522,7 @@
       </div>
 
       <div class="modal-body">
-
         <div class="section-title">Info Produk</div>
-
         <div class="field-grid-2" style="margin-bottom:14px;">
           <div class="field-group">
             <label>Event</label>
@@ -561,41 +535,28 @@
           </div>
           <div class="field-group">
             <label>Nama Produk</label>
-            <input type="text" name="name" class="rsc-input"
-                   placeholder="Nama merchandise" required>
+            <input type="text" name="name" class="rsc-input" placeholder="Nama merchandise" required>
           </div>
           <div class="field-group span2">
             <label>Deskripsi</label>
-            <textarea name="description" class="rsc-input"
-                      placeholder="Deskripsi singkat produk…"></textarea>
+            <textarea name="description" class="rsc-input" placeholder="Deskripsi singkat produk…"></textarea>
           </div>
         </div>
 
         <div class="section-title" style="margin-top:8px;">Varian Produk</div>
-
         <div id="variant-wrapper"></div>
 
         <button type="button" class="btn-sm btn-sm-accent" onclick="addVariant()" style="margin-top:4px;">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.8">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Tambah Varian
         </button>
-
       </div>
 
       <div class="modal-footer">
         <button type="button" class="btn-ghost" onclick="closeModal('createMerchModal')">Batal</button>
-        <button type="submit" class="btn-primary">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.5">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          Simpan Merchandise
-        </button>
+        <button type="submit" class="btn-primary">Simpan Merchandise</button>
       </div>
     </form>
   </div>
@@ -612,12 +573,8 @@
     </div>
     <div class="modal-body">
       <div style="display:flex; align-items:center; gap:7px; margin-bottom:12px;">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-             stroke="#8A7E76" stroke-width="2">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8A7E76" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
         <span id="detailEvent" style="font-size:.75rem; color:#8A7E76;"></span>
       </div>
@@ -626,40 +583,6 @@
       <div class="section-title">Varian</div>
       <div id="detailVariant"></div>
     </div>
-  </div>
-</div>
-
-{{-- ═══════════════════════════════
-     MODAL: EDIT
-═══════════════════════════════ --}}
-<div id="editMerchModal" class="rsc-modal-backdrop" onclick="backdropClose(event, 'editMerchModal')">
-  <div class="rsc-modal modal-md">
-    <form id="editMerchForm" method="POST">
-      @csrf
-      @method('PUT')
-
-      <div class="modal-header">
-        <h3 class="modal-title">Edit Merchandise</h3>
-        <button type="button" class="btn-close-modal" onclick="closeModal('editMerchModal')">✕</button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="edit_id">
-        <div class="field-stack">
-          <div class="field-group">
-            <label>Nama Produk</label>
-            <input type="text" name="name" id="edit_name" class="rsc-input" required>
-          </div>
-          <div class="field-group">
-            <label>Deskripsi</label>
-            <textarea name="description" id="edit_desc" class="rsc-input"></textarea>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-ghost" onclick="closeModal('editMerchModal')">Batal</button>
-        <button type="submit" class="btn-primary">Update</button>
-      </div>
-    </form>
   </div>
 </div>
 
@@ -673,22 +596,16 @@
       @method('DELETE')
       <div class="delete-confirm-body">
         <div class="delete-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-               stroke="#B91C1C" stroke-width="2.2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B91C1C" stroke-width="2.2">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
           </svg>
         </div>
         <div class="delete-confirm-title">Hapus Merchandise?</div>
         <div class="delete-confirm-sub">Tindakan ini tidak bisa dibatalkan.</div>
       </div>
       <div class="delete-confirm-footer">
-        <button type="button" class="btn-ghost" style="flex:1; justify-content:center;"
-                onclick="closeModal('deleteMerchModal')">Batal</button>
-        <button type="submit" class="btn-primary" style="flex:1; justify-content:center;
-                background:#B91C1C;">Hapus</button>
+        <button type="button" class="btn-ghost" style="flex:1; justify-content:center;" onclick="closeModal('deleteMerchModal')">Batal</button>
+        <button type="submit" class="btn-primary" style="flex:1; justify-content:center; background:#B91C1C;">Hapus</button>
       </div>
     </form>
   </div>
@@ -711,19 +628,17 @@ function addVariant() {
   <div class="variant-card">
     <div class="variant-card-header">
       <span class="variant-label">Varian #${vIdx + 1}</span>
-      <button type="button" class="btn-sm btn-sm-danger"
-              onclick="this.closest('.variant-card').remove()">✕ Hapus</button>
+      <button type="button" class="btn-sm btn-sm-danger" onclick="this.closest('.variant-card').remove()">✕ Hapus</button>
     </div>
     <div class="field-grid-2" style="margin-bottom:12px;">
       <div class="field-group">
         <label>Nama Varian</label>
-        <input type="text" name="varians[${vIdx}][varian]"
-               class="rsc-input" placeholder="Misal: Hitam, Putih" required>
+        <input type="text" name="varians[${vIdx}][varian]" class="rsc-input" placeholder="Misal: Hitam, Putih" required>
       </div>
       <div class="field-group">
         <label>Gambar Varian</label>
         <div class="file-zone">
-          <input type="file" name="varians[${vIdx}][image]" accept="image/*">
+          <input type="file" name="varians[${vIdx}][image]" accept="image/*" required>
           <div class="file-zone-text"><span>Pilih gambar</span></div>
         </div>
       </div>
@@ -731,9 +646,7 @@ function addVariant() {
     <div class="size-box">
       <div class="size-box-header">
         <span class="size-box-label">Ukuran & Harga</span>
-        <button type="button" class="btn-sm btn-sm-accent" onclick="addUkuran(${vIdx})">
-          + Ukuran
-        </button>
+        <button type="button" class="btn-sm btn-sm-accent" onclick="addUkuran(${vIdx})">+ Ukuran</button>
       </div>
       <div id="ukuran-wrapper-${vIdx}"></div>
     </div>
@@ -746,27 +659,23 @@ function addVariant() {
 
 function addUkuran(vIdx) {
   const wrapper = document.getElementById(`ukuran-wrapper-${vIdx}`);
-  const uid = Date.now();
+  const uid = Date.now() + Math.floor(Math.random() * 100);
 
   const html = `
   <div class="size-row">
     <div class="field-group">
       <label>Ukuran</label>
-      <input type="text" name="varians[${vIdx}][ukurans][${uid}][ukuran]"
-             class="rsc-input" placeholder="S / M / L" required>
+      <input type="text" name="varians[${vIdx}][ukurans][${uid}][ukuran]" class="rsc-input" placeholder="S / M / L" required>
     </div>
     <div class="field-group">
       <label>Harga</label>
-      <input type="number" name="varians[${vIdx}][ukurans][${uid}][harga]"
-             class="rsc-input" placeholder="0" required>
+      <input type="number" name="varians[${vIdx}][ukurans][${uid}][harga]" class="rsc-input" placeholder="0" required>
     </div>
     <div class="field-group">
       <label>Stok</label>
-      <input type="number" name="varians[${vIdx}][ukurans][${uid}][stok]"
-             class="rsc-input" placeholder="0" required>
+      <input type="number" name="varians[${vIdx}][ukurans][${uid}][stok]" class="rsc-input" placeholder="0" required>
     </div>
-    <button type="button" class="btn-sm btn-sm-danger" style="margin-top:22px; height:38px;"
-            onclick="this.closest('.size-row').remove()">✕</button>
+    <button type="button" class="btn-sm btn-sm-danger" style="margin-top:22px; height:38px;" onclick="this.closest('.size-row').remove()">✕</button>
   </div>`;
 
   wrapper.insertAdjacentHTML('beforeend', html);
@@ -775,7 +684,10 @@ function addUkuran(vIdx) {
 document.addEventListener('DOMContentLoaded', () => addVariant());
 
 /* ── Detail modal ── */
-function showDetail(product) {
+function showDetail(element) {
+  // Parsing JSON super aman dari attribute element tanpa merusak kutip tunggal javascript
+  const product = JSON.parse(element.getAttribute('data-product'));
+
   document.getElementById('detailTitle').innerText = product.name ?? '-';
   document.getElementById('detailDesc').innerText  = product.description ?? '-';
   document.getElementById('detailEvent').innerText = product.event?.title ?? '-';
@@ -810,14 +722,6 @@ function showDetail(product) {
   }
   document.getElementById('detailVariant').innerHTML = html;
   openModal('detailModal');
-}
-
-/* ── Edit modal ── */
-function openEditModal(product) {
-  document.getElementById('edit_name').value = product.name ?? '';
-  document.getElementById('edit_desc').value = product.description ?? '';
-  document.getElementById('editMerchForm').action = `/eo/merch/${product.id}`;
-  openModal('editMerchModal');
 }
 
 /* ── Delete modal ── */

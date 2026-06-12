@@ -221,12 +221,11 @@
                     Request Cancel
                 </button>
             </form>
-
-            <button
-                onclick="openEventModal({{ $event->id }}, 'reschedule')"
-                class="px-4 py-2 text-sm rounded-xl bg-blue-600 text-white hover:bg-blue-700">
-                Request Reschedule
-            </button>
+                <button
+                    onclick="openRescheduleModal({{ $event->id }})"
+                    class="px-4 py-2 text-sm rounded-xl bg-blue-600 text-white">
+                    Request Reschedule
+                </button>
 
         @elseif($event->status == 'rejected')
 
@@ -244,6 +243,8 @@
 <script>
 function openEventModal(eventId, type)
 {
+    console.log('TYPE =', type);
+
     const modal = document.getElementById('eventModal');
     const content = document.getElementById('eventModalContent');
     const title = document.getElementById('modalTitle');
@@ -257,39 +258,26 @@ function openEventModal(eventId, type)
         url = `/eo/event/${eventId}/edit-rejected`;
         title.innerText = 'Perbaiki Event';
     }
-    else if (type === 'reschedule') {
-        url = `/eo/event/${eventId}/reschedule`;
-        title.innerText = 'Request Reschedule';
-    }
     else {
         url = `/eo/event/${eventId}`;
+        title.innerText = 'Detail Event';
     }
 
-    content.innerHTML = `<div class="py-10 text-center text-gray-500">Memuat form...</div>`;
-
-fetch(url, {
-    headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'text/html'
-    }
-})
-.then(async (res) => {
-
-    if (!res.ok) {
-        throw new Error('HTTP ' + res.status);
-    }
-
-    const html = await res.text();
-
-    // DEBUG SAFETY (biar gak ketipu full page event detail)
-    if (html.includes('Jadwal & Tiket') && html.includes('Approved')) {
-        console.warn('Kemungkinan halaman detail event masuk ke modal');
-    }
-
-    content.innerHTML = html;
-})
-.catch(err => {
-    console.error(err);
-});
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+            content.innerHTML = html;
+        });
 }
-<script>
+
+function openRescheduleModal(eventId)
+{
+    console.log('RESCHEDULE', eventId);
+
+    fetch(`/eo/event/${eventId}/reschedule`)
+        .then(res => res.text())
+        .then(html => {
+            document.getElementById('eventModalContent').innerHTML = html;
+        });
+}
+</script>

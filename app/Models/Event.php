@@ -25,6 +25,10 @@ class Event extends Model
         'max_tickets_per_email',
         'status',
         'eo_note',
+        'proposed_date',
+        'reschedule_reason',
+        'can_adjust_schedule',
+        'owner_note',
     ];
 
     protected $casts = [

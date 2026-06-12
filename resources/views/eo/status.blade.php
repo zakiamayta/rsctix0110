@@ -198,12 +198,12 @@
     {{-- FOOTER --}}
     <div class="px-3 pb-3">
         @if($event->status === 'rejected')
-            <button
-                onclick="openEditRejectedModal({{ $event->id }})"
-                class="w-full text-center text-xs font-bold py-2 rounded-md transition-colors hover:bg-orange-50"
+            <a
+                href="{{ route('eo.event.edit-rejected', $event->id) }}"
+                class="w-full block text-center text-xs font-bold py-2 rounded-md transition-colors hover:bg-orange-50"
                 style="border:1px solid #E8470A; color:#E8470A;">
                 Edit & Re-Submit
-            </button>
+            </a>
         @else
             <button
                 onclick="openEventModal({{ $event->id }})"
@@ -261,46 +261,10 @@
     </div>
 </div>
 
-{{-- MODAL RE-SUBMIT (FORM EDIT JIKA REJECTED) --}}
-<div id="editRejectedModal"
-     class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl w-full max-w-7xl max-h-[90vh] overflow-y-auto">
-        <div class="p-5 border-b flex justify-between items-center">
-            <h3 class="font-bold text-lg" style="font-family:'Sora',sans-serif; color:#1A1208;">Edit Event (Re-Submit)</h3>
-            <button onclick="closeEditRejectedModal()" class="text-gray-500 hover:text-red-500 text-xl">✕</button>
-        </div>
-        <div id="editRejectedContent">
-            {{-- DATA FORM UTUH DIAKSER VIA AJAX --}}
-        </div>
-    </div>
-</div>
 
 <script>
 // Fungsi Modal Edit Re-Submit Event Terpilih
-function openEditRejectedModal(id)
-{
-    const content = document.getElementById('editRejectedContent');
-    content.innerHTML = `<div class="py-10 text-center text-gray-500">Memuat Form Perbaikan...</div>`;
-    
-    document.getElementById('editRejectedModal').classList.remove('hidden');
-    document.getElementById('editRejectedModal').classList.add('flex');
 
-    fetch(`/eo/event/${id}/edit-rejected`)
-        .then(res => res.text())
-        .then(html => {
-            content.innerHTML = html;
-        })
-        .catch(err => {
-            content.innerHTML = `<div class="py-10 text-center text-red-500">Gagal mengambil data form edit.</div>`;
-        });
-}
-
-function closeEditRejectedModal()
-{
-    const modal = document.getElementById('editRejectedModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
 
 // Fungsi Modal Lihat Detail Event Terpilih
 function openEventModal(eventId)
@@ -338,9 +302,6 @@ window.addEventListener('click', function(e)
 
     if (e.target === eventModal) {
         closeEventModal();
-    }
-    if (e.target === editRejectedModal) {
-        closeEditRejectedModal();
     }
 });
 </script>

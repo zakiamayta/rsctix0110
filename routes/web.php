@@ -363,6 +363,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/events/{event}', [EventApprovalController::class, 'show'])->name('events.show');
         Route::post('/events/{event}/approve', [EventApprovalController::class, 'approve'])->name('events.approve');
         Route::post('/events/{event}/reject', [EventApprovalController::class, 'reject'])->name('events.reject');
+        Route::put(
+            '/events/{event}/approve-reschedule',
+            [EventApprovalController::class, 'approveReschedule']
+        )->name('events.approve-reschedule');
+
+        Route::put(
+            '/events/{event}/reject-reschedule',
+            [EventApprovalController::class, 'rejectReschedule']
+        )->name('events.reject-reschedule');
         
         // Persetujuan Pembatalan Event oleh Owner
         Route::put('/events/{event}/confirm-cancel', [EventApprovalController::class, 'confirmCancel'])->name('events.confirm-cancel');

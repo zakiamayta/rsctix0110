@@ -114,35 +114,28 @@ class EventApprovalController extends Controller
     /**
      * ✅ Owner menyetujui perubahan jadwal (Reschedule)
      */
-    public function approveReschedule(Event $event)
-    {
-        if ($event->status !== 'pending_reschedule' || !$event->proposed_date) {
-            abort(400, 'Bukan pengajuan reschedule yang sah.');
-        }
-
-        // Memakai Database Transaction agar jika salah satu tabel gagal, data aman tidak korup
-        DB::transaction(function () use ($event) {
-            
-            // 1. Pindahkan proposed_date ke date utama, set status balik ke approved
-            $event->update([
-                'date'          => $event->proposed_date,
-                'status'        => 'approved',
-                'proposed_date' => null // dikosongkan kembali setelah disetujui
-            ]);
-
-            // 2. Samakan tanggal di tabel `jadwal` yang terikat dengan event ini
-            DB::table('jadwal')
-                ->where('event_id', $event->id)
-                ->update([
-                    'tanggal'    => $event->date,
-                    'updated_at' => now()
-                ]);
-        });
-
-        return redirect()
-            ->route('owner.events.index')
-            ->with('success', 'Perubahan jadwal event berhasil disetujui!');
+public function approveReschedule(Event $event)
+{
+    if ($event->status !== 'pending_reschedule') {
+        abort(400);
     }
+
+    $event->update([
+        'date' => $event->proposed_date,
+        'status' => 'approved',
+        'proposed_date' => null,
+
+        // kasih hak edit sekali
+        'can_adjust_schedule' => true,
+    ]);
+
+    return redirect()
+        ->route('owner.events.index')
+        ->with(
+            'success',
+            'Reschedule disetujui. EO dapat melakukan penyesuaian jadwal satu kali.'
+        );
+}
 
     /**
      * ❌ Owner menolak perubahan jadwal
