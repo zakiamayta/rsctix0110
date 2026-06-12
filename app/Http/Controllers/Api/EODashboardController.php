@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage; 
 use Illuminate\Http\Request;
 use Carbon\Carbon;
-
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 class EODashboardController extends Controller
 {
     public function index(Request $request)
@@ -320,6 +321,7 @@ class EODashboardController extends Controller
             'data' => [
                 'transaction' => [
                     'id' => $transaction->id,
+                    'kode_unik' => $transaction->kode_unik ?? '-', // 🔥 BARIS INI YANG MEMPERBAIKI BUG
                     'event_title' => $transaction->event_title,
                     'email' => $transaction->email,
                     'payment_status' => $transaction->payment_status,
@@ -332,6 +334,19 @@ class EODashboardController extends Controller
                 ],
                 'attendees' => $attendees,
             ]
+        ]);
+    }
+    public function generateWebToken(Request $request) 
+    {
+        $user = $request->user(); // Mengambil user dari token Sanctum/Passport
+        $token = Str::random(40);
+
+        // Simpan token di cache selama 2 menit. Key: token, Value: user_id
+        Cache::put('web_autologin_' . $token, $user->id, now()->addMinutes(2));
+
+        return response()->json([
+            'success' => true,
+            'token' => $token // Cukup kirim tokennya saja, URL-nya biar Flutter yang susun
         ]);
     }
 }

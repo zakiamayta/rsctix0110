@@ -14,7 +14,8 @@ use App\Http\Controllers\Api\DetailEventController;
 use App\Http\Controllers\Api\MerchController;
 use App\Http\Controllers\Api\EOTicketController;
 use App\Http\Controllers\Api\EOMerchController;
-
+use App\Http\Controllers\Api\OwnerDashboardController;
+use App\Http\Controllers\Api\OwnerApprovalController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC API
@@ -192,4 +193,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // 3. Endpoint Eksekusi Pengajuan Tarik Dana Merch + Upload Invoice
     Route::post('/merch/withdraw', [EOMerchController::class, 'requestMerchWithdraw']);
     Route::get('/merch-sales', [EOMerchController::class, 'getMerchSales']); 
-});
+    Route::get('/merch-sales/{transactionId}', [EOMerchController::class, 'show']);
+
+    Route::post('/eo/generate-web-token', [EODashboardController::class, 'generateWebToken']);
+    Route::get('/owner/dashboard', [OwnerDashboardController::class, 'index']);
+    Route::get('/owner/approval/eo', [OwnerApprovalController::class, 'index']);
+    Route::post('/owner/approval/eo/{id}', [OwnerApprovalController::class, 'processApproval']);
+    });

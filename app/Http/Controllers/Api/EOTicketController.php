@@ -12,34 +12,38 @@ class EOTicketController extends Controller
     public function index(Request $request)
     {
         try {
-            // 1. Validasi input fleksibel (event_id opsional)
             $request->validate([
                 'eo_id' => 'required|integer',
                 'event_id' => 'nullable|integer', 
             ]);
 
-            // 2. Query data menggunakan JOIN ke tabel events dan eo agar info bank & event terbaca real-time oleh Flutter
+            // 1. Tambahkan LEFT JOIN ke tabel transactions berdasarkan event_id atau foreign key yang sesuai
             $query = DB::table('withdrawals')
                 ->join('events', 'withdrawals.event_id', '=', 'events.id')
-                ->join('eo', 'withdrawals.eo_id', '=', 'eo.id') // <-- Mengambil info bank langsung dari tabel eo
+                ->join('eo', 'withdrawals.eo_id', '=', 'eo.id')
+                // Ambil transaksi pertama yang paid untuk mengambil data kode_unik dari event tersebut
+                ->leftJoin('transactions', function($join) {
+                    $join->on('withdrawals.event_id', '=', 'transactions.event_id')
+                        ->where('transactions.payment_status', '=', 'paid');
+                })
                 ->where('withdrawals.eo_id', $request->eo_id)
                 ->select(
                     'withdrawals.*', 
                     'events.title as event_name',
                     'eo.bank_name',
                     'eo.account_number',
-                    'eo.account_name'
-                );
+                    'eo.account_name',
+                    'transactions.kode_unik as trx_kode_unik' // <-- Ambil kode_unik database di sini
+                )
+                // Grouping agar data withdrawal tidak duplikat jika transaksi paid ada banyak
+                ->groupBy('withdrawals.id', 'events.title', 'eo.bank_name', 'eo.account_number', 'eo.account_name', 'transactions.kode_unik');
 
-            // 3. Filter kondisional berdasarkan event jika dikirim dari front-end
             if ($request->has('event_id') && !is_null($request->event_id)) {
                 $query->where('withdrawals.event_id', $request->event_id);
             }
 
-            // 4. Ambil data dengan urutan terbaru
             $history = $query->orderByDesc('withdrawals.id')->get();
 
-            // 5. Format ulang JSON agar 100% klop dengan komponen BottomSheet & Card di Flutter
             $formattedHistory = $history->map(function ($item) {
                 return [
                     'id' => $item->id,
@@ -49,13 +53,16 @@ class EOTicketController extends Controller
                     'transfer_proof' => $item->transfer_proof,
                     'event_name' => $item->event_name ?? 'Event Tidak Diketahui',
                     
-                    // Detail BottomSheet di Flutter diambil langsung dari hasil JOIN eo
+                    // ========================================================
+                    // SEKARANG KODE_UNIK SUDAH DI-MAPPING DAN DIKIRIM KE FLUTTER
+                    // ========================================================
+                    'kode_unik' => $item->trx_kode_unik ?? '-', 
+                    
                     'reference_number' => $item->reference_number ?? '-',
                     'bank_name' => $item->bank_name ?? '-',
                     'account_number' => $item->account_number ?? '-',
                     'account_name' => $item->account_name ?? '-',
                     
-                    // Format tanggal rapi menggunakan Carbon
                     'created_at' => $item->created_at ? Carbon::parse($item->created_at)->format('d M Y, H:i') : '-',
                     'approved_at' => $item->approved_at ? Carbon::parse($item->approved_at)->format('d M Y, H:i') : null,
                     'paid_at' => $item->paid_at ? Carbon::parse($item->paid_at)->format('d M Y, H:i') : null,

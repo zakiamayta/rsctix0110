@@ -351,8 +351,49 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get('/qrcodes/{filename}', function ($filename) {
-    $path = base_path('public_html/qrcodes/' . $filename);
-    if (!file_exists($path)) abort(404);
-    return response()->file($path);
-})->where('filename', '.*');
+// Route::get('/qrcodes/{filename}', function ($filename) {
+//     $path = base_path('public_html/qrcodes/' . $filename);
+//     if (!file_exists($path)) abort(404);
+//     return response()->file($path);
+// })->where('filename', '.*');
+
+// // 🔥 PINTU MASUK AUTO-LOGIN FLUTTER (VERSI AMAN TANPA PERLU IMPORT DI ATAS FILE)
+// // 🔥 PINTU MASUK AUTO-LOGIN (VERSI KUAT DENGAN PENGUNCI SESI & DEBUG)
+// Route::get('/autologin', function () {
+//     $token = request()->query('token');
+
+//     if (!$token) {
+//         return response("Error: Token tidak ditemukan pada URL.", 400);
+//     }
+
+//     // 1. Ambil ID User dari Cache
+//     $userId = \Illuminate\Support\Facades\Cache::get('web_autologin_' . $token);
+
+//     // 🔍 KONDISI DEBUG 1: Jika Token tidak ditemukan di Cache
+//     if (!$userId) {
+//         return response()->json([
+//             'status' => 'Gagal Auto-Login',
+//             'alasan' => 'Token sudah kedaluwarsa (di atas 2 menit) atau Cache antar-driver tidak sinkron.',
+//             'token_yang_dikirim_flutter' => $token
+//         ], 403);
+//     }
+
+//     // 2. Eksekusi Login Menggunakan ID
+//     // Tambahkan parameter 'true' di belakang agar Laravel membuat 'Remember Me' cookie yang lebih persisten
+//     $loginSukses = \Illuminate\Support\Facades\Auth::loginUsingId($userId, true);
+
+//     // 🔍 KONDISI DEBUG 2: Jika ID user ternyata tidak ada di tabel users
+//     if (!$loginSukses) {
+//         return response("Error: User dengan ID: {$userId} tidak ditemukan di database.", 404);
+//     }
+
+//     // 3. 🔥 JALUR CRUCIAL: Kunci Sesi ke Browser (Wajib untuk Cloudflare Tunnel)
+//     request()->session()->regenerate();
+//     request()->session()->save();
+
+//     // 4. Hapus token dari cache setelah berhasil digunakan demi keamanan
+//     \Illuminate\Support\Facades\Cache::forget('web_autologin_' . $token);
+
+//     // 5. Alihkan ke halaman dashboard tujuan
+//     return redirect('/eo/event'); 
+// });

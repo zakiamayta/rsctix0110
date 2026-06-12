@@ -441,30 +441,34 @@ class EOMerchController extends Controller
     }
 
     /**
-     * 4. GET DAFTAR TRANSAKSI PENJUALAN MERCHANDISE (FIXED RELASI & KOLOM)
+     * 4. GET DAFTAR TRANSAKSI PENJUALAN MERCHANDISE (DENGAN FILTER EVENT)
      */
-    
     public function getMerchSales(Request $request)
     {
         try {
-            $eoId = auth()->user()->id;
-
-            // Menggunakan leftJoin agar data detail tetap muncul walaupun induknya kosong
-            $sales = DB::table('transaction_merch_details as tmd')
+            $query = DB::table('transaction_merch_details as tmd')
                 ->leftJoin('transaction_merch as tm', 'tmd.transaction_merch_id', '=', 'tm.id')
                 ->join('products as p', 'tmd.product_id', '=', 'p.id')
                 ->join('events as e', 'p.event_id', '=', 'e.id')
-                // ->where('e.eo_id', $eoId) // Buka tanda komen ini jika nanti eo_id di DB sudah tepat
                 ->select(
-                    'tmd.transaction_merch_id as transaction_id', // Ambil ID langsung dari detail demi keamanan testing
+                    'tmd.transaction_merch_id as transaction_id',
                     'tm.kode_unik as invoice_number',
                     'tm.payment_status',
                     'tm.created_at as transaction_date',
                     'e.title as event_title',
                     'tmd.buyer_name', 
                     DB::raw('SUM(tmd.subtotal) as total_amount')
-                )
-                ->groupBy(
+                );
+
+            // 🛠️ FILTER: Jika Flutter mengirim parameter eo_id atau event_id
+            if ($request->has('eo_id') && !is_null($request->eo_id)) {
+                $query->where('e.eo_id', $request->eo_id);
+            }
+            if ($request->has('event_id') && !is_null($request->event_id) && $request->event_id != 0) {
+                $query->where('p.event_id', $request->event_id);
+            }
+
+            $sales = $query->groupBy(
                     'tmd.transaction_merch_id', 
                     'tm.kode_unik', 
                     'tm.payment_status', 
@@ -472,16 +476,17 @@ class EOMerchController extends Controller
                     'e.title', 
                     'tmd.buyer_name'
                 )
+                ->orderByDesc('tmd.transaction_merch_id')
                 ->get();
 
             $formattedSales = $sales->map(function ($item) {
                 return [
                     'id' => $item->transaction_id,
-                    'invoice_number' => $item->invoice_number ?? 'INV-DUMMY', // Fallback jika tm.kode_unik null
+                    'invoice_number' => $item->invoice_number ?? 'INV-DUMMY', 
                     'event_title' => $item->event_title,
                     'buyer_name' => $item->buyer_name ?? 'Pembeli',
                     'amount' => (int) $item->total_amount,
-                    'payment_status' => $item->payment_status ?? 'paid', // Fallback jika tm.payment_status null
+                    'payment_status' => $item->payment_status ?? 'paid', 
                     'payment_method' => 'Xendit Gateway',
                     'created_at' => $item->transaction_date ? Carbon::parse($item->transaction_date)->toIso8601String() : Carbon::now()->toIso8601String(),
                 ];
@@ -499,8 +504,115 @@ class EOMerchController extends Controller
             ], 500);
         }
     }
-    
+
+    /**
+     * 5. GET DETAIL TRANSAKSI PENJUALAN MERCHANDISE (FIXED GAMBAR & GROUPBY)
+     */
+    public function show(Request $request, $transactionId)
+    {
+        try {
+            // 1. Ambil data utama asli langsung dari tabel induk 'transaction_merch' agar nominal riil tidak terduplikasi akibat SQL SUM
+            $transaction = DB::table('transaction_merch')
+                ->where('id', $transactionId)
+                ->first();
+
+            if (!$transaction) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Detail transaksi penjualan merch tidak ditemukan.'
+                ], 404);
+            }
+
+            // Ambil salah satu nama pembeli dari detail untuk data pelengkap UI
+            $buyerName = DB::table('transaction_merch_details')
+                ->where('transaction_merch_id', $transactionId)
+                ->value('buyer_name') ?? 'Pembeli';
+
+            // 2. Ambil seluruh item belanjaan di dalam transaksi ini
+            $items = DB::table('transaction_merch_details as tmd')
+                ->join('products as p', 'tmd.product_id', '=', 'p.id')
+                ->leftJoin('products_ukuran as pu', 'tmd.ukuran_id', '=', 'pu.id')
+                ->leftJoin('products_varian as pv', 'tmd.varian_id', '=', 'pv.id')
+                ->where('tmd.transaction_merch_id', $transactionId)
+                ->select([
+                    'tmd.id as detail_id',
+                    'p.name as product_name',
+                    'pv.id as varian_id',
+                    'pv.varian as varian_name',
+                    'pu.ukuran as ukuran_name',
+                    'tmd.quantity', 
+                    'tmd.price', 
+                    'tmd.subtotal'
+                ])
+                ->get();
+
+            // 3. Pasangkan URL Gambar secara dinamis menggunakan helper formatImage agar aman & sinkron ke Flutter
+            $formattedItems = $items->map(function ($item) {
+                $imageUrl = null;
+                if (!is_null($item->varian_id)) {
+                    $imageUrl = DB::table('images')
+                        ->where('product_varian_id', $item->varian_id)
+                        ->orderBy('id', 'asc')
+                        ->value('url');
+                }
+
+                return [
+                    'product_name'  => $item->product_name ?? 'Produk Merch',
+                    'varian_name'   => $item->varian_name ?? '-',
+                    'ukuran_name'   => $item->ukuran_name ?? '-',
+                    'quantity'      => (int) ($item->quantity ?? 1),
+                    'price'         => (int) ($item->price ?? 0),
+                    'subtotal'      => (int) ($item->subtotal ?? 0),
+                    'product_image' => $this->formatImage($imageUrl)
+                ];
+            });
+
+            // 4. Format objek transaksi induk disesuaikan dengan struktur asli MerchController pembeli
+            $formattedTransaction = [
+                'invoice_number' => $transaction->kode_unik ?? 'INV-DUMMY',
+                'buyer_name'     => $buyerName,
+                'email'          => $transaction->email ?? '-',
+                'payment_method' => $transaction->payment_method ?? ($transaction->grand_total == 0 ? 'Free' : 'Xendit Gateway'),
+                'payment_status' => $transaction->payment_status ?? 'paid',
+                'created_at'     => $transaction->created_at ? Carbon::parse($transaction->created_at)->toIso8601String() : now()->toIso8601String(),
+                'total_amount'   => (int) $transaction->total_amount,
+                'service_fee'    => (int) ($transaction->service_tax ?? 0),
+                'total_price'    => (int) $transaction->grand_total,
+            ];
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Berhasil memuat data detail.',
+                'data'    => [
+                    'transaction' => $formattedTransaction,
+                    'items'       => $formattedItems
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Gagal memuat detail transaksi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     private function formatRupiah($angka) {
         return "Rp " . number_format($angka, 0, ',', '.');
+    }
+
+    /**
+     * Format URL Gambar lokal/hosting agar valid dibaca widget image Flutter
+     */
+    private function formatImage($path)
+    {
+        if (!$path) return asset('images/no-image.png');
+        if (str_starts_with($path, 'http')) return $path;
+        
+        $path = ltrim($path, '/');
+        if (!str_contains($path, 'images/')) {
+            $path = 'images/' . $path;
+        }
+        return asset($path);
     }
 }
