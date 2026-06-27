@@ -7,20 +7,39 @@ use App\Models\Event;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class HomeApiController extends Controller
 {
     public function index()
     {
+        // Ambil semua event yang berstatus approved
         $events = Event::where('status', 'approved')
             ->orderBy('date')
             ->get()
             ->map(function ($event) {
                 
-                // 📑 AMBIL TANGGAL TERAKHIR DARI TABEL JADWAL BERDASARKAN EVENT INI
-                $maxJadwalTanggal = DB::table('jadwal')
-                    ->where('event_id', $event->id)
-                    ->max('tanggal');
+                // 📑 1. AMBIL TANGGAL TERAKHIR JADWAL BERDASARKAN EVENT INI
+                $maxJadwalTanggal = null;
+                try {
+                    $maxJadwalTanggal = DB::table('jadwal')
+                        ->where('event_id', $event->id)
+                        ->max('tanggal');
+                } catch (\Exception $e) {
+                    \Log::error("Gagal mengambil jadwal untuk event ID {$event->id}: " . $e->getMessage());
+                }
+
+                // 📑 2. PARSING TANGGAL UTAMA EVENT KE STRING BERFORMAT (YYYY-MM-DD)
+                $cleanDate = $event->date 
+                    ? Carbon::parse($event->date)->toDateString() 
+                    : Carbon::now()->toDateString();
+
+                // 📑 3. TENTUKAN END DATE & REAL END DATE DARI JADWAL (Tabel events tidak memiliki end_date)
+                if ($maxJadwalTanggal) {
+                    $cleanEndDate = Carbon::parse($maxJadwalTanggal)->toDateString();
+                } else {
+                    $cleanEndDate = $cleanDate; // Fallback ke tanggal mulai jika belum ada jadwal
+                }
 
                 return [
                     'id' => $event->id,
@@ -30,15 +49,14 @@ class HomeApiController extends Controller
                     'lineup' => $event->lineup,
                     'organizer' => $event->organizer,
                     'instagram' => $event->instagram,
-                    'date' => $event->date,
                     
-                    'end_date' => $event->end_date, 
-                    
-                    // 📑 FIELD BARU: Kirim tanggal jadwal terakhir (jika tidak ada jadwal, gunakan end_date)
-                    'real_end_date' => $maxJadwalTanggal ?? $event->end_date ?? $event->date,
+                    // Format tanggal bersih siap saji untuk Flutter
+                    'date' => $cleanDate,
+                    'end_date' => $cleanEndDate, 
+                    'real_end_date' => $cleanEndDate,
 
-                    'ticket_sale_start' => $event->ticket_sale_start,
-                    'ticket_redeem_start' => $event->ticket_redeem_start,
+                    'ticket_sale_start' => $event->ticket_sale_start ? Carbon::parse($event->ticket_sale_start)->toDateTimeString() : null,
+                    'ticket_redeem_start' => $event->ticket_redeem_start ? Carbon::parse($event->ticket_redeem_start)->toDateTimeString() : null,
                     'min_age' => $event->min_age,
                     'location' => $event->location,
                     'max_tickets_per_email' => $event->max_tickets_per_email,
@@ -53,9 +71,7 @@ class HomeApiController extends Controller
         return response()->json([
             'status' => true,
             'events' => $events,
-
             'tickets' => Product::where('type', 'ticket')->get(),
-
             'merchandise' => Product::where('type', 'merch')->get(),
         ]);
     }
@@ -93,7 +109,7 @@ class HomeApiController extends Controller
                 'transactions.service_tax',
                 'transactions.grand_total',
                 'transactions.payment_status',
-                'transactions.payment_method', // 🟢 Menambahkan payment_method tiket
+                'transactions.payment_method', 
                 'transactions.checkout_time',
                 'transactions.paid_time',
                 'transactions.qr_code',
@@ -112,7 +128,7 @@ class HomeApiController extends Controller
                 'transactions.service_tax',
                 'transactions.grand_total',
                 'transactions.payment_status',
-                'transactions.payment_method', // 🟢 Wajib masuk groupBy
+                'transactions.payment_method', 
                 'transactions.checkout_time',
                 'transactions.paid_time',
                 'transactions.qr_code',
@@ -149,14 +165,14 @@ class HomeApiController extends Controller
                     'id'                 => $item->id,
                     'kode_unik'          => $item->kode_unik,
                     'payment_status'     => $item->payment_status,
-                    'payment_method'     => $item->payment_method ?? '-', // 🟢 Output API tiket
+                    'payment_method'     => $item->payment_method ?? '-', 
                     'checkout_time'      => $item->checkout_time,
                     'paid_time'          => $item->paid_time,
                     'qr_code'            => $item->qr_code ? asset($item->qr_code) : null,
                     'xendit_invoice_url' => $item->xendit_invoice_url,
                     'event_title'        => $item->event_title ?? 'Event',
                     'location'           => $item->location,
-                    'event_date'         => $item->event_date,
+                    'event_date'         => $item->event_date ? Carbon::parse($item->event_date)->toDateString() : null,
                     'poster'             => $item->poster ? asset($item->poster) : null,
                     'total_amount'       => (int) $item->total_amount,
                     'service_tax'        => (int) $item->service_tax,
@@ -168,7 +184,7 @@ class HomeApiController extends Controller
             });
 
         /// =========================================
-        /// 🛍 MERCH HISTORY (Fixed & Secured)
+        /// 🛍 MERCH HISTORY
         /// =========================================
         $merchandise = DB::table('transaction_merch')
             ->leftJoin(
@@ -190,7 +206,7 @@ class HomeApiController extends Controller
                 'transaction_merch.service_tax',
                 'transaction_merch.grand_total',
                 'transaction_merch.payment_status',
-                'transaction_merch.payment_method', // 🟢 Menambahkan payment_method merch
+                'transaction_merch.payment_method', 
                 'transaction_merch.checkout_time',
                 'transaction_merch.paid_time',
                 'transaction_merch.qr_code',
@@ -206,7 +222,7 @@ class HomeApiController extends Controller
                 'transaction_merch.service_tax',
                 'transaction_merch.grand_total',
                 'transaction_merch.payment_status',
-                'transaction_merch.payment_method', // 🟢 Wajib masuk groupBy
+                'transaction_merch.payment_method', 
                 'transaction_merch.checkout_time',
                 'transaction_merch.paid_time',
                 'transaction_merch.qr_code',
@@ -262,7 +278,7 @@ class HomeApiController extends Controller
                     'id'                 => $item->id,
                     'kode_unik'          => $item->kode_unik,
                     'payment_status'     => $item->payment_status,
-                    'payment_method'     => $item->payment_method ?? '-', // 🟢 Output API merch
+                    'payment_method'     => $item->payment_method ?? '-', 
                     'checkout_time'      => $item->checkout_time,
                     'paid_time'          => $item->paid_time,
                     'qr_code'            => $item->qr_code ? asset($item->qr_code) : null,
@@ -281,6 +297,84 @@ class HomeApiController extends Controller
             'status'      => true,
             'tickets'     => $tickets,
             'merchandise' => $merchandise,
+        ]);
+    }
+    /**
+     * Ambil Notifikasi Kedaruratan Event untuk Pembeli
+     */
+    public function notifications(Request $request)
+    {
+        $email = $request->user() ? $request->user()->email : $request->query('email');
+        
+        if (!$email) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Email tidak ditemukan.',
+                'data' => []
+            ], 400);
+        }
+
+        // Ambil riwayat pembelian tiket yang mengalami pembatalan atau penjadwalan ulang sah
+        $notifications = DB::table('transactions')
+            ->join('events', 'transactions.event_id', '=', 'events.id')
+            ->select(
+                'events.id as event_id',
+                'events.title as event_title',
+                'events.poster as event_poster',
+                'events.status as event_status',
+                'events.date as event_old_date',
+                'events.proposed_date as event_new_date',
+                'events.reschedule_reason',
+                'transactions.kode_unik',
+                'transactions.paid_time'
+            )
+            ->where('transactions.email', $email)
+            ->where('transactions.payment_status', 'paid')
+            ->where(function ($query) {
+                // Kondisi 1: Event dibatalkan
+                $query->whereIn('events.status', ['cancelled', 'pending_cancel'])
+                // Kondisi 2: Reschedule yang sudah disetujui (status approved tapi ada alasan reschedule)
+                      ->orWhere(function ($q) {
+                          $q->where('events.status', 'approved')
+                            ->whereNotNull('events.reschedule_reason')
+                            ->where('events.reschedule_reason', '!=', '');
+                      });
+            })
+            ->orderByDesc('transactions.id')
+            ->get()
+            ->map(function ($item) {
+                $isCancel = in_array($item->event_status, ['cancelled', 'pending_cancel']);
+                
+                $type = $isCancel ? "CANCELLED" : "RESCHEDULE";
+                $title = $isCancel ? "Pembatalan: " . $item->event_title : "Jadwal Baru: " . $item->event_title;
+                
+                // Pesan lengkap yang akan muncul di dialog detail saat diklik
+                if ($isCancel) {
+                    $message = "Dengan hormat kami informasikan bahwa event '" . $item->event_title . "' telah dibatalkan oleh pihak penyelenggara.\n\nSesuai dengan kebijakan proteksi pembeli, Anda memiliki HAK REFUND PENUH (100%) untuk transaksi dengan nomor invoice " . $item->kode_unik . ".";
+                } else {
+                    $newDateStr = $item->event_new_date ? Carbon::parse($item->event_new_date)->translatedFormat('l, d F Y') : '-';
+                    $message = "Event '" . $item->event_title . "' mengalami perubahan jadwal pelaksanaan.\n\n" .
+                               "🗓️ Jadwal Baru: " . $newDateStr . "\n" .
+                               "💬 Alasan: " . $item->reschedule_reason . "\n\n" .
+                               "Apabila Anda berhalangan hadir pada tanggal baru tersebut, Anda BERHAK mengajukan pengembalian dana penuh (100% Refund) atas nomor invoice " . $item->kode_unik . ".";
+                }
+
+                return [
+                    'event_id' => $item->event_id,
+                    'invoice_code' => $item->kode_unik,
+                    'type' => $type,
+                    'title' => $title,
+                    'short_info' => $isCancel ? "Event ini dibatalkan. Klik untuk info refund." : "Tanggal pelaksanaan berubah. Klik untuk lihat detail.",
+                    'message' => $message,
+                    'poster' => $item->event_poster ? asset($item->event_poster) : null,
+                    'created_at' => Carbon::parse($item->paid_time)->toDateTimeString(),
+                ];
+            });
+
+        return response()->json([
+            'status' => true,
+            'total_unread' => $notifications->count(),
+            'data' => $notifications
         ]);
     }
 }

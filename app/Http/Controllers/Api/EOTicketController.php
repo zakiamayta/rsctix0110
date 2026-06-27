@@ -17,26 +17,42 @@ class EOTicketController extends Controller
                 'event_id' => 'nullable|integer', 
             ]);
 
-            // 1. Tambahkan LEFT JOIN ke tabel transactions berdasarkan event_id atau foreign key yang sesuai
+            // 1. BUAT SUBQUERY UNTUK MENGHITUNG TOTAL OMSET TRANSAKSI PER EVENT
+            // Ini mencegah duplikasi data akibat One-to-Many Join
+            $trxSub = DB::table('transactions')
+                ->select('event_id', DB::raw('SUM(total_amount) as total_omset_paid'))
+                ->where('payment_status', 'paid')
+                ->groupBy('event_id');
+
             $query = DB::table('withdrawals')
                 ->join('events', 'withdrawals.event_id', '=', 'events.id')
                 ->join('eo', 'withdrawals.eo_id', '=', 'eo.id')
-                // Ambil transaksi pertama yang paid untuk mengambil data kode_unik dari event tersebut
-                ->leftJoin('transactions', function($join) {
-                    $join->on('withdrawals.event_id', '=', 'transactions.event_id')
-                        ->where('transactions.payment_status', '=', 'paid');
+                // 2. LEFT JOIN MENGGUNAKAN SUBQUERY AGAR AMAN
+                ->leftJoinSub($trxSub, 'trx_summary', function($join) {
+                    $join->on('withdrawals.event_id', '=', 'trx_summary.event_id');
                 })
                 ->where('withdrawals.eo_id', $request->eo_id)
                 ->select(
-                    'withdrawals.*', 
+                    'withdrawals.id',
+                    'withdrawals.eo_id',
+                    'withdrawals.event_id',
+                    'withdrawals.amount',
+                    'withdrawals.note',
+                    'withdrawals.status',
+                    'withdrawals.transfer_proof',
+                    'withdrawals.invoice_file',
+                    'withdrawals.reference_number',
+                    'withdrawals.created_at',
+                    'withdrawals.approved_at',
+                    'withdrawals.paid_at',
                     'events.title as event_name',
                     'eo.bank_name',
                     'eo.account_number',
                     'eo.account_name',
-                    'transactions.kode_unik as trx_kode_unik' // <-- Ambil kode_unik database di sini
-                )
-                // Grouping agar data withdrawal tidak duplikat jika transaksi paid ada banyak
-                ->groupBy('withdrawals.id', 'events.title', 'eo.bank_name', 'eo.account_number', 'eo.account_name', 'transactions.kode_unik');
+                    // Ambil nilai total omset riil yang terjual
+                    DB::raw('IFNULL(trx_summary.total_omset_paid, 0) as total_sales_real')
+                );
+                // KINI KITA TIDAK MEMBUTUHKAN GROUP BY YANG MERUSAK DATA LAGI
 
             if ($request->has('event_id') && !is_null($request->event_id)) {
                 $query->where('withdrawals.event_id', $request->event_id);
@@ -51,18 +67,13 @@ class EOTicketController extends Controller
                     'note' => $item->note ?? '',
                     'status' => $item->status ?? 'pending',
                     'transfer_proof' => $item->transfer_proof,
+                    'invoice_file' => $item->invoice_file,
                     'event_name' => $item->event_name ?? 'Event Tidak Diketahui',
-                    
-                    // ========================================================
-                    // SEKARANG KODE_UNIK SUDAH DI-MAPPING DAN DIKIRIM KE FLUTTER
-                    // ========================================================
-                    'kode_unik' => $item->trx_kode_unik ?? '-', 
-                    
+                    'total_sales_event' => (int) $item->total_sales_real, // Data penjualan sukses sekarang keluar di sini
                     'reference_number' => $item->reference_number ?? '-',
                     'bank_name' => $item->bank_name ?? '-',
                     'account_number' => $item->account_number ?? '-',
                     'account_name' => $item->account_name ?? '-',
-                    
                     'created_at' => $item->created_at ? Carbon::parse($item->created_at)->format('d M Y, H:i') : '-',
                     'approved_at' => $item->approved_at ? Carbon::parse($item->approved_at)->format('d M Y, H:i') : null,
                     'paid_at' => $item->paid_at ? Carbon::parse($item->paid_at)->format('d M Y, H:i') : null,
@@ -85,16 +96,24 @@ class EOTicketController extends Controller
     public function eventWallets($eoId)
     {
         try {
+            // Menggunakan Subquery khusus agar data baris 'events' tidak ter-duplikasi (ganda) akibat join tabel jadwal Many-to-One
+            $jadwalSub = DB::table('jadwal')
+                ->select('event_id', DB::raw('MAX(tanggal) as max_tanggal'))
+                ->groupBy('event_id');
+
             $events = DB::table('events')
                 ->leftJoin('event_wallets', 'events.id', '=', 'event_wallets.event_id')
                 ->join('eo', 'events.eo_id', '=', 'eo.id') 
+                ->leftJoinSub($jadwalSub, 'j_max', function($join) {
+                    $join->on('events.id', '=', 'j_max.event_id');
+                })
                 ->where('events.eo_id', $eoId)
                 ->select(
                     'events.id as event_id',
                     'events.title',
                     'events.poster',
                     'events.date as start_date',  
-                    'events.end_date',            
+                    'j_max.max_tanggal as end_date',            
                     'events.status as event_status',
                     'event_wallets.id as wallet_id',
                     'event_wallets.negative_balance',
@@ -109,7 +128,8 @@ class EOTicketController extends Controller
             $result = [];
 
             foreach ($events as $event) {
-                // Buat dompet otomatis jika belum ada di database
+                $actualEndDate = $event->end_date ?? $event->start_date;
+
                 if (is_null($event->wallet_id)) {
                     $insertedId = DB::table('event_wallets')->insertGetId([
                         'eo_id'             => $eoId,
@@ -133,7 +153,7 @@ class EOTicketController extends Controller
                     ->where('payment_status', 'paid')
                     ->sum('total_amount') ?? 0;
 
-                // 2. Total penarikan yang SUKSES
+                // 2. Total penarikan yang SUKSES maupun PENDING
                 $alreadyWithdrawn = DB::table('withdrawals')
                     ->where('event_id', $event->event_id)
                     ->whereIn('status', ['approved', 'pending']) 
@@ -150,28 +170,36 @@ class EOTicketController extends Controller
                 }
 
                 $isSkalaBesar = $potentialRevenue >= 50000000;
-                $minBalanceRequired = $isSkalaBesar ? 1000000 : 200000; 
+                
+                $minBalanceRequired = $isSkalaBesar ? 3000000 : 1000000; 
                 $minHeldBalance = $isSkalaBesar ? 500000 : 100000;       
 
-                // 4. Hitung masa plafon waktu berjalan
+                // 4. Hitung masa waktu kalender (H-10 & Selesai)
                 $isEventFinished = false;
                 $isHMinus10 = false;
                 
                 if (!is_null($event->start_date)) {
-                    $startDate = Carbon::parse($event->start_date);
-                    $isHMinus10 = now()->diffInDays($startDate, false) <= 10 && now()->isBefore($startDate);
+                    $today = now()->startOfDay();
+                    $startDate = Carbon::parse($event->start_date)->startOfDay();
+                    $daysLeft = $today->diffInDays($startDate);
+                    
+                    $isHMinus10 = ($daysLeft <= 10) && $today->isBefore($startDate);
                 }
                 
-                if (!is_null($event->end_date)) {
-                    $isEventFinished = Carbon::parse($event->end_date)->isPast();
+                if (!is_null($actualEndDate)) {
+                    $isEventFinished = Carbon::parse($actualEndDate)->isPast();
                 }
 
                 if ($isEventFinished) {
                     $plafonPercent = 1.0; 
-                } elseif ($isHMinus10) {
-                    $plafonPercent = 0.7; 
                 } else {
                     $plafonPercent = 0.5; 
+                }
+
+                $isBypassedByHMinus10 = false;
+                if ($isHMinus10 && $paidTotal < $minBalanceRequired) {
+                    $minBalanceRequired = 0; 
+                    $isBypassedByHMinus10 = true;
                 }
 
                 // 5. Rumus Finansial
@@ -198,7 +226,7 @@ class EOTicketController extends Controller
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
-                    $systemReason = 'Total omset belum mencapai batas minimal ' . $this->formatRupiah($minBalanceRequired);
+                    $systemReason = 'Total omset belum mencapai batas minimal pembuka gerbang ' . $this->formatRupiah($minBalanceRequired);
                 } 
                 elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isEventFinished) {
                     $canWithdraw = false;
@@ -209,7 +237,11 @@ class EOTicketController extends Controller
                 elseif ($calculatedAvailable <= 0) {
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
-                    $systemReason = 'Kuota limit penarikan termin berjalan Anda saat ini sudah habis.';
+                    if ($isBypassedByHMinus10) {
+                        $systemReason = 'Gerbang H-10 terbuka otomatis! Namun saldo hak tarik Anda masih 0 karena limit plafon 50% sudah habis atau belum ada tiket laku baru.';
+                    } else {
+                        $systemReason = 'Kuota limit penarikan termin berjalan (Plafon 50%) Anda saat ini sudah diambil.';
+                    }
                 }
 
                 // Update database
@@ -221,12 +253,14 @@ class EOTicketController extends Controller
                         'updated_at'        => now()
                     ]);
 
+                $statusBypassMsg = $isBypassedByHMinus10 ? ' (Bypass H-10 Aktif)' : '';
+
                 $result[] = [
                     'event_id'          => (int) $event->event_id,
                     'event_name'        => $event->title,
                     'poster'            => $event->poster,
                     'start_date'        => $event->start_date,
-                    'end_date'          => $event->end_date,
+                    'end_date'          => $actualEndDate, 
                     'status'            => $event->event_status,
                     'is_event_finished' => $isEventFinished,
                     'is_h_minus_10'     => $isHMinus10,
@@ -239,10 +273,9 @@ class EOTicketController extends Controller
                     'negative_balance'  => (int) $event->negative_balance,
                     'withdraw_locked'   => (int) $event->withdraw_locked,
                     'can_withdraw'      => $canWithdraw,
-                    'system_reason'     => $systemReason,
+                    'system_reason'     => $systemReason . $statusBypassMsg,
                     'min_balance_required' => (int) $minBalanceRequired,
                     'max_amount_allowed'   => (int) $calculatedAvailable,
-
                     'bank_name'         => $event->bank_name ?? '-',
                     'account_name'      => $event->account_name ?? '-',
                     'account_number'    => $event->account_number ?? '-',
@@ -262,32 +295,36 @@ class EOTicketController extends Controller
         }
     }
 
-    /**
-     * ACTION PENARIKAN DANA PER EVENT (UPDATED WITH PROTEKSI PENDING)
-     */
     public function requestWithdraw(Request $request)
     {
-        // 1. Validasi input file invoice dan data ID dasar
         $request->validate([
             'eo_id'    => 'required|integer',
             'event_id' => 'required|integer',
             'amount'   => 'required|integer|min:100000', 
             'note'     => 'nullable|string',
-            'invoice'  => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', // Wajib file, maks 2MB
+            'invoice'  => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', 
         ]);
 
         DB::beginTransaction();
         try {
-            // 2. Query Gabungan: Ambil data Event, Dompet, DAN Data Bank dari tabel EO
+            // Subquery ter-isolasi untuk keamanan relasi 1-to-Many jadwal ke event
+            $jadwalSub = DB::table('jadwal')
+                ->select('event_id', DB::raw('MAX(tanggal) as max_tanggal'))
+                ->groupBy('event_id');
+
             $event = DB::table('events')
                 ->join('event_wallets', 'events.id', '=', 'event_wallets.event_id')
                 ->join('eo', 'events.eo_id', '=', 'eo.id') 
+                ->leftJoinSub($jadwalSub, 'j_max', function($join) {
+                    $join->on('events.id', '=', 'j_max.event_id');
+                })
                 ->where('events.eo_id', $request->eo_id)
                 ->where('events.id', $request->event_id)
                 ->select(
                     'events.date as start_date', 
-                    'events.end_date', 
-                    'event_wallets.*',
+                    'j_max.max_tanggal as end_date',
+                    'event_wallets.id as wallet_id',
+                    'event_wallets.withdraw_locked',
                     'eo.bank_name',       
                     'eo.account_name', 
                     'eo.account_number'
@@ -299,8 +336,8 @@ class EOTicketController extends Controller
                 return response()->json(['success' => false, 'message' => 'Data event, dompet, atau profil EO tidak ditemukan.'], 404);
             }
 
-            // ================== PROTEKSI STATUS PENDING (BARU) ==================
-            // Cek apakah masih ada transaksi withdrawal tiket yang menggantung ('pending') untuk event ini
+            $actualEndDate = $event->end_date ?? $event->start_date;
+
             $hasPendingWithdrawal = DB::table('withdrawals')
                 ->where('event_id', $request->event_id)
                 ->where('status', 'pending')
@@ -309,12 +346,10 @@ class EOTicketController extends Controller
             if ($hasPendingWithdrawal) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal. Anda masih memiliki pengajuan penarikan dana TIKET yang berstatus PENDING pada event ini. Silakan tunggu hingga dicairkan oleh admin sebelum mengajukan kembali.'
+                    'message' => 'Gagal. Anda masih memiliki pengajuan penarikan dana TIKET yang berstatus PENDING pada event ini.'
                 ], 400);
             }
-            // ====================================================================
 
-            // Cek kelengkapan data bank di profil EO sebelum melanjutkan request
             if (is_null($event->bank_name) || is_null($event->account_number)) {
                 return response()->json([
                     'success' => false, 
@@ -333,7 +368,7 @@ class EOTicketController extends Controller
 
             $alreadyWithdrawn = DB::table('withdrawals')
                 ->where('event_id', $request->event_id)
-                ->where('status', 'approved') 
+                ->whereIn('status', ['approved', 'pending']) 
                 ->sum('amount') ?? 0;
 
             try {
@@ -346,41 +381,47 @@ class EOTicketController extends Controller
             }
 
             $isSkalaBesar = $potentialRevenue >= 50000000;
-            $minBalanceRequired = $isSkalaBesar ? 1000000 : 200000;
+            
+            $minBalanceRequired = $isSkalaBesar ? 3000000 : 1000000;
             $minHeldBalance = $isSkalaBesar ? 500000 : 100000;
-
-            if ($paidTotal < $minBalanceRequired) {
-                return response()->json([
-                    'success' => false, 
-                    'message' => 'Gagal. Omset belum mencapai batas syarat minimum ' . $this->formatRupiah($minBalanceRequired)
-                ], 400);
-            }
-
-            if (($paidTotal - ($alreadyWithdrawn + $request->amount)) < $minHeldBalance && !Carbon::parse($event->end_date)->isPast()) {
-                return response()->json([
-                    'success' => false, 
-                    'message' => 'Gagal. Penarikan ini melanggar batas saldo mengendap wajib sistem senilai ' . $this->formatRupiah($minHeldBalance)
-                ], 400);
-            }
 
             $isEventFinished = false;
             $isHMinus10 = false;
 
             if (!is_null($event->start_date)) {
-                $startDate = Carbon::parse($event->start_date);
-                $isHMinus10 = now()->diffInDays($startDate, false) <= 10 && now()->isBefore($startDate);
+                $today = now()->startOfDay();
+                $startDate = Carbon::parse($event->start_date)->startOfDay();
+                $daysLeft = $today->diffInDays($startDate);
+
+                $isHMinus10 = ($daysLeft <= 10) && $today->isBefore($startDate);
             }
 
-            if (!is_null($event->end_date)) {
-                $isEventFinished = Carbon::parse($event->end_date)->isPast();
+            if (!is_null($actualEndDate)) {
+                $isEventFinished = Carbon::parse($actualEndDate)->isPast();
             }
 
             if ($isEventFinished) {
                 $plafonPercent = 1.0;
-            } elseif ($isHMinus10) {
-                $plafonPercent = 0.7;
             } else {
                 $plafonPercent = 0.5;
+            }
+
+            if ($isHMinus10 && $paidTotal < $minBalanceRequired) {
+                $minBalanceRequired = 0;
+            }
+
+            if ($paidTotal < $minBalanceRequired) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Gagal. Omset belum mencapai batas syarat minimum pembuka gerbang ' . $this->formatRupiah($minBalanceRequired)
+                ], 400);
+            }
+
+            if (($paidTotal - ($alreadyWithdrawn + $request->amount)) < $minHeldBalance && !$isEventFinished) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Gagal. Penarikan ini melanggar batas saldo mengendang wajib sistem senilai ' . $this->formatRupiah($minHeldBalance)
+                ], 400);
             }
 
             $maxEligibleBalance = floor($paidTotal * $plafonPercent);
@@ -389,11 +430,10 @@ class EOTicketController extends Controller
             if ($calculatedAvailable < $request->amount) {
                 return response()->json([
                     'success' => false, 
-                    'message' => 'Nominal pengajuan melebihi ketentuan batas limit termin hak tarik Anda saat ini.'
+                    'message' => 'Nominal pengajuan melebihi ketentuan batas limit termin hak tarik Anda (Plafon ' . ($plafonPercent * 100) . '%).'
                 ], 400);
             }
 
-            // Proses Upload File Invoice ke Storage
             $invoicePath = null;
             if ($request->hasFile('invoice')) {
                 $file = $request->file('invoice');
@@ -402,9 +442,8 @@ class EOTicketController extends Controller
                 $invoicePath = 'invoices/' . $filename;
             }
 
-            $adminReviewNote = "[Sistem Log] Skala Omset Potensial: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%";
+            $adminReviewNote = "[Sistem Log] Skala Omset Potensial: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%" . ($isHMinus10 ? " | Darurat H-10 Terbuka" : "");
 
-            // SIMPAN KE TABEL WITHDRAWALS (Tanpa duplikasi kolom bank karena ditarik via JOIN)
             DB::table('withdrawals')->insert([
                 'eo_id'          => $request->eo_id,
                 'event_id'       => $request->event_id,
@@ -417,10 +456,16 @@ class EOTicketController extends Controller
                 'updated_at'     => now(),
             ]);
 
+            // Pembaruan sisa saldo setelah ditarik
+            $finalAvailable = (int) ($calculatedAvailable - $request->amount);
+            $finalHeld = (int) (($paidTotal - ($alreadyWithdrawn + $request->amount)) - $finalAvailable);
+            if ($finalHeld < 0) $finalHeld = 0;
+
             DB::table('event_wallets')
-                ->where('event_id', $request->event_id)
+                ->where('id', $event->wallet_id)
                 ->update([
-                    'available_balance' => (int) ($calculatedAvailable - $request->amount),
+                    'available_balance' => $finalAvailable,
+                    'held_balance'      => $finalHeld,
                     'updated_at'        => now()
                 ]);
 
@@ -428,7 +473,7 @@ class EOTicketController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengajuan penarikan dana & file invoice berhasil dikirim! Menunggu tinjauan manual owner.',
+                'message' => 'Pengajuan penarikan dana berhasil dikirim! Menunggu tinjauan manual.',
             ]);
 
         } catch (\Exception $e) {

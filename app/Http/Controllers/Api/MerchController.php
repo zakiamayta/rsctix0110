@@ -305,10 +305,21 @@ class MerchController extends Controller
 
             $totalItem = $items->sum('quantity');
 
+            // --- PERBAIKAN GENERASI PATH/URL QR CODE ---
+            // Mengambil nama file dari database atau fallback ke kode_unik + .png
+            $qrFile = $trx->qr_code ?? ($trx->kode_unik . '.png');
+            
+            // Jika di database nama filenya mengandung path, ambil nama filenya saja
+            $qrFileName = basename($qrFile); 
+            
+            // Satukan menjadi URL penuh menuju public/images/qrcodes_merch/
+            $qrCodeUrl = asset('images/qrcodes_merch/' . $qrFileName);
+            // --------------------------------------------
+
             $result[] = [
                 'id' => $trx->id,
                 'kode_unik' => $trx->kode_unik,
-                'qr_code' => $trx->qr_code ?? $trx->kode_unik,
+                'qr_code' => $qrCodeUrl, // Mengembalikan URL penuh (e.g., http://domain.com/images/qrcodes_merch/filename.png)
                 'payment_status' => $trx->payment_status,
                 'payment_method' => $trx->payment_method ?? ($trx->grand_total == 0 ? 'Free' : 'Xendit Gateway'),
                 'email' => $trx->email,

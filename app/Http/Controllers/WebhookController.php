@@ -41,7 +41,7 @@ class WebhookController extends Controller
                 return response()->json(['message' => 'Ticket transaction updated'], 200);
             }
 
-            // 👕 2. CEK TRANSAKSI MERCHANDISE (Menggunakan Query Builder agar aman dari Class Not Found)
+            // 👕 2. CEK TRANSAKSI MERCHANDISE
             $merch = DB::table('transaction_merch')->where('xendit_invoice_id', $invoiceId)->first();
             if ($merch) {
                 DB::table('transaction_merch')
@@ -72,7 +72,8 @@ class WebhookController extends Controller
     public function generateTicketQRCode($transaction)
     {
         try {
-            $qrPath = base_path('qrcodes');
+            // Mengubah ke public_path dan mengarahkan ke folder images/qrcodes
+            $qrPath = public_path('images/qrcodes');
             if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
 
             $qrData = route('absen.form', ['kode' => $transaction->kode_unik]);
@@ -81,7 +82,8 @@ class WebhookController extends Controller
 
             QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
 
-            $transaction->qr_code = 'qrcodes/' . $qrFileName;
+            // Simpan path relatif public agar mudah diakses di view/email
+            $transaction->qr_code = 'images/qrcodes/' . $qrFileName;
             $transaction->save();
         } catch (\Exception $e) {
             Log::error('Failed to generate QR Code Tiket: ' . $e->getMessage());
@@ -94,7 +96,8 @@ class WebhookController extends Controller
     public function generateMerchQRCode($transaction)
     {
         try {
-            $qrPath = base_path('qrcodes_merch');
+            // Mengubah ke public_path dan mengarahkan ke folder images/qrcodes_merch
+            $qrPath = public_path('images/qrcodes_merch');
             if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
 
             $qrData = route('guests.merch.qr', ['kode_unik' => $transaction->kode_unik]); 
@@ -103,9 +106,10 @@ class WebhookController extends Controller
 
             QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
 
+            // Simpan path relatif public agar mudah diakses di view/email
             DB::table('transaction_merch')
                 ->where('id', $transaction->id)
-                ->update(['qr_code' => 'qrcodes_merch/' . $qrFileName]);
+                ->update(['qr_code' => 'images/qrcodes_merch/' . $qrFileName]);
         } catch (\Exception $e) {
             Log::error('Failed to generate QR Code Merch: ' . $e->getMessage());
         }

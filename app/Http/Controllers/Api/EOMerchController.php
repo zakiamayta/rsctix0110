@@ -102,7 +102,6 @@ class EOMerchController extends Controller
                     'events.title',
                     'events.poster',
                     'events.date as start_date',  
-                    'events.end_date',            
                     'events.status as event_status',
                     'merch_wallets.id as wallet_id',
                     'merch_wallets.negative_balance',
@@ -159,22 +158,17 @@ class EOMerchController extends Controller
                 $minBalanceRequired = $isSkalaBesar ? 500000 : 100000; 
                 $minHeldBalance = $isSkalaBesar ? 250000 : 50000;       
 
-                // 4. Hitung masa plafon waktu berjalan
-                $isEventFinished = false;
+                // 4. Hitung masa plafon waktu berjalan (Menghapus Aturan End Date)
                 $isHMinus10 = false;
                 
                 if (!is_null($event->start_date)) {
                     $startDate = Carbon::parse($event->start_date);
-                    $isHMinus10 = now()->diffInDays($startDate, false) <= 10 && now()->isBefore($startDate);
-                }
-                
-                if (!is_null($event->end_date)) {
-                    $isEventFinished = Carbon::parse($event->end_date)->isPast();
+                    // H-10 atau setelahnya sebelum event dimulai (atau saat hari H berjalan)
+                    $isHMinus10 = now()->diffInDays($startDate, false) <= 10;
                 }
 
-                if ($isEventFinished) {
-                    $plafonPercent = 1.0; 
-                } elseif ($isHMinus10) {
+                // Jika sudah H-10, plafon naik ke 70%
+                if ($isHMinus10) {
                     $plafonPercent = 0.7; 
                 } else {
                     $plafonPercent = 0.5; 
@@ -200,13 +194,15 @@ class EOMerchController extends Controller
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
                     $systemReason = 'Fitur penarikan dana dinonaktifkan sementara oleh admin.';
                 } 
-                elseif ($paidTotal < $minBalanceRequired) {
+                // Auto terbuka jika sudah H-10 walau nominal omset belum tercapai
+                elseif ($paidTotal < $minBalanceRequired && !$isHMinus10) {
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
                     $systemReason = 'Total omset belum mencapai batas minimal ' . $this->formatRupiah($minBalanceRequired);
                 } 
-                elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isEventFinished) {
+                // Auto terbuka jika sudah H-10 walau sisa saldo berjalan di bawah target mengendap
+                elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isHMinus10) {
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
@@ -232,9 +228,7 @@ class EOMerchController extends Controller
                     'event_name'        => $event->title,
                     'poster'            => $event->poster,
                     'start_date'        => $event->start_date,
-                    'end_date'          => $event->end_date,
                     'status'            => $event->event_status,
-                    'is_event_finished' => $isEventFinished,
                     'is_h_minus_10'     => $isHMinus10,
                     'skala_event'       => $isSkalaBesar ? 'Besar (Potensi Capai ' . $this->formatRupiah($potentialRevenue) . ')' : 'Kecil (Potensi ' . $this->formatRupiah($potentialRevenue) . ')',
                     'total_sales'       => (int) $paidTotal,
@@ -270,6 +264,9 @@ class EOMerchController extends Controller
     /**
      * 3. ACTION REQUEST PENARIKAN DANA MERCHANDISE PER EVENT
      */
+    /**
+     * 3. ACTION REQUEST PENARIKAN DANA MERCHANDISE PER EVENT (PERBAIKAN)
+     */
     public function requestMerchWithdraw(Request $request)
     {
         $request->validate([
@@ -282,14 +279,14 @@ class EOMerchController extends Controller
 
         DB::beginTransaction();
         try {
-            $event = DB::table('events')
-                ->join('merch_wallets', 'events.id', '=', 'merch_wallets.event_id')
-                ->join('eo', 'events.eo_id', '=', 'eo.id') 
-                ->where('events.eo_id', $request->eo_id)
-                ->where('events.id', $request->event_id)
+            // Lock langsung ke tabel dompet untuk menghindari race condition saldo
+            $wallet = DB::table('merch_wallets')
+                ->join('events', 'merch_wallets.event_id', '=', 'events.id')
+                ->join('eo', 'merch_wallets.eo_id', '=', 'eo.id')
+                ->where('merch_wallets.eo_id', $request->eo_id)
+                ->where('merch_wallets.event_id', $request->event_id)
                 ->select(
                     'events.date as start_date', 
-                    'events.end_date', 
                     'merch_wallets.id as wallet_id',
                     'merch_wallets.withdraw_locked',
                     'eo.bank_name',       
@@ -299,7 +296,7 @@ class EOMerchController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if (!$event) {
+            if (!$wallet) {
                 return response()->json(['success' => false, 'message' => 'Data event, dompet, atau profil EO tidak ditemukan.'], 404);
             }
 
@@ -316,14 +313,14 @@ class EOMerchController extends Controller
                 ], 400);
             }
 
-            if (is_null($event->bank_name) || is_null($event->account_number)) {
+            if (is_null($wallet->bank_name) || is_null($wallet->account_number)) {
                 return response()->json([
                     'success' => false, 
                     'message' => 'Gagal. Anda belum melengkapi data rekening bank di profil EO Anda.'
                 ], 400);
             }
 
-            if ($event->withdraw_locked == 1) {
+            if ($wallet->withdraw_locked == 1) {
                 return response()->json(['success' => false, 'message' => 'Penarikan untuk event ini sedang dikunci.'], 403);
             }
 
@@ -334,6 +331,7 @@ class EOMerchController extends Controller
                 ->where('tm.payment_status', 'paid')
                 ->sum('tmd.subtotal') ?? 0;
 
+            // Menghitung penarikan sebelumnya (Approved & Pending yang sudah ada sebelum request ini)
             $alreadyWithdrawn = DB::table('merch_withdrawals')
                 ->where('event_id', $request->event_id)
                 ->whereIn('status', ['approved', 'pending']) 
@@ -348,35 +346,29 @@ class EOMerchController extends Controller
             $minBalanceRequired = $isSkalaBesar ? 500000 : 100000;
             $minHeldBalance = $isSkalaBesar ? 250000 : 50000;
 
-            if ($paidTotal < $minBalanceRequired) {
+            $isHMinus10 = false;
+            if (!is_null($wallet->start_date)) {
+                $startDate = Carbon::parse($wallet->start_date);
+                $isHMinus10 = now()->diffInDays($startDate, false) <= 10;
+            }
+
+            // Validasi omset minimum jika belum H-10
+            if ($paidTotal < $minBalanceRequired && !$isHMinus10) {
                 return response()->json([
                     'success' => false, 
                     'message' => 'Gagal. Omset belum mencapai batas syarat minimum ' . $this->formatRupiah($minBalanceRequired)
                 ], 400);
             }
 
-            if (($paidTotal - ($alreadyWithdrawn + $request->amount)) < $minHeldBalance && !Carbon::parse($event->end_date)->isPast()) {
+            // Validasi saldo mengendap jika belum H-10
+            if (($paidTotal - ($alreadyWithdrawn + $request->amount)) < $minHeldBalance && !$isHMinus10) {
                 return response()->json([
                     'success' => false, 
                     'message' => 'Gagal. Penarikan ini melanggar batas saldo mengendap wajib sistem senilai ' . $this->formatRupiah($minHeldBalance)
                 ], 400);
             }
 
-            $isEventFinished = false;
-            $isHMinus10 = false;
-
-            if (!is_null($event->start_date)) {
-                $startDate = Carbon::parse($event->start_date);
-                $isHMinus10 = now()->diffInDays($startDate, false) <= 10 && now()->isBefore($startDate);
-            }
-
-            if (!is_null($event->end_date)) {
-                $isEventFinished = Carbon::parse($event->end_date)->isPast();
-            }
-
-            if ($isEventFinished) {
-                $plafonPercent = 1.0;
-            } elseif ($isHMinus10) {
+            if ($isHMinus10) {
                 $plafonPercent = 0.7;
             } else {
                 $plafonPercent = 0.5;
@@ -402,6 +394,7 @@ class EOMerchController extends Controller
 
             $adminReviewNote = "[Sistem Log] Skala Omset Potensial: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%";
 
+            // 1. Masukkan data ke log penarikan (Status: pending)
             DB::table('merch_withdrawals')->insert([
                 'eo_id'          => $request->eo_id,
                 'event_id'       => $request->event_id,
@@ -414,13 +407,19 @@ class EOMerchController extends Controller
                 'updated_at'     => now(),
             ]);
 
+            // 2. Sinkronkan nilai sisa ke merch_wallets untuk dibaca real-time oleh dashboard
             $newAvailableBalance = (int) ($calculatedAvailable - $request->amount);
-            if($newAvailableBalance < 0) $newAvailableBalance = 0;
+            if ($newAvailableBalance < 0) $newAvailableBalance = 0;
+
+            $sisaKasSistem = $paidTotal - ($alreadyWithdrawn + $request->amount);
+            $heldBalance = $sisaKasSistem - $newAvailableBalance;
+            if ($heldBalance < 0) $heldBalance = 0;
 
             DB::table('merch_wallets')
-                ->where('id', $event->wallet_id)
+                ->where('id', $wallet->wallet_id)
                 ->update([
                     'available_balance' => $newAvailableBalance,
+                    'held_balance'      => $heldBalance,
                     'updated_at'        => now()
                 ]);
 
@@ -506,12 +505,11 @@ class EOMerchController extends Controller
     }
 
     /**
-     * 5. GET DETAIL TRANSAKSI PENJUALAN MERCHANDISE (FIXED GAMBAR & GROUPBY)
+     * 5. GET DETAIL TRANSAKSI PENJUALAN MERCHANDISE
      */
     public function show(Request $request, $transactionId)
     {
         try {
-            // 1. Ambil data utama asli langsung dari tabel induk 'transaction_merch' agar nominal riil tidak terduplikasi akibat SQL SUM
             $transaction = DB::table('transaction_merch')
                 ->where('id', $transactionId)
                 ->first();
@@ -523,12 +521,10 @@ class EOMerchController extends Controller
                 ], 404);
             }
 
-            // Ambil salah satu nama pembeli dari detail untuk data pelengkap UI
             $buyerName = DB::table('transaction_merch_details')
                 ->where('transaction_merch_id', $transactionId)
                 ->value('buyer_name') ?? 'Pembeli';
 
-            // 2. Ambil seluruh item belanjaan di dalam transaksi ini
             $items = DB::table('transaction_merch_details as tmd')
                 ->join('products as p', 'tmd.product_id', '=', 'p.id')
                 ->leftJoin('products_ukuran as pu', 'tmd.ukuran_id', '=', 'pu.id')
@@ -546,7 +542,6 @@ class EOMerchController extends Controller
                 ])
                 ->get();
 
-            // 3. Pasangkan URL Gambar secara dinamis menggunakan helper formatImage agar aman & sinkron ke Flutter
             $formattedItems = $items->map(function ($item) {
                 $imageUrl = null;
                 if (!is_null($item->varian_id)) {
@@ -567,7 +562,6 @@ class EOMerchController extends Controller
                 ];
             });
 
-            // 4. Format objek transaksi induk disesuaikan dengan struktur asli MerchController pembeli
             $formattedTransaction = [
                 'invoice_number' => $transaction->kode_unik ?? 'INV-DUMMY',
                 'buyer_name'     => $buyerName,
@@ -601,9 +595,6 @@ class EOMerchController extends Controller
         return "Rp " . number_format($angka, 0, ',', '.');
     }
 
-    /**
-     * Format URL Gambar lokal/hosting agar valid dibaca widget image Flutter
-     */
     private function formatImage($path)
     {
         if (!$path) return asset('images/no-image.png');

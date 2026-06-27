@@ -90,14 +90,14 @@ class TicketController extends Controller
             $grandTotal = $totalAmount + $serviceTax;
             $kodeUnik = strtoupper(Str::random(10));
 
-            // SIMPAN TRANSACTION (Set Default Payment Method agar tidak NULL)
+            // SIMPAN TRANSACTION
             $transactionId = DB::table('transactions')->insertGetId([
                 'event_id' => $event->id,
                 'jadwal_id' => $jadwal->id,
                 'email' => $request->email,
                 'checkout_time' => now(),
                 'payment_status' => $grandTotal == 0 ? 'paid' : 'unpaid',
-                'payment_method' => $grandTotal == 0 ? 'Free' : 'Xendit Gateway', // 🔥 FIX: Tidak NULL semenjak di-insert
+                'payment_method' => $grandTotal == 0 ? 'Free' : 'Xendit Gateway',
                 'kode_unik' => $kodeUnik,
                 'total_amount' => $totalAmount,
                 'service_tax' => $serviceTax,
@@ -106,12 +106,13 @@ class TicketController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // SIMPAN ATTENDEES
+            // SIMPAN ATTENDEES (Ditambahkan kolom 'jadwal_id' agar relasi ke dashboard Owner sinkron)
             foreach ($request->tickets as $item) {
                 for ($i = 0; $i < $item['qty']; $i++) {
                     DB::table('ticket_attendees')->insert([
                         'transaction_id' => $transactionId,
                         'ticket_id' => $item['ticket_id'],
+                        'jadwal_id' => $jadwal->id, // 🔥 FIX: Menyimpan jadwal_id ke tabel peserta
                         'name' => $item['name'],
                         'phone_number' => $item['phone'],
                     ]);
@@ -156,7 +157,6 @@ class TicketController extends Controller
                 'amount' => $grandTotal,
                 'currency' => 'IDR',
                 'invoice_duration' => 900,
-                // 'payment_methods' => ['QRIS'], // 🔥 FIX: Dihapus/dikomentar agar semua metode (VA, E-Wallet, Retail) aktif otomatis
                 'success_redirect_url' => 'myapp://payment-success?trx_id=' . $transactionId,
                 'failure_redirect_url' => 'myapp://payment-failed',
             ]);
@@ -263,10 +263,22 @@ class TicketController extends Controller
                 ];
             })->values()->toArray();
 
+            // LOGIKA URL QR CODE
+            $fullQrUrl = '';
+            if (!empty($trx->qr_code)) {
+                if (str_starts_with($trx->qr_code, 'http')) {
+                    $fullQrUrl = $trx->qr_code;
+                } else {
+                    $fullQrUrl = url($trx->qr_code); 
+                }
+            } else {
+                $fullQrUrl = $trx->kode_unik;
+            }
+
             $result[] = [
                 'id' => $trx->id,
                 'kode_unik' => $trx->kode_unik,
-                'qr_code' => $trx->qr_code ?? $trx->kode_unik,
+                'qr_code' => $fullQrUrl,
                 'total_amount' => (int) $trx->total_amount,
                 'service_tax' => (int) $trx->service_tax,
                 'grand_total' => (int) $trx->grand_total,
@@ -287,6 +299,7 @@ class TicketController extends Controller
                 'jadwal_info' => $trx->jadwal_info,
                 'tanggal' => $trx->tanggal_event,
                 'jadwal_deskripsi' => $trx->jadwal_deskripsi,
+                // Memastikan data attendees ter-map dengan struktur array murni
                 'attendees' => $attendees->map(fn($a) => [
                     'id' => $a->id,
                     'name' => $a->name,
@@ -298,6 +311,7 @@ class TicketController extends Controller
             ];
         }
 
+        // Return langsung array $result atau pastikan Flutter membaca key 'data'
         return response()->json([
             'success' => true,
             'data' => $result
