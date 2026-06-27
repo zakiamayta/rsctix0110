@@ -12,6 +12,7 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\GuestController;
 use App\Http\Controllers\AbsensiController;
+use App\Http\Controllers\AbsenMerchController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MerchController;
 use App\Http\Controllers\InfoController;
@@ -31,6 +32,16 @@ use App\Http\Controllers\Eo\SaldoController;
 use App\Http\Controllers\Owner\WithdrawalApprovalController;
 use App\Http\Controllers\Eo\MerchTransactionController;
 use App\Http\Controllers\Owner\OwnerController;
+use App\Http\Controllers\Eo\TicketWithdrawalController;
+use App\Http\Controllers\Eo\TicketHistoryController;
+use App\Http\Controllers\Eo\MerchWithdrawalController;
+use App\Http\Controllers\Owner\MerchWithdrawalApprovalController;
+use App\Http\Controllers\BuyerRefundController;
+use App\Http\Controllers\Admin\AdminRefundController;
+use App\Http\Controllers\Owner\OwnerRefundMonitoringController;
+use App\Http\Controllers\Eo\EoRefundController;
+use App\Http\Controllers\Admin\PlatformWalletController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -54,18 +65,38 @@ Route::get('/band/negatifa', fn() => view('band.negatifa'))->name('band.negatifa
 | 2. GUEST & AUTHENTICATION ROUTES (GOOGLE)
 |--------------------------------------------------------------------------
 */
-// Login User Frontend
-Route::get('/loginuser', fn() => view('auth.loginuser'))->name('loginuser');
+Route::get('/login',[
+    LoginController::class,
+    'showLoginForm'
+])->name('login');
 
-// Google Auth
-Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('google.login');
-Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
+
+Route::get(
+'/auth/google',
+[GoogleAuthController::class,'redirect']
+)->name('google.login');
+
+
+Route::get(
+'/auth/google/callback',
+[GoogleAuthController::class,'callback']
+);
 
 // Logout User
-Route::post('/user/logout', function () {
-    Auth::guard('user')->logout();
+// Route::post('/user/logout', function () {
+//     Auth::guard('user')->logout();
+//     return redirect('/');
+// })->name('user.logout');
+Route::post('/logout', function () {
+
+    Auth::logout();
+
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+
     return redirect('/');
-})->name('user.logout');
+
+})->name('logout');
 
 
 /*
@@ -73,7 +104,7 @@ Route::post('/user/logout', function () {
 | 3. PROTECTED USER ROUTES (Harus Login Akun User)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:user')->group(function () {
+Route::middleware('auth')->group(function () {
 
     // ==========================
     // PROFILE USER
@@ -93,12 +124,15 @@ Route::middleware('auth:user')->group(function () {
     Route::get('/riwayat-merch', [UserController::class, 'myMerch'])
         ->name('user.merch');
 
+    Route::get('/tickets/{id}/refund', [BuyerRefundController::class, 'create'])->name('buyer.refund.create');
+    Route::post('/tickets/{id}/refund', [BuyerRefundController::class, 'store'])->name('buyer.refund.store');
+
     // ==========================
     // REGISTRASI EO
     // ==========================
     Route::get('/eo/register', function () {
 
-        $userId = Auth::guard('user')->id();
+        $userId = Auth::id();
 
         $eo = DB::table('eo')
             ->where('user_id', $userId)
@@ -162,17 +196,33 @@ Route::middleware('auth:user')->group(function () {
         Route::get('/transactions/export-pdf', [TransactionController::class, 'exportPDF'])
             ->name('transactions.export.pdf');
 
-        // =================================
-        // SALDO
-        // =================================
-        Route::get('/saldo', [SaldoController::class, 'index'])
-            ->name('saldo');
+        // // =================================
+        // // SALDO
+        // // =================================
+        // // Rute Finansial & Dompet Saldo (Grouped)
+        //         Route::get(
+        //     '/ticket-wallet',
+        //     [TicketWalletController::class, 'dashboard']
+        // )->name('ticket-wallet.dashboard');
 
-        Route::post('/withdraw', [SaldoController::class, 'store'])
-            ->name('withdraw.store');
+
+        Route::get('/ticket-withdraw/{eventId}',[TicketWithdrawalController::class, 'create'])->name('ticket-withdraw.create');
+        Route::post('/ticket-withdraw',[TicketWithdrawalController::class, 'store'])->name('ticket-withdraw.store');
+        Route::get('/ticket-history',[TicketHistoryController::class, 'index'])->name('ticket-history.index');
+        Route::get('/ticket-history/{id}',[TicketHistoryController::class, 'show'])->name('ticket-history.show');
+        Route::get('/ticket-wallet',[TicketWithdrawalController::class, 'index'])->name('ticket-wallet.dashboard');
+        Route::get('ticket-withdraw/tickets/{eventId}', [TicketWithdrawalController::class, 'soldTickets'])->name('eo.ticket-withdraw.tickets');
+
+        Route::get('/merch-wallet', [MerchWithdrawalController::class, 'index'])->name('merch-wallet.dashboard');
+        Route::get('/merch-wallet/create/{eventId}', [MerchWithdrawalController::class, 'create'])->name('merch-withdrawal.create');
+        Route::post('/merch-wallet/store', [MerchWithdrawalController::class, 'store'])->name('merch-withdrawal.store');
+        Route::get('/merch-wallet/detail/{id}', [MerchWithdrawalController::class, 'show'])->name('merch-withdrawal.show');
+        Route::get('merch-withdraw/history', [MerchWithdrawalController::class, 'history'])->name('merch-withdraw.history');
+        Route::get('merch-withdraw/history/{id}', [MerchWithdrawalController::class, 'showDetailHistory'])->name('merch-withdraw.history.detail');
+        Route::get('merch-withdraw/products/{eventId}', [MerchWithdrawalController::class, 'soldProducts'])->name('eo.merch-withdraw.products');
 
         // =================================
-        // MERCH EO
+        // MERCH DASHBOARD EO
         // =================================
         Route::resource('merch', EoMerchController::class);
 
@@ -224,6 +274,20 @@ Route::middleware('auth:user')->group(function () {
             'event/{event}/request-reschedule',
             [EoEventController::class, 'requestReschedule']
         )->name('event.request-reschedule');
+
+        // =================================
+        // PANTAUAN ABSENSI & MERCHANDISE (SISI EO)
+        // =================================
+        // 🎫 Sisi Tiket
+        Route::get('/absensi/tiket', [AbsensiController::class, 'indexPantauan'])->name('absensi.tiket');
+        Route::post('/absensi/manual/{id}', [AbsensiController::class, 'absenManual'])->name('absensi.manual');
+        Route::post('/absensi/batal/{id}', [AbsensiController::class, 'batalAbsen'])->name('absensi.batal');
+
+       // 📦 Sisi Penukaran Merchandise EO (Sekarang diarahkan ke AbsenMerchController)
+// 📦 Sisi Penukaran Merchandise EO
+        Route::get('/absensi/merch', [AbsenMerchController::class, 'indexMerch'])->name('absensi.merch');
+        Route::post('/absensi/merch/manual/{id}', [AbsenMerchController::class, 'merchManual'])->name('absensi.merch.manual');
+        Route::post('/absensi/merch/batal/{id}', [AbsenMerchController::class, 'batalMerch'])->name('absensi.merch.batal');
 
 
             
@@ -277,13 +341,15 @@ Route::get('/absen/{kode}', [AbsensiController::class, 'showPasswordForm'])->nam
 Route::post('/absen/{kode}', [AbsensiController::class, 'handleScan'])->name('absen.submit');
 
 
+
+
 /*
 |--------------------------------------------------------------------------
 | 6. ADMIN ROUTES (Manajemen Internal / Super Admin)
 |--------------------------------------------------------------------------
 */
-Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [LoginController::class, 'login'])->name('login.post');
+// Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+// Route::post('/login', [LoginController::class, 'login'])->name('login.post');
 
 Route::middleware('auth')->group(function () {
     
@@ -294,10 +360,21 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/dashboard', 'index')->name('admin.dashboard');
         Route::get('/admin/dashboard/export-excel', 'exportSimpleExcel')->name('admin.dashboard.export.excel');
         Route::get('/admin/dashboard/export-pdf', 'exportPDF')->name('admin.dashboard.export.pdf');
-        Route::get('/admin/absensi', 'absensi')->name('admin.absensi');
         Route::post('/admin/transactions/{id}/regenerate-qr', 'regenerateQR')->name('admin.transactions.regenerateQR');
         Route::post('/admin/transactions/regenerate-qr', 'regenerateAllQR')->name('admin.transactions.regenerate-qr');
     });
+
+    // SINKRONISASI: Satukan rute pantauan absensi Admin ke AbsensiController utama
+    Route::controller(AbsensiController::class)->group(function () {
+        Route::get('/admin/absensi', 'indexPantauan')->name('admin.absensi');
+        Route::post('/admin/absensi/manual/{id}', 'absenManual')->name('admin.absensi.manual'); // URL diperbaiki dengan /admin
+        Route::post('/admin/absensi/batal/{id}', 'batalAbsen')->name('admin.absensi.batal');   // URL diperbaiki dengan /admin
+    });
+
+    // Tambahkan rute POST ini di dalam web.php Anda (di kelompok Admin/Auth)
+// URL-nya disesuaikan dengan kebutuhan form-merch.blade.php Anda tanpa mengubah jalur scan awal
+Route::post('/guest/merch/qr/{kode_unik}/verify', [App\Http\Controllers\Admin\AbsenMerchController::class, 'verify'])->name('admin.absen.verify-merch');
+Route::post('/guest/merch/qr/{kode_unik}/store', [App\Http\Controllers\Admin\AbsenMerchController::class, 'store'])->name('admin.absen.store-merch');
 
     // Admin Merch Dashboard
     Route::controller(DashboardMerchController::class)->group(function () {
@@ -312,8 +389,6 @@ Route::middleware('auth')->group(function () {
     Route::controller(AdminController::class)->group(function () {
         Route::post('/admin/absensi/{transaction}/mark', 'markPresence')->name('admin.absensi.mark');
         Route::post('/admin/absensi/{transaction}/cancel', 'cancelPresence')->name('admin.absensi.cancel');
-        Route::post('/absensi/manual/{id}', 'absenManual')->name('admin.absensi.manual');
-        Route::post('/absensi/batal/{id}', 'batalAbsen')->name('admin.absensi.batal');
         Route::get('/admin/attendee/{email}', 'showAttendeeDetail')->name('admin.attendee.detail');
     });
 
@@ -342,6 +417,70 @@ Route::middleware('auth')->group(function () {
     Route::get('/guest/merch/qr/{kode_unik}', [MerchController::class, 'showQr'])->name('guests.merch.qr');
 });
 
+
+            // ==========================================
+            // 👨‍✈️ 1. GRUP ROUTE: ADMIN UTAMA (EKSEKUTOR)
+            // ==========================================
+            Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+                
+                // Halaman utama daftar batch & form buka batch
+                Route::get('/refunds', [AdminRefundController::class, 'index'])->name('refunds.index');
+                
+                // Aksi untuk membuka batch refund baru per event
+                Route::post('/refunds/batch', [AdminRefundController::class, 'storeBatch'])->name('refunds.storeBatch');
+                
+                // Melihat rincian rekening penonton di dalam batch tertentu
+                Route::get('/refunds/batch/{id}', [AdminRefundController::class, 'show'])->name('refunds.show');
+                
+                // Aksi tombol centang (Menyelesaikan batch & kalkulasi potong saldo/utang EO)
+                Route::post('/refunds/batch/{id}/complete', [AdminRefundController::class, 'completeBatch'])->name('refunds.completeBatch');
+                Route::get('/refunds', [AdminRefundController::class, 'index'])->name('refunds.index');
+                Route::get('/refunds/batch/{id}', [AdminRefundController::class, 'show'])->name('refunds.show');
+
+                // 🌟 RUTE BARU: Export Excel Berdasarkan ID Batch Refund
+                //  KODE BARU YANG SUDAH SINKRON:
+                Route::get('/refunds/batch/{id}/export-xendit', [AdminRefundController::class, 'exportXendit'])->name('refunds.exportXendit');
+                Route::patch('/refunds/batch/{id}/toggle-status', [AdminRefundController::class, 'toggleStatus'])->name('refunds.toggleStatus');
+                
+            });
+
+
+            // ==========================================
+            // 👑 2. GRUP ROUTE: OWNER UTAMA (MONITORING)
+            // ==========================================
+            Route::middleware(['auth'])->prefix('owner')->name('owner.')->group(function () {
+                
+                // Halaman utama dashboard pengawasan audit refund & list utang EO global
+                Route::get('/refund-monitoring', [OwnerRefundMonitoringController::class, 'index'])->name('refunds.monitor');
+                
+                // Melihat rincian data batch tertentu tanpa tombol aksi eksekusi (read-only)
+                Route::get('/refund-monitoring/batch/{id}', [OwnerRefundMonitoringController::class, 'showBatchDetails'])->name('refunds.monitor.show');
+                
+            });
+
+
+            // ==========================================
+            // 🤝 3. GRUP ROUTE: EVENT ORGANIZER (TRANSPARANSI)
+            // ==========================================
+            Route::middleware(['auth'])->prefix('eo')->name('eo.')->group(function () {
+                
+                // Halaman utama EO melihat status refund event mereka & rekap log utang sendiri
+                Route::get('/refunds', [EORefundController::class, 'index'])->name('refunds.index');
+                
+                // Melihat data penonton mereka yang mengajukan refund (tanpa nomor rekening penuh)
+                Route::get('/refunds/batch/{id}', [EORefundController::class, 'showBatchDetails'])->name('refunds.show');
+
+                
+                
+            });
+
+            // Pastikan user sudah login terlebih dahulu
+Route::middleware(['auth'])->group(function () {
+    
+    // Route Dompet Platform yang dishare untuk Admin dan Owner
+    Route::get('/global-platform-wallet', [PlatformWalletController::class, 'index'])->name('platform.wallet.index');
+
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -378,13 +517,27 @@ Route::middleware('auth')->group(function () {
         Route::put('/events/{event}/reject-cancel', [EventApprovalController::class, 'rejectCancel'])->name('events.reject-cancel');
     });
 
-    // Withdrawal Approval Group
+
+// =========================================================================
+    // Withdrawal Approval Group (SUDAH DIPERBAIKI URUTANNYA)
+    // =========================================================================
     Route::prefix('owner')->name('owner.')->group(function () {
+        
+        // 1. Letakkan rute index utama tiket paling atas
         Route::get('/withdrawals', [WithdrawalApprovalController::class, 'index'])->name('withdrawals.index');
+        
+        // 2. Letakkan rute Merchandise DISINI (Sebelum rute wildcard {})
+        Route::get('withdrawals/merch', [MerchWithdrawalApprovalController::class, 'index'])->name('withdrawals.merch.index');
+        Route::get('withdrawals/merch/{id}', [MerchWithdrawalApprovalController::class, 'show'])->name('withdrawals.merch.show');
+        Route::post('withdrawals/merch/{id}/approve', [MerchWithdrawalApprovalController::class, 'approve'])->name('withdrawals.merch.approve');
+        Route::post('withdrawals/merch/{id}/reject', [MerchWithdrawalApprovalController::class, 'reject'])->name('withdrawals.merch.reject');
+
+        // 3. Letakkan rute detail wildcard tiket PALING BAWAH agar tidak memotong rute merch
         Route::get('/withdrawals/{withdrawal}', [WithdrawalApprovalController::class, 'show'])->name('withdrawals.show');
         Route::post('/withdrawals/{withdrawal}/approve', [WithdrawalApprovalController::class, 'approve'])->name('withdrawals.approve');
         Route::post('/withdrawals/{withdrawal}/reject', [WithdrawalApprovalController::class, 'reject'])->name('withdrawals.reject');
     });
+
 });
 
 

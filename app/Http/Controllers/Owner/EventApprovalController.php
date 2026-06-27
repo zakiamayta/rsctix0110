@@ -124,6 +124,7 @@ public function approveReschedule(Event $event)
         'date' => $event->proposed_date,
         'status' => 'approved',
         'proposed_date' => null,
+        'is_rescheduled' => $event->is_rescheduled + 1,
 
         // kasih hak edit sekali
         'can_adjust_schedule' => true,

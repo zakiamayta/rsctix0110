@@ -32,7 +32,7 @@
           </svg>
         </div>
 
-    @if(auth('user')->check())
+    @if(auth()->check())
 
     <div class="relative">
 
@@ -42,7 +42,7 @@
             class="flex items-center focus:outline-none"
         >
             <img
-                src="{{ auth('user')->user()->avatar }}"
+                src="{{ auth()->user()->avatar }}"
                 alt="Avatar"
                 class="w-10 h-10 rounded-full object-cover border border-gray-300"
                 referrerpolicy="no-referrer"
@@ -57,10 +57,10 @@
             {{-- Header: Nama & Email --}}
             <div class="px-4 py-3 border-b">
                 <p class="text-sm font-semibold text-gray-800">
-                    {{ auth('user')->user()->name }}
+                    {{ auth()->user()->name }}
                 </p>
                 <p class="text-xs text-gray-500">
-                    {{ auth('user')->user()->email }}
+                    {{ auth()->user()->email }}
                 </p>
             </div>
 
@@ -72,7 +72,7 @@
 
             {{-- Menu: Dashboard EO (hanya jika role eo & approved) --}}
             @php
-                $user = auth('user')->user();
+                $user = auth()->user();
                 $eo = \App\Models\Eo::where('user_id', $user->id)->first();
             @endphp
 
@@ -84,7 +84,7 @@
             @endif
 
             {{-- Menu: Logout --}}
-            <form method="POST" action="{{ route('user.logout') }}">
+            <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button
                     type="submit"

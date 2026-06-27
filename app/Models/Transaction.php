@@ -6,47 +6,41 @@ use Illuminate\Database\Eloquent\Model;
 
 class Transaction extends Model
 {
-    protected $fillable = [
-        'user_id',
+    protected $table = 'transactions'; // Definisikan secara eksplisit
 
-        // pembayaran
+    protected $fillable = [
+        'kode_unik',         // ✅ Ditambahkan sesuai database
+        'event_id',          // ✅ Ditambahkan sesuai database
+        'jadwal_id',         // ✅ Ditambahkan sesuai database
+        'payment_method',
+        'payment_status',    // Di database namanya payment_status (bukan status)
+        'email',
+        'checkout_time',
+        'paid_time',
+        'xendit_invoice_id',
+        'xendit_invoice_url',
+        'qr_code',
         'total_amount',
         'service_tax',
         'grand_total',
-
-        'payment_method',
-        'status',
-        'payment_status',
-
-        // user
-        'email',
-
-        // waktu
-        'checkout_time',
-        'paid_time',
-
-        // xendit
-        'xendit_invoice_id',
-        'xendit_invoice_url',
-
-        // qr
-        'qr_code',
+        'is_registered',     // ✅ Ditambahkan sesuai database
+        'registered_at',     // ✅ Ditambahkan sesuai database
     ];
+
+    public $timestamps = true;
 
     public function event()
     {
         return $this->belongsTo(Event::class, 'event_id', 'id');
     }
 
-    public function attendees()
-    {
-        return $this->hasMany(TicketAttendee::class, 'transaction_id');
-    }
-
     public function jadwal()
     {
-        return $this->belongsTo(\App\Models\Jadwal::class, 'jadwal_id');
+        return $this->belongsTo(Jadwal::class, 'jadwal_id', 'id');
     }
 
-    public $timestamps = true;
+    public function attendees()
+    {
+        return $this->hasMany(TicketAttendee::class, 'transaction_id', 'id');
+    }
 }

@@ -18,7 +18,7 @@ class EoMerchController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth('user')->user();
+        $user = auth()->user();
 
         $eo = DB::table('eo')->where('user_id', $user->id)->first();
 
@@ -144,7 +144,7 @@ class EoMerchController extends Controller
     }
     public function edit($id)
 {
-    $user = auth('user')->user();
+    $user = auth()->user();
 
     $eo = DB::table('eo')
         ->where('user_id', $user->id)

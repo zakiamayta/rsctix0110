@@ -12,41 +12,28 @@ class TransactionMerch extends Model
     protected $table = 'transaction_merch';
 
     protected $fillable = [
-
-        // subtotal barang
-        'total_amount',
-
-        // biaya layanan
-        'service_tax',
-
-        // total akhir pembayaran
-        'grand_total',
-
+        'event_id', // ✅ Wajib ditambahkan karena ada FK fk_transaction_merch_event
         'kode_unik',
+        'total_amount',
+        'service_tax',
+        'grand_total',
         'payment_status',
-
         'email',
-
         'checkout_time',
         'paid_time',
-
         'xendit_invoice_id',
         'xendit_invoice_url',
-
         'qr_code',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | RELATION
-    |--------------------------------------------------------------------------
-    */
+    // ✅ Ditambahkan relasi ke Event
+    public function event()
+    {
+        return $this->belongsTo(Event::class, 'event_id', 'id');
+    }
 
     public function details()
     {
-        return $this->hasMany(
-            TransactionMerchDetail::class,
-            'transaction_merch_id'
-        );
+        return $this->hasMany(TransactionMerchDetail::class, 'transaction_merch_id', 'id');
     }
 }

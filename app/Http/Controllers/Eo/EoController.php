@@ -133,7 +133,7 @@ class EoController extends Controller
 
     public function profile()
 {
-    $user = auth('user')->user();
+    $user = auth()->user();
 
     $eo = \App\Models\Eo::where('user_id', $user->id)->first();
 
@@ -142,7 +142,7 @@ class EoController extends Controller
 
 public function updateProfile(Request $request)
 {
-    $user = auth('user')->user();
+    $user = auth()->user();
 
     $eo = \App\Models\Eo::where('user_id', $user->id)->first();
 
