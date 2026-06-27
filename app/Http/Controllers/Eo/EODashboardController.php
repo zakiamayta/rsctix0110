@@ -20,11 +20,11 @@ class EoDashboardController extends Controller
     {
         $this->middleware(function ($request, $next) {
 
-            if (!auth('user')->check()) {
-                return redirect()->route('loginuser');
+            if (!auth()->check()) {
+                return redirect()->route('login');
             }
 
-            $user = auth('user')->user();
+            $user = auth()->user();
 
             $eo = Eo::where('user_id', $user->id)->first();
 
@@ -42,7 +42,7 @@ class EoDashboardController extends Controller
 
     public function index()
     {
-        $user = auth('user')->user();
+        $user = auth()->user();
 
         /*
         |--------------------------------------------------------------------------

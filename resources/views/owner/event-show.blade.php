@@ -17,12 +17,7 @@
         </p>
     </div>
 
-    {{-- ALERT --}}
-    @if(session('success'))
-        <div class="mb-4 bg-green-100 text-green-700 px-4 py-3 rounded-lg">
-            {{ session('success') }}
-        </div>
-    @endif
+
 
     {{-- CARD --}}
     <div class="bg-white rounded-2xl shadow p-6">
@@ -73,18 +68,48 @@
                 </p>
             </div>
 
+            {{-- TANGGAL BARU RESCHEDULE --}}
+            @if($event->status == 'pending_reschedule')
             <div>
-                <label class="text-sm text-gray-500">Status</label>
+                <label class="text-sm text-gray-500">
+                    Tanggal Baru Yang Diajukan
+                </label>
+
+                <p class="font-semibold text-blue-600">
+                    {{ $event->proposed_date }}
+                </p>
+            </div>
+            @endif
+
+            <div>
+                <label class="text-sm text-gray-500 mb-1 block">Status</label>
 
                 @if($event->status == 'pending')
                     <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs">
-                        Pending
+                        Pending Approval
                     </span>
+
                 @elseif($event->status == 'approved')
                     <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs">
                         Approved
                     </span>
-                @else
+
+                @elseif($event->status == 'pending_cancel')
+                    <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">
+                        Pending Cancel
+                    </span>
+
+                @elseif($event->status == 'pending_reschedule')
+                    <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                        Pending Reschedule
+                    </span>
+
+                @elseif($event->status == 'cancelled')
+                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">
+                        Cancelled
+                    </span>
+
+                @elseif($event->status == 'rejected')
                     <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs">
                         Rejected
                     </span>
@@ -92,6 +117,19 @@
             </div>
 
         </div>
+
+        {{-- ALASAN RESCHEDULE --}}
+        @if($event->status == 'pending_reschedule')
+        <div class="mt-6">
+            <label class="text-sm text-gray-500">
+                Alasan Reschedule
+            </label>
+
+            <div class="mt-2 border rounded-xl p-4 bg-blue-50 text-blue-800">
+                {{ $event->reschedule_reason }}
+            </div>
+        </div>
+        @endif
 
         {{-- DESKRIPSI --}}
         <div class="mt-6">
@@ -171,36 +209,73 @@
 
     </div>
 
-    {{-- ACTION --}}
-    @if($event->status == 'pending')
+    {{-- ACTION BUTTON OWNER --}}
+    <div class="flex gap-3 mt-6 flex-wrap">
 
-    <div class="flex gap-3 mt-6">
+        {{-- APPROVAL EVENT BARU --}}
+        @if($event->status == 'pending')
 
-        <form method="POST"
-              action="{{ route('owner.events.approve', $event->id) }}">
+            <form method="POST" action="{{ route('owner.events.approve', $event->id) }}">
+                @csrf
+                <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Approve Event
+                </button>
+            </form>
 
-            @csrf
+            <form method="POST" action="{{ route('owner.events.reject', $event->id) }}">
+                @csrf
+                <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Reject Event
+                </button>
+            </form>
 
-            <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl">
-                Approve Event
-            </button>
+        {{-- APPROVAL CANCEL --}}
+        @elseif($event->status == 'pending_cancel')
 
-        </form>
+            <form method="POST" action="{{ route('owner.events.confirm-cancel', $event->id) }}">
+                @csrf
+                @method('PUT')
 
-        <form method="POST"
-              action="{{ route('owner.events.reject', $event->id) }}">
+                <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Setujui Pembatalan Event
+                </button>
+            </form>
 
-            @csrf
+            <form method="POST" action="{{ route('owner.events.reject-cancel', $event->id) }}">
+                @csrf
+                @method('PUT')
 
-            <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl">
-                Reject Event
-            </button>
+                <button class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-xl text-sm font-semibold">
+                    Tolak Pembatalan
+                </button>
+            </form>
 
-        </form>
+        {{-- APPROVAL RESCHEDULE --}}
+        @elseif($event->status == 'pending_reschedule')
+
+            <form method="POST"
+                  action="{{ route('owner.events.approve-reschedule', $event->id) }}">
+                @csrf
+                @method('PUT')
+
+                <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                    Setujui Reschedule
+                </button>
+            </form>
+
+            <form method="POST"
+                  action="{{ route('owner.events.reject-reschedule', $event->id) }}">
+                @csrf
+                @method('PUT')
+
+                <button class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-xl text-sm font-semibold">
+                    Tolak Reschedule
+                </button>
+            </form>
+
+        @endif
 
     </div>
-
-    @endif
 
 </div>
 

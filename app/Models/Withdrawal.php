@@ -10,19 +10,30 @@ class Withdrawal extends Model
 
     protected $fillable = [
         'eo_id',
+        'event_id',
         'amount',
-        'bank_name',
-        'account_name',
-        'account_number',
         'note',
+        'owner_note',
+        'invoice_file',
         'transfer_proof',
         'status',
         'approved_at',
+        'paid_at',
     ];
 
     public function eo()
     {
-        return $this->belongsTo(Eo::class);
+        return $this->belongsTo(
+            Eo::class,
+            'eo_id'
+        );
     }
-    
+
+    public function event()
+    {
+        return $this->belongsTo(
+            Event::class,
+            'event_id'
+        );
+    }
 }

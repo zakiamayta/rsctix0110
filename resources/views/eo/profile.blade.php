@@ -27,12 +27,12 @@
 
 </div>
 
-{{-- ALERT --}}
+<!-- {{-- ALERT --}}
 @if(session('success'))
 <div class="mb-5 px-4 py-3 rounded-xl bg-green-100 text-green-700">
     {{ session('success') }}
 </div>
-@endif
+@endif -->
 
 {{-- PROFILE CARD --}}
 <div class="grid grid-cols-3 gap-6">

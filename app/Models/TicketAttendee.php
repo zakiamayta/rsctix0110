@@ -15,15 +15,22 @@ class TicketAttendee extends Model
         'name',
         'phone_number',
         'ticket_id',
+        'jadwal_id', // ✅ Ditambahkan sesuai database
     ];
 
     public function transaction()
     {
-        return $this->belongsTo(Transaction::class, 'transaction_id');
+        return $this->belongsTo(Transaction::class, 'transaction_id', 'id');
     }
 
     public function ticket()
     {
-        return $this->belongsTo(Ticket::class, 'ticket_id');
+        return $this->belongsTo(Ticket::class, 'ticket_id', 'id');
+    }
+
+    // ✅ Ditambahkan relasi ke Jadwal sesuai database
+    public function jadwal()
+    {
+        return $this->belongsTo(Jadwal::class, 'jadwal_id', 'id');
     }
 }

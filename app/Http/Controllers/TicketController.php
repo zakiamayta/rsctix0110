@@ -238,13 +238,26 @@ class TicketController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | SERVICE TAX ADMIN
+            | SERVICE TAX ADMIN (MODIFIED LOGIC)
             |--------------------------------------------------------------------------
             */
 
-            $servicePercent = 10;
-
-            $serviceTax = ($totalTicketAmount * $servicePercent) / 100;
+            if ($totalTicketAmount == 0) {
+                $serviceTax = 0;
+            } elseif ($totalTicketAmount <= 500000) {
+                // Tiket Rp1 - Rp500.000: Biaya layanan 5%, minimal Rp2.500
+                $calculatedTax = ($totalTicketAmount * 5) / 100;
+                $serviceTax = max(2500, $calculatedTax);
+            } elseif ($totalTicketAmount <= 1500000) {
+                // Tiket Rp500.001 - Rp1.500.000: Biaya layanan 3%
+                $serviceTax = ($totalTicketAmount * 3) / 100;
+            } elseif ($totalTicketAmount <= 2500000) {
+                // Tiket Rp1.500.001 - Rp2.500.000: Biaya layanan 2%
+                $serviceTax = ($totalTicketAmount * 2) / 100;
+            } else {
+                // Tiket di atas Rp2.500.000: Flat Rp50.000
+                $serviceTax = 50000;
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -794,5 +807,4 @@ class TicketController extends Controller
             'details'     => $details
         ]);
     }
-    
 }

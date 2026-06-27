@@ -70,43 +70,33 @@
                 <div class="col-lg-6 p-5 d-flex align-items-center">
                     <div class="w-100" style="max-width:420px; margin:auto;">
 
-                        <div class="mb-4 text-center">
-                            <h2 class="fw-bold mb-1">Masuk ke RSCtix</h2>
-                            <p class="text-muted">
-                                User · EO · Admin · Owner
+                        <div class="text-center">
+
+                            <h2 class="fw-bold mb-2">
+                                Masuk ke RSCtix
+                            </h2>
+
+                            <p class="text-muted mb-4">
+                                Login menggunakan akun Google
                             </p>
+
+                            <a
+                                href="{{ route('google.login') }}"
+                                class="btn btn-light border w-100 py-3 d-flex align-items-center justify-content-center gap-3 rounded-4"
+                            >
+
+                                <img
+                                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                    width="22"
+                                >
+
+                                <span class="fw-semibold">
+                                    Lanjut dengan Google
+                                </span>
+
+                            </a>
+
                         </div>
-
-                        @if (session('error'))
-                            <div class="alert alert-danger">
-                                {{ session('error') }}
-                            </div>
-                        @endif
-
-                        <form method="POST" action="{{ route('login') }}">
-                            @csrf
-
-                            <div class="mb-3">
-                                <label class="form-label">Email</label>
-                                <input type="email" name="email"
-                                       value="{{ old('email') }}"
-                                       class="form-control"
-                                       placeholder="email@example.com"
-                                       required>
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="form-label">Password</label>
-                                <input type="password" name="password"
-                                       class="form-control"
-                                       placeholder="••••••••"
-                                       required>
-                            </div>
-
-                            <button type="submit" class="w-100 btn-gradient-orange">
-                                Masuk Sekarang
-                            </button>
-                        </form>
 
                         <div class="text-center mt-4 text-muted" style="font-size:.85rem;">
                             © {{ date('Y') }} RSCtix · Platform Tiket Event

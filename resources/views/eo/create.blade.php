@@ -330,6 +330,12 @@ textarea.rsc-input {
   flex-direction: column;
   gap: 14px;
 }
+
+.rsc-input:disabled{
+    background:#f3f3f3;
+    cursor:not-allowed;
+    opacity:.7;
+}
 </style>
 
 <div class="rsc-wrap">
@@ -369,7 +375,7 @@ textarea.rsc-input {
 
         <div class="field-group">
           <label>Tanggal Event</label>
-          <input type="datetime-local" name="date" class="rsc-input" required>
+          <input type="datetime-local"id="eventDate" name="date" class="rsc-input"required>
         </div>
 
         <div class="field-group">
@@ -464,61 +470,490 @@ textarea.rsc-input {
 </div>
 
 <script>
+function getEventDate()
+{
+    return document.getElementById('eventDate').value;
+}
+
+document.querySelector(
+    'input[name="ticket_sale_start"]'
+).addEventListener('change', function(){
+
+
+
+    const eventValue = getEventDate();
+
+    if(!eventValue){
+        alert(
+            'Isi tanggal event terlebih dahulu.'
+        );
+
+        this.value = '';
+        return;
+    }
+
+    const eventDate =
+        new Date(eventValue);
+
+    const saleDate =
+        new Date(this.value);
+
+    const latestAllowed =
+        new Date(eventDate);
+
+    latestAllowed.setDate(
+        latestAllowed.getDate() - 2
+    );
+
+    if(saleDate > latestAllowed){
+
+        alert(
+            'Mulai penjualan tiket harus minimal H-2 sebelum event.'
+        );
+
+        this.value = '';
+    }
+        updateTicketSaleInputs();
+
+});
+
 let jadwalIndex = 0;
 
-function addJadwal() {
-  const wrapper = document.getElementById('jadwal-wrapper');
+function addJadwal()
+{
 
-  const html = `
-  <div class="jadwal-item">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div class="jadwal-label">Jadwal #${jadwalIndex + 1}</div>
-      <button type="button" class="btn-remove"
-              onclick="this.closest('.jadwal-item').remove()">
-        ✕ Hapus
-      </button>
+    let defaultDate = getEventDate();
+
+    if(jadwalIndex > 0){
+
+        const previousInput =
+            document.querySelector(
+                `input[name="jadwal[${jadwalIndex - 1}][tanggal]"]`
+            );
+
+        if(previousInput?.value){
+
+            const nextDate =
+                new Date(previousInput.value);
+
+            nextDate.setDate(
+                nextDate.getDate() + 1
+            );
+
+            defaultDate =
+                nextDate
+                .toISOString()
+                .slice(0,16);
+        }
+    }
+
+
+
+    const wrapper =
+        document.getElementById('jadwal-wrapper');
+
+    const isFirstJadwal = jadwalIndex === 0;
+
+    const html = `
+    <div class="jadwal-item">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+
+            <div class="jadwal-label">
+                Jadwal #${jadwalIndex + 1}
+            </div>
+
+            ${
+                isFirstJadwal
+                ? ''
+                : `
+                <button
+                    type="button"
+                    class="btn-remove"
+                    onclick="this.closest('.jadwal-item').remove()">
+                    ✕ Hapus
+                </button>
+                `
+            }
+
+        </div>
+
+        <div class="field-grid">
+
+            <div class="field-group">
+
+                <label>Info Jadwal</label>
+
+                <input
+                    type="text"
+                    name="jadwal[${jadwalIndex}][info]"
+                    class="rsc-input"
+                    required>
+
+            </div>
+
+            <div class="field-group">
+
+                <label>Tanggal & Waktu</label>
+
+                <input
+                    type="datetime-local"
+                    name="jadwal[${jadwalIndex}][tanggal]"
+                    class="rsc-input jadwal-date"
+                    value="${defaultDate}"
+                    ${isFirstJadwal ? 'readonly' : ''}
+                    required>
+
+            </div>
+
+            <div class="field-group span2">
+
+                <label>Deskripsi Jadwal</label>
+
+                <textarea
+                    name="jadwal[${jadwalIndex}][deskripsi]"
+                    class="rsc-input"></textarea>
+
+            </div>
+
+        </div>
+
+        <div class="ticket-box">
+
+            <div class="ticket-box-header">
+
+                <span class="ticket-box-label">
+                    Tiket
+                </span>
+
+                <button
+                    type="button"
+                    class="btn-add-ticket"
+                    onclick="addTicket(${jadwalIndex})">
+
+                    + Tiket
+
+                </button>
+
+            </div>
+
+            <div id="ticket-wrapper-${jadwalIndex}">
+            </div>
+
+        </div>
+
     </div>
+    `;
 
-    <div class="field-grid" style="margin-bottom:0;">
-      <div class="field-group">
-        <label>Info Jadwal</label>
-        <input type="text"
-               name="jadwal[${jadwalIndex}][info]"
-               class="rsc-input" placeholder="Misal: Hari 1 / Stage A"
-               required>
-      </div>
+    wrapper.insertAdjacentHTML(
+        'beforeend',
+        html
+    );
 
-      <div class="field-group">
-        <label>Tanggal & Waktu</label>
-        <input type="datetime-local"
-               name="jadwal[${jadwalIndex}][tanggal]"
-               class="rsc-input" required>
-      </div>
 
-      <div class="field-group span2">
-        <label>Deskripsi Jadwal</label>
-        <textarea name="jadwal[${jadwalIndex}][deskripsi]"
-                  class="rsc-input" style="min-height:64px;"
-                  placeholder="Opsional…"></textarea>
-      </div>
-    </div>
 
-    <div class="ticket-box">
-      <div class="ticket-box-header">
-        <span class="ticket-box-label">Tiket</span>
-        <button type="button" class="btn-add-ticket"
-                onclick="addTicket(${jadwalIndex})">
-          + Tiket
-        </button>
-      </div>
-      <div id="ticket-wrapper-${jadwalIndex}"></div>
-    </div>
-  </div>`;
+    addTicket(jadwalIndex);
 
-  wrapper.insertAdjacentHTML('beforeend', html);
-  addTicket(jadwalIndex);
-  jadwalIndex++;
+        updateTicketSaleInputs();
+
+    jadwalIndex++;
 }
+
+document
+.getElementById('eventDate')
+.addEventListener('change', function(){
+
+    const firstJadwal =
+        document.querySelector('.jadwal-date');
+
+    if(firstJadwal){
+        firstJadwal.value = this.value;
+    }
+
+});
+
+document.querySelector(
+    'input[name="ticket_redeem_start"]'
+)?.addEventListener('change', function(){
+
+    const saleStart =
+        document.querySelector(
+            'input[name="ticket_sale_start"]'
+        )?.value;
+
+    const eventValue =
+        getEventDate();
+
+    if(!saleStart){
+
+        alert(
+            'Isi tanggal mulai penjualan tiket terlebih dahulu.'
+        );
+
+        this.value = '';
+        return;
+    }
+
+    if(!eventValue){
+        return;
+    }
+
+    const redeemDate =
+        new Date(this.value);
+
+    const saleDate =
+        new Date(saleStart);
+
+    const eventDate =
+        new Date(eventValue);
+
+    if(redeemDate < saleDate){
+
+        alert(
+            'Tanggal redeem tidak boleh sebelum tanggal mulai penjualan tiket.'
+        );
+
+        this.value = '';
+        return;
+    }
+
+    if(redeemDate > eventDate){
+
+        alert(
+            'Tanggal redeem tidak boleh melebihi tanggal event.'
+        );
+
+        this.value = '';
+    }
+
+    updateTicketSaleInputs();
+
+});
+
+document.addEventListener(
+    'change',
+    function(e){
+
+        if(
+            !e.target.classList.contains(
+                'jadwal-date'
+            )
+        ){
+            return;
+        }
+
+        const eventValue =
+            getEventDate();
+
+        if(!eventValue){
+            return;
+        }
+
+        const eventDate =
+            new Date(eventValue);
+
+        const jadwalDate =
+            new Date(e.target.value);
+
+        const maxDate =
+            new Date(eventValue);
+
+        maxDate.setDate(
+            maxDate.getDate() + 14
+        );
+
+        const match =
+            e.target.name.match(
+                /jadwal\[(\d+)\]/
+            );
+
+        let previousInput = null;
+
+        if(match){
+
+            const currentIndex =
+                parseInt(match[1]);
+
+            if(currentIndex > 0){
+
+                previousInput =
+                    document.querySelector(
+                        `input[name="jadwal[${currentIndex - 1}][tanggal]"]`
+                    );
+
+                if(previousInput?.value){
+
+                    const previousDate =
+                        new Date(
+                            previousInput.value
+                        );
+
+                    if(
+                        jadwalDate <
+                        previousDate
+                    ){
+
+                        alert(
+                            'Tanggal jadwal tidak boleh lebih awal dari jadwal sebelumnya.'
+                        );
+
+                        e.target.value =
+                            previousInput.value;
+
+                        return;
+                    }
+
+                }
+
+            }
+
+        }
+
+        if(jadwalDate < eventDate){
+
+            alert(
+                'Tanggal jadwal tidak boleh mendahului tanggal event.'
+            );
+
+            e.target.value =
+                eventValue;
+
+            return;
+        }
+
+        if(jadwalDate > maxDate){
+
+            alert(
+                'Tanggal jadwal maksimal 14 hari setelah event.'
+            );
+
+            e.target.value =
+                previousInput?.value ||
+                eventValue;
+
+            return;
+        }
+
+    }
+);
+
+document.addEventListener('change', function(e){
+
+    if(
+        !e.target.name ||
+        !e.target.name.includes('[start_sale]')
+    ){
+        return;
+    }
+
+    const eventValue =
+        getEventDate();
+
+    const globalSaleStart =
+        document.querySelector(
+            'input[name="ticket_sale_start"]'
+        )?.value;
+
+    if(!eventValue){
+        alert('Isi tanggal event terlebih dahulu.');
+        e.target.value = '';
+        return;
+    }
+
+    const saleDate =
+        new Date(e.target.value);
+
+    const eventDate =
+        new Date(eventValue);
+
+    const latestAllowed =
+        new Date(eventDate);
+
+    latestAllowed.setDate(
+        latestAllowed.getDate() - 2
+    );
+
+    // wajib H-2
+    if(saleDate > latestAllowed){
+
+        alert(
+            'Mulai penjualan tiket minimal H-2 sebelum event.'
+        );
+
+        e.target.value = '';
+        return;
+    }
+
+
+    if(globalSaleStart){
+
+    const globalDate =
+        new Date(globalSaleStart);
+
+    if(saleDate < globalDate){
+
+        alert(
+            'Penjualan tiket tidak boleh sebelum tanggal Mulai Penjualan Tiket Event.'
+        );
+
+        e.target.value = '';
+        return;
+    }
+
+}
+    
+
+});
+
+document.addEventListener('change', function(e){
+
+    const eventDate =
+        new Date(getEventDate());
+
+    if(
+        e.target.name &&
+        e.target.name.includes('[end_sale]')
+    ){
+
+        const endDate =
+            new Date(e.target.value);
+
+        const ticketItem =
+            e.target.closest('.ticket-item');
+
+        const startInput =
+            ticketItem.querySelector(
+                'input[name*="[start_sale]"]'
+            );
+
+        if(startInput?.value){
+
+            const startDate =
+                new Date(startInput.value);
+
+            if(endDate < startDate){
+
+                alert(
+                    'Akhir penjualan tiket tidak boleh sebelum mulai penjualan tiket.'
+                );
+
+                e.target.value = '';
+                return;
+            }
+        }
+
+        if(endDate > eventDate){
+
+            alert(
+                'Akhir penjualan tiket tidak boleh melebihi tanggal event.'
+            );
+
+            e.target.value = '';
+            return;
+        }
+    }
+
+});
 
 function addTicket(jadwalId) {
   const wrapper = document.getElementById(`ticket-wrapper-${jadwalId}`);
@@ -556,19 +991,54 @@ function addTicket(jadwalId) {
       <div class="field-group">
         <label>Mulai Jual</label>
         <input type="datetime-local"
-               name="jadwal[${jadwalId}][tickets][${ticketId}][start_sale]"
-               class="rsc-input">
+              name="jadwal[${jadwalId}][tickets][${ticketId}][start_sale]"
+              class="rsc-input ticket-start-sale"
+              disabled>
       </div>
       <div class="field-group">
         <label>Akhir Jual</label>
         <input type="datetime-local"
-               name="jadwal[${jadwalId}][tickets][${ticketId}][end_sale]"
-               class="rsc-input">
+              name="jadwal[${jadwalId}][tickets][${ticketId}][end_sale]"
+              class="rsc-input ticket-end-sale"
+              disabled>
       </div>
     </div>
   </div>`;
 
   wrapper.insertAdjacentHTML('beforeend', html);
+
+  updateTicketSaleInputs();
+}
+
+function updateTicketSaleInputs()
+{
+    const saleStart =
+        document.querySelector(
+            'input[name="ticket_sale_start"]'
+        )?.value;
+
+    const redeemStart =
+        document.querySelector(
+            'input[name="ticket_redeem_start"]'
+        )?.value;
+
+    const enabled =
+        saleStart &&
+        redeemStart;
+
+    document
+        .querySelectorAll(
+            '.ticket-start-sale, .ticket-end-sale'
+        )
+        .forEach(input => {
+
+            input.disabled = !enabled;
+
+            if(!enabled){
+                input.value = '';
+            }
+
+        });
 }
 
 function previewPoster(event) {

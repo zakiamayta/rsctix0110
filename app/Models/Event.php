@@ -25,6 +25,11 @@ class Event extends Model
         'max_tickets_per_email',
         'status',
         'eo_note',
+        'proposed_date',
+        'is_rescheduled',
+        'reschedule_reason',
+        'can_adjust_schedule',
+        'owner_note',
     ];
 
     protected $casts = [
@@ -32,9 +37,6 @@ class Event extends Model
         'ticket_sale_start' => 'datetime',
         'ticket_redeem_start' => 'datetime',
     ];
-
-
-
 
     public function products()
     {
@@ -50,9 +52,10 @@ class Event extends Model
     {
         return $this->hasMany(ProductUkuran::class, 'event_id');
     }
+
     public function tickets()
     {
-        return $this->hasMany(Ticket::class);
+        return $this->hasMany(Ticket::class, 'event_id');
     }
     
     public function jadwals()
@@ -61,9 +64,60 @@ class Event extends Model
     }
 
     public function eo()
-{
-    return $this->belongsTo(\App\Models\Eo::class);
-}
+    {
+        return $this->belongsTo(\App\Models\Eo::class, 'eo_id');
+    }
 
+    public function wallet()
+    {
+        return $this->hasOne(
+            EventWallet::class,
+            'event_id'
+        );
+    }
 
+    public function merchWallet()
+    {
+        return $this->hasOne(
+            MerchWallet::class,
+            'event_id'
+        );
+    }
+
+    public function withdrawals()
+    {
+        return $this->hasMany(
+            Withdrawal::class,
+            'event_id'
+        );
+    }
+
+    public function merchWithdrawals()
+    {
+        return $this->hasMany(
+            MerchWithdrawal::class,
+            'event_id'
+        );
+    }
+
+    public function eventWallet()
+    {
+        return $this->hasOne(\App\Models\EventWallet::class, 'event_id');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 🆕 NEW REFUND & DEBT RELATIONS
+    |--------------------------------------------------------------------------
+    */
+
+    public function refundBatches()
+    {
+        return $this->hasMany(RefundBatch::class, 'event_id');
+    }
+
+    public function debts()
+    {
+        return $this->hasMany(EODebt::class, 'event_id');
+    }
 }

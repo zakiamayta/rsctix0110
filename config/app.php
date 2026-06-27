@@ -161,6 +161,7 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
+        Maatwebsite\Excel\ExcelServiceProvider::class,
 
         /*
          * Application Service Providers...
@@ -175,6 +176,7 @@ return [
 
     'aliases' => [
     'QrCode' => SimpleSoftwareIO\QrCode\Facades\QrCode::class,
+    'Excel' => Maatwebsite\Excel\Facades\Excel::class,
 ],
 
 

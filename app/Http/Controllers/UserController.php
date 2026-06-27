@@ -8,24 +8,30 @@ use App\Models\TransactionMerch;
 
 class UserController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | RIWAYAT TIKET
-    |--------------------------------------------------------------------------
-    */
-
     public function myTickets()
     {
-        $user = Auth::guard('user')->user();
+        $user = Auth::user(); 
 
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu.');
+        }
+
+        // Mengambil semua jenis transaksi (termasuk paid, unpaid, dan refunded)
         $transactions = DB::table('transactions')
-            ->where('email', $user->email)
-            ->orderByDesc('checkout_time')
+            ->join('events', 'transactions.event_id', '=', 'events.id')
+            ->leftJoin('refunds', 'transactions.id', '=', 'refunds.transaction_id')
+            ->where('transactions.email', $user->email)
+            ->select(
+                'transactions.*',
+                'transactions.id as id', // Memastikan ID transaksi tidak tertimpa ID refund
+                'events.status as event_status',
+                'events.is_rescheduled as event_is_rescheduled',
+                'refunds.status as refund_status'
+            )
+            ->orderByDesc('transactions.checkout_time')
             ->get();
 
-        // detail transaksi tiket
         foreach ($transactions as $trx) {
-
             $trx->details = DB::table('ticket_attendees')
                 ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
                 ->leftJoin('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
@@ -34,13 +40,10 @@ class UserController extends Controller
                 ->select(
                     'ticket_attendees.name',
                     'ticket_attendees.phone_number',
-
                     'tickets.name as ticket_name',
                     'tickets.price',
-
                     'events.title as event_title',
                     'events.date as event_date',
-
                     'jadwal.tanggal as jadwal_tanggal',
                     'jadwal.info as jadwal_info'
                 )
@@ -50,15 +53,13 @@ class UserController extends Controller
         return view('user.riwayat-tiket', compact('transactions'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RIWAYAT MERCH
-    |--------------------------------------------------------------------------
-    */
-
     public function myMerch()
     {
-        $user = Auth::guard('user')->user();
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu.');
+        }
 
         $transactions = TransactionMerch::with([
             'details.product',

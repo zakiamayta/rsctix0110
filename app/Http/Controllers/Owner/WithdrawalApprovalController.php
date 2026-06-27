@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-
-use App\Models\Withdrawal;
-
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+
+use App\Models\Withdrawal;
+use App\Models\EventWallet;
 
 class WithdrawalApprovalController extends Controller
 {
@@ -28,49 +29,73 @@ class WithdrawalApprovalController extends Controller
         });
     }
 
-    /*
+/*
     |--------------------------------------------------------------------------
-    | LIST WITHDRAWAL
+    | LIST WITHDRAWAL (DENGAN FILTER & SALDO WALLET DINAMIS)
     |--------------------------------------------------------------------------
     */
 
-    public function index()
+    public function index(Request $request)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | LOAD EO + DATA REKENING EO
-        |--------------------------------------------------------------------------
-        */
+        // 1. Ambil semua event yang memiliki wallet tiket/event untuk pilihan dropdown filter
+        $filterEvents = \App\Models\Event::whereHas('eventWallet')->get();
 
-        $withdrawals = Withdrawal::with('eo')
-            ->latest()
-            ->get();
+        // 2. Buat query dasar untuk pengajuan penarikan dana
+        $withdrawalQuery = Withdrawal::with([
+            'eo',
+            'event'
+        ])->latest();
+
+        // 3. Buat query dasar untuk menghitung saldo wallet event
+        $walletQuery = EventWallet::query();
+
+        // 4. Jika terdapat filter event_id yang dipilih oleh Owner
+        if ($request->filled('event_id')) {
+            $eventId = $request->event_id;
+            
+            // Filter daftar penarikan berdasarkan event terkait
+            $withdrawalQuery->where('event_id', $eventId);
+            
+            // Filter hitungan saldo wallet hanya untuk event terkait
+            $walletQuery->where('event_id', $eventId);
+        }
+
+        // 5. Hitung total saldo tersedia (Available Balance) secara dinamis
+        $totalAvailableBalance = $walletQuery->sum('available_balance');
+
+        // 6. Eksekusi data penarikan dengan tetap membawa query string filter saat berpindah halaman
+        $withdrawals = $withdrawalQuery->paginate(20)->withQueryString();
 
         return view(
             'owner.withdrawals.index',
-            compact('withdrawals')
+            compact('withdrawals', 'totalAvailableBalance', 'filterEvents')
         );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | DETAIL
+    | DETAIL WITHDRAWAL
     |--------------------------------------------------------------------------
     */
 
-    public function show(Withdrawal $withdrawal)
+    public function show($id)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | LOAD RELATION EO
-        |--------------------------------------------------------------------------
-        */
+        $withdrawal = Withdrawal::with([
+            'eo',
+            'event'
+        ])->findOrFail($id);
 
-        $withdrawal->load('eo');
+        $wallet = EventWallet::where(
+            'event_id',
+            $withdrawal->event_id
+        )->first();
 
         return view(
             'owner.withdrawals.show',
-            compact('withdrawal')
+            compact(
+                'withdrawal',
+                'wallet'
+            )
         );
     }
 
@@ -82,90 +107,151 @@ class WithdrawalApprovalController extends Controller
 
     public function approve(
         Request $request,
-        Withdrawal $withdrawal
+        $id
     ) {
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDASI
-        |--------------------------------------------------------------------------
-        */
+
+        $withdrawal = Withdrawal::findOrFail($id);
 
         $request->validate([
-            'transfer_proof' => 'required|image|max:4096',
-            'note'           => 'nullable|string',
+            'transfer_proof' =>
+                'required|file|mimes:jpg,jpeg,png,pdf|max:4096',
+
+            'owner_note' =>
+                'nullable|string|max:1000',
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | CEK STATUS
-        |--------------------------------------------------------------------------
-        */
-
-        if ($withdrawal->status === 'approved') {
+        if ($withdrawal->status !== 'pending') {
 
             return back()->with(
                 'error',
-                'Withdrawal sudah diapprove'
+                'Withdrawal sudah diproses'
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPLOAD BUKTI TRANSFER
-        |--------------------------------------------------------------------------
-        */
+        DB::beginTransaction();
 
-        $proofPath = null;
-
-        if ($request->hasFile('transfer_proof')) {
-
-            $file = $request->file('transfer_proof');
+        try {
 
             /*
             |--------------------------------------------------------------------------
-            | BUAT FOLDER JIKA BELUM ADA
+            | WALLET
             |--------------------------------------------------------------------------
             */
 
-            if (!File::exists(public_path('images/withdrawals'))) {
+            $wallet = EventWallet::where(
+                'event_id',
+                $withdrawal->event_id
+            )
+            ->lockForUpdate()
+            ->first();
 
-                File::makeDirectory(
-                    public_path('images/withdrawals'),
-                    0755,
-                    true
+            if (!$wallet) {
+
+                DB::rollBack();
+
+                return back()->with(
+                    'error',
+                    'Wallet event tidak ditemukan'
                 );
             }
 
-            $filename = Str::uuid() . '.'
-                . $file->getClientOriginalExtension();
+            if (
+                $wallet->available_balance <
+                $withdrawal->amount
+            ) {
 
-            $file->move(
-                public_path('images/withdrawals'),
-                $filename
+                DB::rollBack();
+
+                return back()->with(
+                    'error',
+                    'Saldo wallet tidak mencukupi'
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPLOAD BUKTI TRANSFER
+            |--------------------------------------------------------------------------
+            */
+
+            $proofPath = null;
+
+            if ($request->hasFile('transfer_proof')) {
+
+                if (
+                    !File::exists(
+                        public_path('images/withdrawals')
+                    )
+                ) {
+                    File::makeDirectory(
+                        public_path('images/withdrawals'),
+                        0755,
+                        true
+                    );
+                }
+
+                $file = $request->file(
+                    'transfer_proof'
+                );
+
+                $filename =
+                    Str::uuid()
+                    . '.'
+                    . $file->getClientOriginalExtension();
+
+                $file->move(
+                    public_path('images/withdrawals'),
+                    $filename
+                );
+
+                $proofPath =
+                    'images/withdrawals/' .
+                    $filename;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | POTONG SALDO WALLET
+            |--------------------------------------------------------------------------
+            */
+
+            $wallet->available_balance =
+                $wallet->available_balance -
+                $withdrawal->amount;
+
+            $wallet->save();
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE WITHDRAWAL
+            |--------------------------------------------------------------------------
+            */
+
+            $withdrawal->status = 'approved';
+            $withdrawal->transfer_proof = $proofPath;
+            $withdrawal->owner_note = $request->owner_note;
+            $withdrawal->approved_at = now();
+            $withdrawal->paid_at = now();
+            $withdrawal->save();
+
+            DB::commit();
+
+            return redirect()
+                ->route('owner.withdrawals.index')
+                ->with(
+                    'success',
+                    'Withdrawal berhasil diapprove'
+                );
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            return back()->with(
+                'error',
+                $e->getMessage()
             );
-
-            $proofPath = 'images/withdrawals/' . $filename;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE WITHDRAWAL
-        |--------------------------------------------------------------------------
-        */
-
-        $withdrawal->update([
-            'status'          => 'approved',
-            'transfer_proof'  => $proofPath,
-            'note'            => $request->note,
-            'approved_at'     => now(),
-        ]);
-
-        return redirect()
-            ->route('owner.withdrawals.index')
-            ->with(
-                'success',
-                'Withdrawal berhasil diapprove'
-            );
     }
 
     /*
@@ -176,45 +262,28 @@ class WithdrawalApprovalController extends Controller
 
     public function reject(
         Request $request,
-        Withdrawal $withdrawal
+        $id
     ) {
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDASI
-        |--------------------------------------------------------------------------
-        */
+
+        $withdrawal = Withdrawal::findOrFail($id);
 
         $request->validate([
-            'note' => 'required|string',
+            'owner_note' =>
+                'required|string|max:1000',
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | HAPUS BUKTI TRANSFER JIKA ADA
-        |--------------------------------------------------------------------------
-        */
+        if ($withdrawal->status !== 'pending') {
 
-        if (
-            $withdrawal->transfer_proof &&
-            file_exists(public_path($withdrawal->transfer_proof))
-        ) {
-            File::delete(
-                public_path($withdrawal->transfer_proof)
+            return back()->with(
+                'error',
+                'Withdrawal sudah diproses'
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE STATUS
-        |--------------------------------------------------------------------------
-        */
-
-        $withdrawal->update([
-            'status'          => 'rejected',
-            'note'            => $request->note,
-            'approved_at'     => null,
-            'transfer_proof'  => null,
-        ]);
+        $withdrawal->status = 'rejected';
+        $withdrawal->owner_note = $request->owner_note;
+        $withdrawal->approved_at = null;
+        $withdrawal->save();
 
         return redirect()
             ->route('owner.withdrawals.index')

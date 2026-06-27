@@ -17,11 +17,11 @@ class TransactionController extends Controller
     {
         $this->middleware(function ($request, $next) {
 
-            if (!auth('user')->check()) {
-                return redirect()->route('loginuser');
+            if (!auth()->check()) {
+                return redirect()->route('login');
             }
 
-            $user = auth('user')->user();
+            $user = auth()->user();
 
             $eo = Eo::where('user_id', $user->id)->first();
 
@@ -41,7 +41,7 @@ class TransactionController extends Controller
     {
         $transactions = $this->getAllTransactionData($request);
 
-        $user = auth('user')->user();
+        $user = auth()->user();
         $eo = Eo::where('user_id', $user->id)->first();
 
         $events = Event::where('eo_id', $eo->id)
@@ -75,7 +75,7 @@ class TransactionController extends Controller
 
     public function getAllTransactionData(Request $request)
     {
-        $user = auth('user')->user();
+        $user = auth()->user();
         $eo = Eo::where('user_id', $user->id)->first();
 
         $sortBy = $request->input('sort_by');
