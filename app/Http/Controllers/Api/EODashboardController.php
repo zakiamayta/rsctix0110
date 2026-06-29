@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage; 
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 
 class EODashboardController extends Controller
 {
@@ -45,6 +47,7 @@ class EODashboardController extends Controller
                         'approved_events' => 0,
                         'pending_events' => 0,
                         'rejected_events' => 0,
+                        'pending_reschedule_events' => 0, // Tambahan fallback
                         'events' => [],
                     ]
                 ]);
@@ -112,15 +115,27 @@ class EODashboardController extends Controller
             $approvedEvents = DB::table('events')->where('eo_id', $eoId)->where('status', 'approved')->count();
             $pendingEvents = DB::table('events')->where('eo_id', $eoId)->where('status', 'pending')->count();
             $rejectedEvents = DB::table('events')->where('eo_id', $eoId)->where('status', 'rejected')->count();
+            
+            // 🔄 Tambahan statistik baru untuk event reschedule
+            $pendingRescheduleEvents = DB::table('events')->where('eo_id', $eoId)->where('status', 'pending_reschedule')->count();
         
             /// 🚀 EVENT AKTIF 
+            // Note: Event berstatus 'pending_reschedule' masih dianggap aktif karena belum resmi dibatalkan/ditolak.
             $activeEvents = DB::table('events')
-                ->where('eo_id', $eoId)
-                ->where('status', 'approved')
-                ->whereDate('end_date', '>=', Carbon::today()) 
+                ->leftJoin('jadwal', 'events.id', '=', 'jadwal.event_id')
+                ->where('events.eo_id', $eoId)
+                ->whereIn('events.status', ['approved', 'pending_reschedule'])
+                ->where(function($query) {
+                    $query->whereDate('jadwal.tanggal', '>=', Carbon::today())
+                          ->orWhere(function($sub) {
+                              $sub->whereNull('jadwal.tanggal')
+                                  ->whereDate('events.date', '>=', Carbon::today());
+                          });
+                })
+                ->distinct('events.id')
                 ->count();
 
-            /// 🎫 LIST EVENT
+            /// 🎫 LIST EVENT (Ditambahkan data-data reschedule untuk keperluan Front End)
             $events = DB::table('events')
                 ->leftJoin('transactions', function ($join) {
                     $join->on('events.id', '=', 'transactions.event_id')
@@ -131,9 +146,11 @@ class EODashboardController extends Controller
                     'events.id',
                     'events.title',
                     'events.date',
-                    'events.end_date', 
+                    'events.proposed_date', // Dikirim untuk handle preview tgl baru di FE
                     'events.status',
                     'events.poster',
+                    'events.reschedule_reason', // Alasan reschedule
+                    'events.reschedule_rejected_reason', // Alasan penolakan reschedule jika ada
                     DB::raw('COUNT(transactions.id) as sold'),
                     DB::raw('COALESCE(SUM(transactions.total_amount), 0) as revenue')
                 )
@@ -141,15 +158,17 @@ class EODashboardController extends Controller
                     'events.id', 
                     'events.title', 
                     'events.date', 
-                    'events.end_date', 
+                    'events.proposed_date',
                     'events.status', 
                     'events.poster', 
+                    'events.reschedule_reason',
+                    'events.reschedule_rejected_reason',
                     'events.created_at'
                 )
                 ->orderByDesc('events.created_at')
                 ->get();
 
-            /// ✨ UBAH POSTER LIST EVENT MENJADI FULL URL UNTUK FLUTTER
+            /// ✨ MAP DATA & GENERATE REAL END DATE DARI JADWAL UNTUK LIST EVENT
             $events->transform(function ($event) {
                 if ($event->poster) {
                     $event->poster = filter_var($event->poster, FILTER_VALIDATE_URL) 
@@ -159,6 +178,16 @@ class EODashboardController extends Controller
                     $event->poster = null;
                 }
                 
+                // Cari real_end_date dari tabel jadwal secara dinamis
+                $maxJadwal = DB::table('jadwal')->where('event_id', $event->id)->max('tanggal');
+                
+                // Format paksa ke YYYY-MM-DD agar Flutter tidak crash
+                $event->date = $event->date ? Carbon::parse($event->date)->toDateString() : Carbon::today()->toDateString();
+                $event->proposed_date = $event->proposed_date ? Carbon::parse($event->proposed_date)->toDateString() : null;
+                
+                $event->end_date = $maxJadwal ? Carbon::parse($maxJadwal)->toDateString() : $event->date;
+                $event->real_end_date = $event->end_date;
+
                 $event->sold = (int) $event->sold;
                 $event->revenue = (int) $event->revenue;
                 
@@ -186,6 +215,7 @@ class EODashboardController extends Controller
                     'approved_events' => (int) $approvedEvents,
                     'pending_events' => (int) $pendingEvents,
                     'rejected_events' => (int) $rejectedEvents,
+                    'pending_reschedule_events' => (int) $pendingRescheduleEvents, // Data baru untuk counter badge di FE
 
                     /// 🎫 EVENTS
                     'events' => $events,
@@ -320,6 +350,7 @@ class EODashboardController extends Controller
             'data' => [
                 'transaction' => [
                     'id' => $transaction->id,
+                    'kode_unik' => $transaction->kode_unik ?? '-', 
                     'event_title' => $transaction->event_title,
                     'email' => $transaction->email,
                     'payment_status' => $transaction->payment_status,
@@ -333,5 +364,131 @@ class EODashboardController extends Controller
                 'attendees' => $attendees,
             ]
         ]);
+    }
+
+    public function generateWebToken(Request $request) 
+    {
+        $user = $request->user(); 
+        $token = Str::random(40);
+
+        Cache::put('web_autologin_' . $token, $user->id, now()->addMinutes(2));
+
+        return response()->json([
+            'success' => true,
+            'token' => $token 
+        ]);
+    }
+    public function getSalesRecap(Request $request)
+    {
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+            }
+
+            $eo = DB::table('eo')->where('user_id', $user->id)->first();
+            if (!$eo) {
+                return response()->json([
+                    'success' => true,
+                    'data' => ['tickets' => [], 'merch' => []]
+                ], 200);
+            }
+
+            $eoId = $eo->id;
+
+            // --- 1. DATA TIKET + INFO JADWAL ---
+            $ticketsData = DB::table('tickets')
+                ->join('events', 'tickets.event_id', '=', 'events.id')
+                ->leftJoin('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
+                ->where('events.eo_id', $eoId)
+                ->select(
+                    'tickets.id',
+                    'tickets.event_id',
+                    'events.title as event_title',
+                    'tickets.name as item_name',
+                    'tickets.stock as remaining_stock',
+                    'tickets.jadwal_id',
+                    DB::raw("COALESCE(jadwal.info, 'Jadwal Umum') as jadwal_info")
+                )
+                ->groupBy('tickets.id', 'tickets.event_id', 'events.title', 'tickets.name', 'tickets.stock', 'tickets.jadwal_id', 'jadwal.info')
+                ->get();
+
+            foreach ($ticketsData as $ticket) {
+                $buyers = DB::table('transactions')
+                    ->where('transactions.event_id', $ticket->event_id)
+                    ->where('transactions.payment_status', 'paid')
+                    ->where(function($query) use ($ticket) {
+                        if ($ticket->jadwal_id) {
+                            $query->where('transactions.jadwal_id', $ticket->jadwal_id);
+                        }
+                    })
+                    ->select(
+                        'transactions.id as transaction_id',
+                        'transactions.email as buyer_email',
+                        'transactions.kode_unik as order_code',
+                        'transactions.qr_code as qr_data', // Mengirimkan string raw data QR dari database langsung
+                        'transactions.is_registered',
+                        'transactions.registered_at',
+                        'transactions.jadwal_id'
+                    )
+                    ->get();
+
+                foreach ($buyers as $buyer) {
+                    $buyer->attendees = DB::table('ticket_attendees')
+                        ->where('transaction_id', $buyer->transaction_id)
+                        ->where('ticket_id', $ticket->id)
+                        ->select('name', 'phone_number')
+                        ->get();
+                }
+
+                $ticket->sold = count($buyers);
+                $ticket->buyers = $buyers;
+            }
+
+            // --- 2. DATA MERCHANDISE ---
+            $merchData = DB::table('products_ukuran')
+                ->join('products_varian', 'products_ukuran.varian_id', '=', 'products_varian.id')
+                ->join('products', 'products_varian.product_id', '=', 'products.id')
+                ->join('events', 'products.event_id', '=', 'events.id')
+                ->where('events.eo_id', $eoId)
+                ->select(
+                    'products_ukuran.id',
+                    'events.title as event_title',
+                    DB::raw("CONCAT(products.name, ' (', products_varian.varian, ' - ', products_ukuran.ukuran, ')') as item_name"),
+                    'products_ukuran.stok as remaining_stock'
+                )
+                ->groupBy('products_ukuran.id', 'events.title', 'products.name', 'products_varian.varian', 'products_ukuran.ukuran', 'products_ukuran.stok')
+                ->get();
+
+            foreach ($merchData as $merch) {
+                $buyers = DB::table('transaction_merch_details')
+                    ->join('transaction_merch', 'transaction_merch_details.transaction_merch_id', '=', 'transaction_merch.id')
+                    ->where('transaction_merch_details.ukuran_id', $merch->id)
+                    ->where('transaction_merch.payment_status', 'paid')
+                    ->select(
+                        'transaction_merch.email as buyer_email',
+                        'transaction_merch_details.buyer_name',
+                        'transaction_merch_details.buyer_phone',
+                        'transaction_merch.kode_unik as order_code',
+                        'transaction_merch.qr_code as qr_data', // Mengirimkan string raw data QR dari database langsung
+                        'transaction_merch_details.quantity'
+                    )->get();
+
+                $merch->sold = $buyers->sum('quantity');
+                $merch->buyers = $buyers;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data berhasil diambil',
+                'data' => [
+                    'tickets' => $ticketsData,
+                    'merch' => $merchData
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 }

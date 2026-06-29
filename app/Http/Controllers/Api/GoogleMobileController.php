@@ -48,48 +48,57 @@ class GoogleMobileController extends Controller
         $avatar = $payload['picture'] ?? null;
 
         /// CREATE / UPDATE USER
-        $user = User::updateOrCreate(
-            ['email' => $email],
-            [
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            // Jika user baru daftar lewat google, default role tetap 'user'
+            $user = User::create([
+                'email'     => $email,
                 'google_id' => $googleId,
                 'name'      => $name,
                 'avatar'    => $avatar,
-            ]
-        );
+                'role'      => 'user', 
+            ]);
+        } else {
+            // Jika user sudah ada, cukup update data google info terbarunya
+            $user->update([
+                'google_id' => $googleId,
+                'name'      => $name,
+                'avatar'    => $avatar,
+            ]);
+        }
 
-        /// TOKEN
+        /// GENERATE TOKEN
         $token = $user->createToken('mobile')->plainTextToken;
 
         /// CHECK PROFILE COMPLETE
-        $isComplete =
-            !empty($user->phone) &&
-            !empty($user->birth_date) &&
-            !empty($user->gender);
+        $isComplete = !empty($user->phone) &&
+                      !empty($user->birth_date) &&
+                      !empty($user->gender);
 
-        $eo = DB::table('eo')
-            ->where('user_id', $user->id)
-            ->first();
+        // Ambil data EO jika diperlukan untuk kebutuhan internal fitur di dalam MainNavigation
+        $eo = DB::table('eo')->where('user_id', $user->id)->first();
 
         return response()->json([
             'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'birth_date' => $user->birth_date,
-                'gender' => $user->gender,
-                'avatar' => $user->avatar,
-                'profile_complete' => $user->profile_complete,
+                'id'               => $user->id,
+                'name'             => $user->name,
+                'email'            => $user->email,
+                'phone'            => $user->phone,
+                'birth_date'       => $user->birth_date,
+                'gender'           => $user->gender,
+                'avatar'           => $user->avatar,
+                'profile_complete' => (bool)$user->profile_complete,
+                'role'             => $user->role, // Flutter akan membaca role ini ('owner', 'eo', atau 'user')
             ],
-            'token' => $token,
+            'token'               => $token,
             'is_profile_complete' => $isComplete,
-
-            'is_eo' => $eo ? true : false,
-            'eo_id' => $eo?->id,
-            'eo_status' => $eo?->status,
+            
+            // Flag pendukung untuk fitur di dalam aplikasi (jika role dia owner atau punya data di tabel eo)
+            'is_eo'               => ($user->role === 'owner' || $eo) ? true : false,
+            'eo_id'               => $eo?->id,
+            'eo_status'           => $eo?->status ?? ($user->role === 'owner' ? 'active' : null),
         ]);
-        print("FULL RESPONSE:");
-        print_r($data);
     }
 
     /// GET PROFILE
