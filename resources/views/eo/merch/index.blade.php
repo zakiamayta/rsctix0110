@@ -399,12 +399,13 @@
       <h2><span class="accent-dot"></span>Kelola Merchandise</h2>
       <p>Tambah dan kelola produk merch untuk event kamu</p>
     </div>
-    <button type="button" class="btn-primary" onclick="openModal('createMerchModal')">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      Tambah Merch
-    </button>
+    <a href="{{ route('eo.merch.create') }}" class="btn-primary" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" style="display: block;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Tambah Merch</span>
+    </a>
   </div>
 
   {{-- Filter --}}

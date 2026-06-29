@@ -3,9 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class EODebt extends Model
+class EoDebt extends Model
 {
     protected $table = 'eo_debts';
 
@@ -14,21 +13,21 @@ class EODebt extends Model
         'event_id',
         'total_debt',
         'remaining_debt',
-        'status',
+        'status'
     ];
 
     /**
-     * Relasi Balik ke EO
+     * Hubungan ke data profil Event Organizer (EO)
      */
-    public function eo(): BelongsTo
+    public function eo()
     {
-        return $this->belongsTo(EO::class, 'eo_id');
+        return $this->belongsTo(Eo::class, 'eo_id');
     }
 
     /**
-     * Relasi Balik ke Event
+     * Hubungan ke data Event terkait yang minus saldonya
      */
-    public function event(): BelongsTo
+    public function event()
     {
         return $this->belongsTo(Event::class, 'event_id');
     }

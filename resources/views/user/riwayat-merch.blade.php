@@ -73,6 +73,13 @@
 
 @php
     $totalQty = $trx->details->sum('quantity');
+    
+    // Tarik info Event & Status Klaim Lapangan
+    $firstDetail = $trx->details->first();
+    $relatedEvent = $firstDetail && $firstDetail->product ? $firstDetail->product->event : null;
+    
+    // Status pengambilan (sesuai data loop dari controller)
+    $currentKlaimStatus = $trx->klaim_status ?? 'belum_diambil';
 @endphp
 
 <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
@@ -101,14 +108,21 @@
                     {{ $trx->kode_unik }}
                 </p>
 
-                <span class="badge rounded-pill px-3 py-2
-                    {{ $trx->payment_status == 'paid'
-                        ? 'bg-success bg-opacity-10 text-success'
-                        : 'bg-warning bg-opacity-10 text-warning' }}">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge rounded-pill px-3 py-2
+                        {{ $trx->payment_status == 'paid'
+                            ? 'bg-success bg-opacity-10 text-success'
+                            : 'bg-warning bg-opacity-10 text-warning' }}">
+                        {{ strtoupper($trx->payment_status) }}
+                    </span>
 
-                    {{ strtoupper($trx->payment_status) }}
-
-                </span>
+                    {{-- INDIKATOR STATUS EVENT DI CARD UTAMA --}}
+                    @if($relatedEvent && $relatedEvent->status === 'cancelled')
+                        <span class="badge rounded-pill px-3 py-2 bg-danger bg-opacity-10 text-danger small">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> EVENT CANCEL
+                        </span>
+                    @endif
+                </div>
 
             </div>
 
@@ -205,7 +219,57 @@
 
             <div class="modal-body p-4">
 
-                {{-- STATUS --}}
+                {{-- NOTIFIKASI POLA PENYELESAIAN JIKA EVENT DIBATALKAN --}}
+                @if($relatedEvent && $relatedEvent->status === 'cancelled')
+                    <div class="alert alert-danger rounded-4 border-0 mb-4 p-3 small text-dark d-flex gap-2">
+                        <i class="bi bi-info-circle-fill text-danger h5 mb-0 mt-0.5"></i>
+                        <div>
+                            <strong>Informasi Pembatalan Event:</strong>
+                            <p class="mb-0 mt-1">Event terkait pesanan ini telah dibatalkan.</p>
+                            {{-- Kondisional logis pilihan kebijakan dari Event Organizer --}}
+                            @if(isset($relatedEvent->merch_policy) && $relatedEvent->merch_policy === 'ship')
+                                <p class="mb-0 text-muted small">Kebijakan EO: <strong>Merchandise tetap dikirim/diproduksi</strong> ke alamat pemesan. Silakan pantau pengiriman berkala.</p>
+                            @else
+                                <p class="mb-0 text-muted small">Kebijakan EO: Pembeli dipersilakan melakukan koordinasi/pengajuan refund sesuai instruksi panitia pelaksana resmi.</p>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                {{-- QR CODE & STATUS AMBIL BARANG (HANYA MUNCUL JIKA SUDAH LUNAS) --}}
+                @if($trx->payment_status == 'paid')
+                    <div class="p-4 rounded-4 mb-4 bg-light text-center border">
+                        <h6 class="fw-bold text-dark mb-3">
+                            <i class="bi bi-qr-code-scan text-orange me-1"></i> Kode Batang Pengambilan
+                        </h6>
+                        
+                        <div class="bg-white p-3 d-inline-block rounded-3 shadow-sm mb-3">
+                            {{-- Membaca aset qr_code hasil webhook secara dinamis --}}
+                            @if($trx->qr_code && file_exists(base_path($trx->qr_code)))
+                                <img src="{{ asset($trx->qr_code) }}" alt="QR Code" class="img-fluid" style="max-width: 160px;">
+                            @else
+                                {{-- Fallback jika file fisik QR belum tergenerate di server --}}
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ route('guests.merch.qr', ['kode_unik' => $trx->kode_unik]) }}" alt="QR Code" class="img-fluid" style="max-width: 160px;">
+                            @endif
+                        </div>
+
+                        <p class="small text-muted mb-2">Tunjukkan QR di atas ke panitia penyerahan merchandise di lokasi event</p>
+                        
+                        <div>
+                            @if($currentKlaimStatus === 'sudah_diambil')
+                                <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-4 py-2 fw-bold small shadow-sm">
+                                    <i class="bi bi-bag-check-fill me-1"></i> BARANG SUDAH DIAMBIL
+                                </span>
+                            @else
+                                <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-4 py-2 fw-bold small shadow-sm">
+                                    <i class="bi bi-hourglass-split me-1"></i> BELUM DIAMBIL
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                {{-- STATUS PEMBAYARAN ORIGINAL --}}
                 <div class="p-3 rounded-4 mb-4
                     {{ $trx->payment_status == 'paid'
                         ? 'bg-success bg-opacity-10'

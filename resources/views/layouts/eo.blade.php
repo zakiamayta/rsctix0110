@@ -593,6 +593,16 @@
                     </svg>
                     Riwayat Withdraw Merch
                 </a>
+
+                            {{-- Tombol Menuju Halaman Index Keuangan EO (Satu Tema & Sinkron) --}}
+            <a href="{{ route('eo.finance.index') }}" 
+               class="nav-link {{ request()->routeIs('eo.finance.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Pusat Keuangan & Tagihan
+            </a>
             </div>
 
             {{-- Pembatalan & Refund --}}
@@ -827,6 +837,65 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 @stack('scripts')
+{{-- POPUP GLOBAL DI SELURUH HALAMAN EO UNTUK KEPUTUSAN MERCHANDISE EVENT CANCEL --}}
+@if(isset($globalPendingMerchEvent) && $globalPendingMerchEvent)
+<div id="globalMerchDecisionModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 m-4 border border-gray-200 text-sm text-gray-800" style="font-family: 'DM Sans', sans-serif;">
+        
+        <div class="flex items-center gap-3 border-b pb-3 mb-4">
+            <span class="text-2xl">⚠️</span>
+            <div>
+                <h3 class="text-base font-bold text-gray-900" style="font-family: 'Sora', sans-serif;">Keputusan Komoditas Merchandise</h3>
+                <p class="text-xs text-red-600 font-semibold">Event: <strong>{{ $globalPendingMerchEvent->title }}</strong> Resmi Dibatalkan</p>
+            </div>
+        </div>
 
+        <form action="{{ route('eo.event.submit-merch-decision', $globalPendingMerchEvent->id) }}" method="POST">
+            @csrf
+
+            <p class="text-xs text-gray-600 mb-4 leading-relaxed">
+                Pengajuan pembatalan event Anda telah disetujui oleh Owner. Karena event ini menjual produk merchandise terikat, Anda <strong>wajib</strong> menetapkan metode penyelesaian dana merchandise penonton di bawah ini sebelum melanjutkan aktivitas di dashboard:
+            </p>
+
+            <div class="space-y-3 mb-4">
+                <label class="block p-3 border rounded-xl hover:bg-orange-50 cursor-pointer transition border-gray-200">
+                    <div class="flex items-start gap-3">
+                        <input type="radio" name="merch_decision" value="refund" required class="mt-1 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="text-xs font-bold text-gray-800 block">Proses Pengembalian Dana (Refund via Platform)</span>
+                            <span class="text-[11px] text-gray-500 leading-normal block mt-0.5">
+                                Seluruh nominal transaksi merchandise penonton akan dialihkan ke antrean Batch Refund Admin Platform untuk dikembalikan penuh ke pembeli. Dompet merchandise event Anda akan disesuaikan.
+                            </span>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="block p-3 border rounded-xl hover:bg-orange-50 cursor-pointer transition border-gray-200">
+                    <div class="flex items-start gap-3">
+                        <input type="radio" name="merch_decision" value="ship_independently" required class="mt-1 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="text-xs font-bold text-gray-800 block">Kirim Mandiri ke Alamat Pembeli (Ship Independently)</span>
+                            <span class="text-[11px] text-gray-500 leading-normal block mt-0.5">
+                                Dana penjualan merchandise tetap diteruskan ke dompet Anda. Anda berkomitmen memproduksi barang secara mandiri sesuai kuota pesanan yang sah.
+                            </span>
+                        </div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-lg text-[11px] leading-relaxed mb-5">
+                <strong>💡 Disclaimer Pengiriman Mandiri:</strong><br>
+                Segala bentuk biaya operasional, logistik kurir, produksi, dan pendistribusian produk dilakukan sepenuhnya oleh pihak penyelenggara (EO) sendiri di luar platform. Setelah barang sukses dikirim ke alamat pembeli, Anda wajib memperbarui manifes dengan <strong>mencentang lembar absen klaim merchandise</strong> di dasbor Anda sebagai bukti penuntasan kewajiban.
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs font-bold py-2.5 px-5 rounded-lg hover:opacity-90 shadow-md transition w-full sm:w-auto">
+                    Konfirmasi Kebijakan Merchandise
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 </body>
 </html>

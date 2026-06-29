@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\DB;
+use App\Models\Event;
 use Xendit\Xendit;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,17 +23,37 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-
-    // public function boot()
-    // {
-    //     \URL::forceScheme('https');
-    // }
-public function boot(): void
+    public function boot(): void
     {
-        // Kode untuk memaksa HTTPS agar CSS muncul di ngrok
+        // 1. Kode bawaan Anda: Memaksa HTTPS agar CSS muncul di ngrok
         if (str_contains(config('app.url'), 'ngrok-free.dev')) {
             URL::forceScheme('https');
         }
-    }
 
+        // 2. DETEKSI GLOBAL: Cek keputusan merchandise untuk event yang batal (Tanpa Middleware)
+        view()->composer('*', function ($view) {
+            
+            // Pastikan user sudah login dan rolenya adalah EO
+            if (auth()->check() && auth()->user()->role === 'eo') {
+                
+                $eo = DB::table('eo')->where('user_id', auth()->id())->first();
+
+                if ($eo) {
+                    // CARI GLOBAL: Apakah ada event resmi batal (cancelled) tapi keputusan merchnya masih NULL?
+                    $pendingMerchEvent = Event::where('eo_id', $eo->id)
+                        ->where('status', 'cancelled')
+                        ->whereNull('merch_cancel_decision')
+                        ->whereHas('products', function ($q) {
+                            $q->where('type', 'merch');
+                        })
+                        ->first();
+
+                    // Jika ditemukan event menggantung, lempar data ke layout blade secara otomatis
+                    if ($pendingMerchEvent) {
+                        $view->with('globalPendingMerchEvent', $pendingMerchEvent);
+                    }
+                }
+            }
+        });
+    }
 }

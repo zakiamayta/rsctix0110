@@ -23,7 +23,9 @@ class UserController extends Controller
             ->where('transactions.email', $user->email)
             ->select(
                 'transactions.*',
-                'transactions.id as id', // Memastikan ID transaksi tidak tertimpa ID refund
+                'transactions.id as id', 
+                'transactions.is_registered as is_registered', // ✨ MEMASTIKAN KOLOM ABSENSI TERAMBIL DENGAN AMAN
+                'events.title as event_title', 
                 'events.status as event_status',
                 'events.is_rescheduled as event_is_rescheduled',
                 'refunds.status as refund_status'
@@ -61,14 +63,25 @@ class UserController extends Controller
             return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu.');
         }
 
+        // Ambil transaksi merchandise beserta relasi produk dan event
         $transactions = TransactionMerch::with([
-            'details.product',
+            'details.product.event',
             'details.varian',
             'details.ukuran'
         ])
         ->where('email', $user->email)
         ->orderByDesc('created_at')
         ->get();
+
+        foreach ($transactions as $trx) {
+            // Sinkronisasi data: Membaca status klaim dari tabel merch_attendees
+            $klaimCheck = DB::table('merch_attendees')
+                ->where('transaction_merch_id', $trx->id)
+                ->first();
+
+            // Jika ada barisnya dan is_completed bernilai 1, maka ditandai 'sudah_diambil'
+            $trx->klaim_status = ($klaimCheck && $klaimCheck->is_completed == 1) ? 'sudah_diambil' : 'belum_diambil';
+        }
 
         return view('user.riwayat-merch', compact('transactions'));
     }

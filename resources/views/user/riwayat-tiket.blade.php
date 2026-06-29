@@ -70,7 +70,7 @@
 
     @php
         $totalQty = $trx->details->count();
-        // Membaca status refund secara aman dari data transaksi (baik berupa string langsung atau relasi objek)
+        // Membaca status refund secara aman dari data transaksi
         $currentRefundStatus = $trx->refund_status ?? ($trx->refund->status ?? null);
     @endphp
 
@@ -83,7 +83,7 @@
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
                     <h4 class="fw-bold mb-1">
-                        {{ $trx->details[0]->event_title ?? '-' }}
+                        {{ $trx->event_title ?? '-' }}
                     </h4>
                     <p class="text-muted mb-2 small">
                         {{ $trx->kode_unik }}
@@ -137,7 +137,7 @@
                         <span class="badge bg-danger rounded-pill px-3 py-2 small">
                             <i class="bi bi-x-circle"></i> Refund Ditolak
                         </span>
-                    @elseif($trx->payment_status === 'paid' && ($trx->event_status === 'cancelled' || $trx->event_is_rescheduled > 0))
+                    @elseif($trx->payment_status === 'paid' && ($trx->event_status === 'cancelled' || $trx->event_status === 'cancelled' || $trx->event_is_rescheduled > 0))
                         <a href="{{ route('buyer.refund.create', $trx->id) }}" class="btn btn-warning rounded-pill px-3 text-white fw-semibold">
                             <i class="bi bi-exclamation-circle me-1"></i> Ajukan Refund
                         </a>
@@ -201,21 +201,70 @@
                         </div>
                     </div>
 
-                    {{-- DETAIL ITEMS TIKET --}}
-                    <h5 class="fw-bold mb-3">Detail Tiket</h5>
+                    {{-- DETAIL ITEMS TIKET BESERTA QR KODE DAN STATUS ABSENSI --}}
+                    <h5 class="fw-bold mb-3">Detail Pemegang Tiket & QR Check-In</h5>
                     @foreach($trx->details as $item)
-                    <div class="border rounded-4 p-3 mb-3">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <h6 class="fw-bold mb-1">{{ $item->ticket_name }}</h6>
-                                <small class="text-muted d-block">Pemegang: {{ $item->name }}</small>
-                                <small class="text-muted">
-                                    {{ $item->jadwal_info }} ({{ \Carbon\Carbon::parse($item->jadwal_tanggal)->translatedFormat('d F Y') }})
-                                </small>
+                    <div class="border rounded-4 p-3 mb-3 bg-white shadow-sm">
+                        <div class="row align-items-center">
+                            
+                            {{-- SISI KIRI: DATA DIRI & STATUS PAKAI TIKET --}}
+                            <div class="col-md-8 mb-3 mb-md-0">
+                                <h6 class="fw-bold mb-1 text-dark">{{ $item->ticket_name }}</h6>
+                                <div class="text-secondary small mb-2">
+                                    <span class="d-block text-dark fw-semibold">Nama Pemegang: {{ $item->name }}</span>
+                                    @if(isset($item->phone_number))
+                                        <span class="d-block"><i class="bi bi-telephone me-1"></i> {{ $item->phone_number }}</span>
+                                    @endif
+                                    <span class="d-block">
+                                        <i class="bi bi-calendar-event me-1"></i> {{ $item->jadwal_info }} ({{ \Carbon\Carbon::parse($item->jadwal_tanggal)->translatedFormat('d F Y') }})
+                                    </span>
+                                </div>
+                                
+                                {{-- STATUS EVALUASI PENGGUNAAN TIKET --}}
+                                <div>
+                                    @if(isset($trx->is_registered) && ($trx->is_registered == 1 || $trx->is_registered === true))
+                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1.5 small fw-bold">
+                                            <i class="bi bi-check-circle-fill me-1"></i> TIKET SUDAH DIGUNAKAN
+                                        </span>
+                                    @else
+                                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1.5 small fw-bold">
+                                            <i class="bi bi-ticket-perforated-fill me-1"></i> TIKET SIAP (BELUM DIPAKAI)
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
-                            <div class="text-end">
-                                <strong>Rp {{ number_format($item->price,0,',','.') }}</strong>
+
+                            {{-- SISI KANAN: QR CODE ASLI DARI DATABASE (TANPA GENERATE SENDIRI) --}}
+                            <div class="col-md-4 text-center text-md-end">
+                                @if($trx->payment_status === 'paid' && $trx->event_status !== 'cancelled')
+                                    @if($trx->qr_code)
+                                        <div class="p-2 border d-inline-block bg-light rounded-3 shadow-sm text-center">
+                                            {{-- Menggunakan nama class lengkap \Illuminate\Support\Str agar tidak error Class Not Found --}}
+                                            @if(\Illuminate\Support\Str::contains($trx->qr_code, ['.png', '.jpg', '.jpeg', '.svg']))
+                                                <img src="{{ asset($trx->qr_code) }}" alt="QR Ticket" class="img-fluid" style="width: 110px; height: 110px;">
+                                            @else
+                                                {{-- Jika isi kolom bkn path gambar melainkan teks raw string, tampilkan teksnya saja --}}
+                                                <div class="p-3 text-dark small font-monospace bg-white rounded border text-center" style="width: 110px; min-height: 110px; display: flex; align-items: center; justify-content: center; word-break: break-all;">
+                                                    {{ $trx->qr_code }}
+                                                </div>
+                                            @endif
+                                            <span class="d-block text-muted mt-1 font-monospace" style="font-size: 10px;">{{ $trx->kode_unik }}</span>
+                                        </div>
+                                    @else
+                                        {{-- Jika data qr_code di database kosong, tidak menampilkan QR sama sekali --}}
+                                        <div class="text-center p-3 text-muted small bg-light rounded-3 d-inline-block w-100" style="max-width: 140px;">
+                                            <i class="bi bi-qr-code text-secondary" style="font-size: 24px; opacity:0.5;"></i>
+                                            <span class="d-block mt-1 text-secondary small">QR Belum Tersedia</span>
+                                        </div>
+                                    @endif
+                                @else
+                                    <div class="text-center p-3 text-muted small bg-light rounded-3 d-inline-block w-100" style="max-width: 140px;">
+                                        <i class="bi bi-qr-code text-danger" style="font-size: 24px; opacity:0.5;"></i>
+                                        <span class="d-block mt-1 text-danger fw-semibold small">QR Non-Aktif</span>
+                                    </div>
+                                @endif
                             </div>
+
                         </div>
                     </div>
                     @endforeach

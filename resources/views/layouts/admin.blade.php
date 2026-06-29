@@ -435,20 +435,29 @@
                     Performa Event Organizer
                 </a>
             </div>
+        <div class="nav-group">
+            <div class="nav-group-label">Saldo</div>
 
-<div class="nav-group">
-    <div class="nav-group-label">Saldo</div>
+            {{-- UPDATE: Tombol Dompet & Finansial EO Sudah Satu Tema Menggunakan nav-link & SVG Icon --}}
+            <a href="{{ route('admin.finance.index') }}" 
+               class="nav-link {{ request()->routeIs('admin.finance.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Dompet & Finansial EO
+            </a>
 
-    <a href="{{ route('platform.wallet.index') }}"
-       class="nav-link {{ request()->routeIs('platform.wallet.*') ? 'active' : '' }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/>
-            <path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/>
-            <path d="M18 12a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4v-6z"/>
-        </svg>
-        Dompet Platform
-    </a>
-</div>
+            <a href="{{ route('platform.wallet.index') }}"
+               class="nav-link {{ request()->routeIs('platform.wallet.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/>
+                    <path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/>
+                    <path d="M18 12a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4v-6z"/>
+                </svg>
+                Dompet Platform
+            </a>
+        </div>
 
             {{-- Refund --}}
             <div class="nav-group">

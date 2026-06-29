@@ -40,6 +40,17 @@
         </div>
     @endif
 
+    <div class="flex border-b border-gray-200 mb-5">
+        <a href="{{ route('admin.refunds.index', ['tab' => 'ticket']) }}" 
+           class="py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 {{ $activeTab === 'ticket' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+            🎫 Refund Tiket Penonton
+        </a>
+        <a href="{{ route('admin.refunds.index', ['tab' => 'merch']) }}" 
+           class="py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 {{ $activeTab === 'merch' ? 'border-amber-600 text-amber-600 bg-amber-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+            🛍️ Refund Merchandise Event
+        </a>
+    </div>
+
     {{-- 📢 TABEL RIWAYAT / BERITA PROSES EVENT TERKINI (DENGAN MAX-HEIGHT & SCROLL VERTICAL) --}}
     <div class="bg-white border border-gray-200 rounded overflow-hidden shadow-sm mb-3">
         <div class="bg-gray-100 px-3 py-2 border-b border-gray-200 flex items-center justify-between sticky top-0 z-10">

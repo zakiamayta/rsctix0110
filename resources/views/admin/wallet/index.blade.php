@@ -29,6 +29,7 @@
     
     <hr class="text-secondary opacity-25 mb-3">
 
+    {{-- CARD STATISTIK UTAMA --}}
     <div class="row g-3 mb-3">
         <div class="col-12 col-md-4">
             <div class="card border-0 shadow-sm" style="border-radius: 8px;">
@@ -82,7 +83,8 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius: 8px; overflow: hidden;">
+    {{-- TABEL 1: JURNAL MUTASI KAS REAL-TIME --}}
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; overflow: hidden;">
         <div class="card-header bg-white border-0 py-3 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
             <div>
                 <h5 class="fw-bold text-dark mb-0" style="font-weight: 600;"><i class="fas fa-exchange-alt text-secondary me-2"></i>Jurnal Mutasi Kas Real-Time</h5>
@@ -111,18 +113,22 @@
                         @if(isset($mutations) && count($mutations) > 0)
                             @foreach($mutations as $log)
                                 <tr>
-                                    <td class="py-2.5 px-3 text-muted">{{ \Carbon\Carbon::parse($log->created_at)->format('Y-m-d H:i:s') }}</td>
+                                    {{-- PERBAIKAN: Menggunakan trx_date sesuai properti database hasil query --}}
+                                    <td class="py-2.5 px-3 text-muted">
+                                        {{ $log->trx_date ? date('Y-m-d H:i:s', strtotime($log->trx_date)) : '-' }}
+                                    </td>
                                     <td class="py-2.5 px-2 fw-bold text-secondary" style="font-weight: 600;">{{ $log->reference_code }}</td>
                                     <td class="py-2.5 px-2 text-dark">{{ $log->description }}</td>
                                     <td class="py-2.5 px-2">
-                                        @if($log->type === 'INCOME')
+                                        {{-- Menyesuaikan dengan nilai 'income' / 'expense' dari query gabungan --}}
+                                        @if(strtolower($log->type) === 'income')
                                             <span class="badge bg-success-subtle text-success px-2 py-1 rounded border border-success border-opacity-10 fw-semibold">MASUK (TAX)</span>
                                         @else
                                             <span class="badge bg-danger-subtle text-danger px-2 py-1 rounded border border-danger border-opacity-10 fw-semibold">KELUAR (BIAYA)</span>
                                         @endif
                                     </td>
-                                    <td class="py-2.5 px-3 text-end fw-bold {{ $log->type === 'INCOME' ? 'text-success' : 'text-danger' }}" style="font-weight: 600;">
-                                        {{ $log->type === 'INCOME' ? '+' : '-' }} Rp {{ number_format($log->amount, 0, ',', '.') }}
+                                    <td class="py-2.5 px-3 text-end fw-bold {{ strtolower($log->type) === 'income' ? 'text-success' : 'text-danger' }}" style="font-weight: 600;">
+                                        {{ strtolower($log->type) === 'income' ? '+' : '-' }} Rp {{ number_format($log->amount, 0, ',', '.') }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -143,5 +149,51 @@
             </div>
         </div>
     </div>
+
+    {{-- TABEL 2: TOP 5 EVENT PENYEBAB REFUND --}}
+    <div class="card border-0 shadow-sm" style="border-radius: 8px; overflow: hidden;">
+        <div class="card-header bg-white border-0 py-3 px-3">
+            <h5 class="fw-bold text-dark mb-0" style="font-weight: 600;"><i class="fas fa-exclamation-triangle text-danger me-2"></i>⚠️ Top 5 Event Pemicu Kebocoran Biaya Administrasi Refund</h5>
+            <p class="text-muted small mb-0" style="font-weight: 400;">Analisis event dengan tingkat pembalikan transaksi tertinggi yang memotong kas operasional.</p>
+        </div>
+        
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 w-100">
+                    <thead class="table-light text-uppercase small" style="--bs-table-bg: #f8fafc; color: #475569; font-weight: 600; font-size: 0.8rem;">
+                        <tr>
+                            <th class="py-2.5 px-3">Nama Event Resmi</th>
+                            <th class="py-2.5 px-2 text-center" style="width: 25%;">Volume Kasus Pengajuan</th>
+                            <th class="py-2.5 px-3 text-end" style="width: 30%;">Beban Finansial Ditanggung Platform</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small" style="font-weight: 400;">
+                        @if(isset($refundStats) && count($refundStats) > 0)
+                            @foreach($refundStats as $stat)
+                                <tr>
+                                    <td class="py-2.5 px-3 fw-bold text-dark" style="font-weight: 600;">{{ $stat->event_name }}</td>
+                                    <td class="py-2.5 px-2 text-center">
+                                        <span class="badge bg-warning-subtle text-warning border border-warning border-opacity-10 px-2 py-1 fw-semibold">
+                                            {{ $stat->total_kasus_refund }} Kasus Terverifikasi
+                                        </span>
+                                    </td>
+                                    <td class="py-2.5 px-3 text-end fw-bold text-danger" style="font-weight: 600;">
+                                        Rp {{ number_format($stat->total_biaya_hangus, 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @else
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">
+                                    <span class="small d-block text-secondary" style="font-weight: 500; font-style: italic;">Sistem dalam keadaan bersih dari kebocoran/pengeluaran biaya refund.</span>
+                                </td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection

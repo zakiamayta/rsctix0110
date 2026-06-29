@@ -29,8 +29,9 @@ class EoEventController extends Controller
         });
     }
 
-    /**
+/**
      * 📌 Event milik EO (Approved & Cancelled)
+     * Ditambahkan fitur deteksi otomatis event batal yang membutuhkan keputusan merchandise
      */
     public function index()
     {
@@ -40,6 +41,7 @@ class EoEventController extends Controller
             ->where('user_id', $user->id)
             ->first();
 
+        // 1. Ambil list event disetujui & batal untuk ditampilkan di tabel/grid utama seperti biasa
         $events = Event::where('eo_id', $eo->id)
             ->whereIn('status', [
                 'approved',
@@ -48,7 +50,18 @@ class EoEventController extends Controller
             ->latest()
             ->get();
 
-        return view('eo.event-show', compact('events'));
+        // 2. 🔥 DETEKSI POPUP: Cari apakah ada event yang sudah disetujui BATAL (cancelled) oleh Owner,
+        // namun keputusan penanganan dana merchandise-nya belum dipilih (masih NULL)
+        $pendingMerchEvent = Event::where('eo_id', $eo->id)
+            ->where('status', 'cancelled')
+            ->whereNull('merch_cancel_decision')
+            ->whereHas('products', function ($q) {
+                $q->where('type', 'merch');
+            })
+            ->first(); // Ambil satu event gantung terlama untuk dipaksa diselesaikan lewat modal popup
+
+        // Kirim $pendingMerchEvent ke halaman blade eo.event-show
+        return view('eo.event-show', compact('events', 'pendingMerchEvent'));
     }
 
     /**
@@ -625,6 +638,78 @@ class EoEventController extends Controller
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 🛍️ Menyimpan keputusan EO terkait Merchandise pada Event Batal
+     */
+    public function submitMerchDecision(Request $request, $eventId)
+    {
+        $request->validate([
+            'merch_decision' => 'required|in:refund,ship_independently',
+        ]);
+
+        // Pastikan event ini milik EO yang sedang login dan memang berstatus cancelled
+        $eoId = auth()->user()->eo->id; // Sesuaikan dengan cara Anda mengambil EO ID log masuk
+        
+        $event = DB::table('events')
+            ->where('id', $eventId)
+            ->where('eo_id', $eoId)
+            ->first();
+
+        if (!$event) {
+            return redirect()->back()->with('error', 'Data event tidak ditemukan atau Anda tidak memiliki akses.');
+        }
+
+        if ($event->status !== 'cancelled') {
+            return redirect()->back()->with('error', 'Keputusan merchandise hanya dapat diambil jika status event sudah Resmi Batal.');
+        }
+
+        if (!is_null($event->merch_cancel_decision)) {
+            return redirect()->back()->with('error', 'Anda sudah mengambil keputusan untuk merchandise pada event ini sebelumnya.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Update keputusan di tabel events
+            DB::table('events')->where('id', $eventId)->update([
+                'merch_cancel_decision' => $request->merch_decision,
+                'updated_at' => now()
+            ]);
+
+            // [OPSI KIRIM MANDIRI] Jika EO memilih kirim mandiri, otomatis daftarkan semua item ke manifes absen merch
+            if ($request->merch_decision === 'ship_independently') {
+                // Ambil semua detail item merchandise yang transaksinya sudah SUKSES (paid) untuk event ini
+                $merchDetails = DB::table('transaction_merch_details')
+                    ->join('transaction_merch', 'transaction_merch_details.transaction_merch_id', '=', 'transaction_merch.id')
+                    ->where('transaction_merch.event_id', $eventId)
+                    ->where('transaction_merch.payment_status', 'paid')
+                    ->select('transaction_merch_details.id as detail_id', 'transaction_merch.id as tx_id')
+                    ->get();
+
+                foreach ($merchDetails as $detail) {
+                    DB::table('merch_attendees')->insert([
+                        'transaction_merch_id' => $detail->tx_id,
+                        'transaction_merch_detail_id' => $detail->detail_id,
+                        'is_completed' => 0, // Default awal belum dicentang
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                }
+            }
+
+            DB::commit();
+            
+            $msg = $request->merch_decision === 'refund' 
+                ? 'Keputusan disimpan. Transaksi merchandise dialihkan ke antrean Batch Refund Admin Platform.'
+                : 'Keputusan disimpan. Silakan lakukan pengiriman mandiri dan kelola pencentangan manifes di dashboard Anda.';
+
+            return redirect()->back()->with('success', $msg);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal menyimpan keputusan: ' . $e->getMessage());
         }
     }
 }
