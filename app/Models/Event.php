@@ -30,6 +30,7 @@ class Event extends Model
         'reschedule_reason',
         'can_adjust_schedule',
         'owner_note',
+        'merch_cancel_decision'
     ];
 
     protected $casts = [

@@ -158,7 +158,7 @@
                     class="form-control rounded-pill"
                     required
                     placeholder="nama@gmail.com"
-                    value="{{ old('email', $user->email ?? '') }}">
+                    value="{{ old('email', auth()->user()?->email) }}">
 
               </div>
 

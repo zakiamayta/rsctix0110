@@ -136,7 +136,7 @@
                         {{-- Tombol --}}
                         <div class="d-grid gap-2">
 
-                            <a href="{{ route('merchandise.index', ['event_id' => $event->id]) }}"
+                            <a href="{{ route('merch.index', ['event_id' => $event->id]) }}"
                                class="btn btn-outline-orange btn-lg">
                                 <i class="bi bi-bag"></i> Beli Merchandise
                             </a>
@@ -151,17 +151,22 @@
 </div>
 
 <script>
-    const isLoggedIn = @json(auth()->guard('user')->check());
+    const isLoggedIn = @json(auth()->check());
 
     function handleJadwalClick(e, url) {
         e.preventDefault();
 
         if (!isLoggedIn) {
-            const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+            const modal = new bootstrap.Modal(
+                document.getElementById('loginModal')
+            );
+
             modal.show();
-        } else {
-            window.location.href = url;
+
+            return;
         }
+
+        window.location.href = url;
     }
 </script>
 <!-- Modal Login Required -->

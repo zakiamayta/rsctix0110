@@ -261,12 +261,12 @@
         </small>
     </label>
 
-    <input type="email"
-           name="email"
-           class="form-control rounded-pill"
-           placeholder="nama@gmail.com"
-           value="{{ old('email', auth('user')->user()->email ?? '') }}"
-           required>
+        <input type="email"
+            name="email"
+            class="form-control rounded-pill"
+            placeholder="nama@gmail.com"
+            value="{{ old('email', $user->email ?? '') }}"
+            required>
 </div>
 
 <div class="mb-3">

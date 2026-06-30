@@ -35,11 +35,13 @@
                 <div class="space-y-0.5">
                     <div class="flex justify-between">
                         <span class="text-gray-400 text-[11px]">Available:</span>
-                        <span class="font-semibold text-gray-700">Rp{{ number_format($batch->event->eventWallet->available_balance ?? 0, 0, ',', '.') }}</span>
+                        {{-- 🎯 DIUBAH AGAR DINAMIS MENGIKUTI WALLET DARI CONTROLLER --}}
+                        <span class="font-semibold text-gray-700">Rp{{ number_format($wallet->available_balance ?? 0, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex justify-between border-b pb-0.5">
                         <span class="text-gray-400 text-[11px]">Held (Sanksi):</span>
-                        <span class="font-semibold text-gray-700">Rp{{ number_format($batch->event->eventWallet->held_balance ?? 0, 0, ',', '.') }}</span>
+                        {{-- 🎯 DIUBAH AGAR DINAMIS MENGIKUTI WALLET DARI CONTROLLER --}}
+                        <span class="font-semibold text-gray-700">Rp{{ number_format($wallet->held_balance ?? 0, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex justify-between pt-0.5">
                         <span class="text-gray-600 font-medium text-[11px]">Kapasitas Kas:</span>

@@ -14,6 +14,7 @@ class RefundBatch extends Model
         'eo_id',
         'event_id',
         'name',
+        'type',
         'start_date',
         'end_date',
         'status', // Status Baru yang divalidasi: 'open', 'closed', 'completed'

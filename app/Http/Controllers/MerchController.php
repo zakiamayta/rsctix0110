@@ -12,38 +12,86 @@ use Illuminate\Support\Facades\Log;
 
 class MerchController extends Controller
 {
-    public function index()
-    {
-        $varians = ProductVarian::with([
+public function index($eventId)
+{
+    $event = \App\Models\Event::findOrFail($eventId);
+
+    $varians = ProductVarian::with([
             'product',
             'ukurans'
-        ])->get();
+        ])
+        ->whereHas('product', function ($q) use ($eventId) {
+            $q->where('event_id', $eventId);
+        })
+        ->get();
 
-        $user = auth()->user();
+    $user = auth()->user();
 
-        return view('merch.index', [
-            'varians' => $varians,
-            'user'    => $user
-        ]);
-    }
+    return view('merch.index', [
+        'varians' => $varians,
+        'event' => $event,
+        'user' => $user
+    ]);
+}
 
-    public function preview(Request $request)
+    // Hitung biaya layanan berdasarkan total harga barang
+    // (logikanya sama persis dengan TicketController::calcServiceTax)
+    private function calcServiceTax($total)
     {
-        $orderData = $request->all();
-
-        $orderData['buyer_name']  = $orderData['buyer_name'] ?? '';
-        $orderData['email']       = $orderData['email'] ?? '';
-        $orderData['buyer_phone'] = $orderData['buyer_phone'] ?? '';
-        $orderData['items']       = $orderData['items'] ?? [];
-
-        session(['orderData' => $orderData]);
-
-        return view('merch.checkout', compact('orderData'));
+        if ($total == 0) return 0;
+        if ($total <= 500000) return max(2500, ($total * 5) / 100); // 5%, min Rp2.500
+        if ($total <= 1500000) return ($total * 3) / 100; // 3%
+        if ($total <= 2500000) return ($total * 2) / 100; // 2%
+        return 50000; // flat
     }
+
+    // Label biaya layanan untuk ditampilkan di view
+    // (logikanya sama persis dengan TicketController::serviceLabel)
+    private function serviceLabel($totalAmount, $serviceFee)
+    {
+        if ($totalAmount == 0) return 'Gratis';
+        if ($totalAmount <= 500000) {
+            $calculated = round(($totalAmount * 5) / 100);
+            return ($serviceFee == 2500 && $calculated < 2500) ? 'Minimal Rp2.500' : '5%';
+        }
+        if ($totalAmount <= 1500000) return '3%';
+        if ($totalAmount <= 2500000) return '2%';
+        return 'Flat Rp50.000';
+    }
+
+public function preview(Request $request)
+{
+    $orderData = $request->all();
+    $orderData['buyer_name']  = $orderData['buyer_name'] ?? '';
+    $orderData['email']       = $orderData['email'] ?? '';
+    $orderData['buyer_phone'] = $orderData['buyer_phone'] ?? '';
+    $orderData['items']       = $orderData['items'] ?? [];
+
+    session(['orderData' => $orderData]);
+
+    return redirect()->route('merch.checkout.show'); // redirect ke GET route baru
+}
+
+public function showCheckout()
+{
+    $orderData = session('orderData');
+
+    if (!$orderData) {
+        return redirect()->route('home')->with('error', 'Sesi pesanan tidak ditemukan, silakan ulangi pemesanan.');
+    }
+
+    $event = null;
+    if (!empty($orderData['event_id'])) {
+        $event = \App\Models\Event::find($orderData['event_id']);
+    }
+
+    return view('merch.checkout', compact('orderData', 'event'));
+}
 
     public function checkout(Request $request)
     {
         $validated = $request->validate([
+            'event_id' => 'required|exists:events,id',
             'email'       => 'required|email',
             'buyer_name'  => 'required|string|max:255',
             'buyer_phone' => 'required|string|max:20',
@@ -70,23 +118,14 @@ class MerchController extends Controller
             return (int) $item['subtotal'];
         });
 
-        // total qty barang
-        $totalQty = collect($validated['items'])->sum(function ($item) {
-            return (int) $item['quantity'];
-        });
-
         /*
         |--------------------------------------------------------------------------
         | BIAYA LAYANAN
         |--------------------------------------------------------------------------
         */
 
-        // sama seperti tiket:
-        // 1 item = 10%
-        // >1 item = 7%
-        $servicePercent = $totalQty == 1 ? 10 : 7;
-
-        $serviceTax = ($totalAmount * $servicePercent) / 100;
+        // sama seperti tiket: tier berdasarkan total nominal
+        $serviceTax = $this->calcServiceTax($totalAmount);
 
         /*
         |--------------------------------------------------------------------------
@@ -103,6 +142,8 @@ class MerchController extends Controller
         */
 
         $transaction = TransactionMerch::create([
+            'event_id' => $validated['event_id'],
+
             'email' => $validated['email'],
 
             // subtotal barang

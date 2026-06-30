@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+// 🌟 PASTIKAN MODEL BERIKUT SUDAH DI-IMPORT AGAR EMAIL MERCHANDISE JALAN
+use App\Models\TransactionMerch; 
 
 class WebhookController extends Controller
 {
@@ -16,6 +18,9 @@ class WebhookController extends Controller
     /// ===================================================
     public function handleCallback(Request $request)
     {
+        // ✅ SOLUSI TIMEOUT: Berikan kelonggaran waktu eksekusi agar pengiriman SMTP & PDF tidak putus di tengah jalan
+        set_time_limit(180); 
+
         $data = $request->all();
         Log::info('Xendit Webhook Received:', $data);
 
@@ -41,19 +46,22 @@ class WebhookController extends Controller
                 return response()->json(['message' => 'Ticket transaction updated'], 200);
             }
 
-            // 👕 2. CEK TRANSAKSI MERCHANDISE
-            $merch = DB::table('transaction_merch')->where('xendit_invoice_id', $invoiceId)->first();
+            // 👕 2. CEK TRANSAKSI MERCHANDISE (DIUBAH KE ELOQUENT MODEL BIAR TIDAK TYPE ERROR)
+            $merch = TransactionMerch::where('xendit_invoice_id', $invoiceId)->first();
             if ($merch) {
-                DB::table('transaction_merch')
-                    ->where('id', $merch->id)
-                    ->update([
-                        'payment_status' => 'paid',
-                        'paid_time' => now(),
-                        'payment_method' => $paymentChannel,
-                    ]);
+                $merch->update([
+                    'payment_status' => 'paid',
+                    'paid_time' => now(),
+                    'payment_method' => $paymentChannel,
+                ]);
 
-                // Ambil data terbaru untuk generate QR dan Email
-                $updatedMerch = DB::table('transaction_merch')->where('id', $merch->id)->first();
+                // Ambil data terbaru berbasis Eloquent Model, bukan stdClass mentah lagi
+                $updatedMerch = TransactionMerch::with([
+                    'details.product',
+                    'details.varian',
+                    'details.ukuran',
+                ])->find($merch->id);
+                
                 $this->generateMerchQRCode($updatedMerch);
                 $this->sendMerchEmail($updatedMerch);
                 return response()->json(['message' => 'Merch transaction updated'], 200);
@@ -72,7 +80,6 @@ class WebhookController extends Controller
     public function generateTicketQRCode($transaction)
     {
         try {
-            // Mengubah ke public_path dan mengarahkan ke folder images/qrcodes
             $qrPath = public_path('images/qrcodes');
             if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
 
@@ -82,7 +89,6 @@ class WebhookController extends Controller
 
             QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
 
-            // Simpan path relatif public agar mudah diakses di view/email
             $transaction->qr_code = 'images/qrcodes/' . $qrFileName;
             $transaction->save();
         } catch (\Exception $e) {
@@ -96,7 +102,6 @@ class WebhookController extends Controller
     public function generateMerchQRCode($transaction)
     {
         try {
-            // Mengubah ke public_path dan mengarahkan ke folder images/qrcodes_merch
             $qrPath = public_path('images/qrcodes_merch');
             if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
 
@@ -106,7 +111,6 @@ class WebhookController extends Controller
 
             QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
 
-            // Simpan path relatif public agar mudah diakses di view/email
             DB::table('transaction_merch')
                 ->where('id', $transaction->id)
                 ->update(['qr_code' => 'images/qrcodes_merch/' . $qrFileName]);
@@ -121,20 +125,42 @@ class WebhookController extends Controller
     public function sendTicketEmail($transaction)
     {
         ini_set('memory_limit', '-1');
+
         try {
-            $transaction = \App\Models\Transaction::with(['event', 'attendees.ticket.jadwal'])->find($transaction->id);
-            Mail::to($transaction->email)->send(new \App\Mail\TicketWithPDF($transaction));
+
+            Log::info('START SEND EMAIL');
+
+            $transaction =
+            \App\Models\Transaction::with([
+                'event',
+                'attendees.ticket.jadwal'
+            ])->find($transaction->id);
+
+            Log::info('EMAIL TARGET: '.$transaction->email);
+
+            Mail::to($transaction->email)
+                ->send(
+                    new \App\Mail\TicketWithPDF($transaction)
+                );
+
+            Log::info('EMAIL SUCCESS');
+
         } catch (\Exception $e) {
-            Log::error('Failed to send ticket email: ' . $e->getMessage());
+
+            Log::error(
+                'Failed to send ticket email: '
+                .$e->getMessage()
+            );
         }
     }
 
     public function sendMerchEmail($merch)
     {
         try {
+            // $merch di sini otomatis aman diparsing karena tipenya sudah sesuai dengan target Mailable
             Mail::to($merch->email)->send(new \App\Mail\MerchInvoiceWithPDF($merch));
         } catch (\Exception $e) {
             Log::error('Failed to send merch email: ' . $e->getMessage());
         }
     }
-}
+}   

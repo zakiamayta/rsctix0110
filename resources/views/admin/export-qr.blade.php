@@ -151,7 +151,7 @@
             </div>
 
             <div class="qrcode">
-                <img src="{{ base_path('public_html/qrcodes/ticket_' . $guest->kode_unik . '.png') }}" width="200" height="200" alt="QR Code">
+                <img src="{{ public_path($guest->qr_code ?? ('images/qrcodes/ticket_' . $guest->kode_unik . '.png')) }}" width="200" height="200" alt="QR Code">
             </div>
 
             <p class="note">

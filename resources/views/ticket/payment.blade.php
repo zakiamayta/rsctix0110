@@ -149,7 +149,10 @@
                 {{-- Service fee --}}
                 <div class="d-flex justify-content-between mt-2 text-muted">
                     <span>
-                        Biaya Layanan (10%)
+                        Biaya Layanan
+                        @if(!empty($serviceLabel))
+                            ({{ $serviceLabel }})
+                        @endif
                     </span>
 
                     <span>

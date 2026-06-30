@@ -20,6 +20,7 @@ use App\Http\Controllers\AbsenMerchController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BuyerRefundController;
+use App\Http\Controllers\BuyerMerchRefundController;
 
 // Controllers - Admin Area
 use App\Http\Controllers\AdminController;
@@ -100,8 +101,12 @@ Route::middleware('auth')->group(function () {
     
     Route::get('/tickets/{id}/refund', [BuyerRefundController::class, 'create'])->name('buyer.refund.create');
     Route::post('/tickets/{id}/refund', [BuyerRefundController::class, 'store'])->name('buyer.refund.store');
-    Route::get('/my-merch/refund/{id}', [BuyerMerchRefundController::class, 'create'])->name('buyer.merch.refund.create');
-    Route::post('/my-merch/refund/{id}', [BuyerMerchRefundController::class, 'store'])->name('buyer.merch.refund.store');
+    Route::get('/merch-refund/create/{id}', [BuyerMerchRefundController::class, 'create'])
+        ->name('user.merch-refund.create');
+
+    // Route untuk menyimpan/store Data Pengajuan Refund Merchandise
+    Route::post('/merch-refund/store/{id}', [BuyerMerchRefundController::class, 'store'])
+        ->name('user.merch-refund.store');
 
     // ==========================
     // REGISTRASI EO
@@ -330,9 +335,9 @@ Route::controller(TicketController::class)->group(function () {
 });
 
 Route::controller(MerchController::class)->group(function () {
-    Route::get('/merch', 'index')->name('merch.index');
-    Route::get('/merchandise/{event_id}', 'index')->name('merchandise.index');
+    Route::get('/merchandise/{event_id}', 'index')->name('merch.index');
     Route::post('/merch/checkout', 'checkout')->name('merch.checkout');
+    Route::get('/merch/checkout', 'showCheckout')->name('merch.checkout.show');
     Route::post('/merch/preview', 'preview')->name('merch.preview');
     Route::get('/merch/payment/{id}', 'processPayment')->name('merch.payment');
     Route::get('/merch/success/{id}', 'success')->name('merch.success');

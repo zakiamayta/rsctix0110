@@ -55,7 +55,7 @@ class UserController extends Controller
         return view('user.riwayat-tiket', compact('transactions'));
     }
 
-    public function myMerch()
+public function myMerch()
     {
         $user = Auth::user();
 
@@ -74,13 +74,21 @@ class UserController extends Controller
         ->get();
 
         foreach ($transactions as $trx) {
-            // Sinkronisasi data: Membaca status klaim dari tabel merch_attendees
+            // 1. Sinkronisasi data: Membaca status klaim/ambil fisik dari tabel merch_attendees
             $klaimCheck = DB::table('merch_attendees')
                 ->where('transaction_merch_id', $trx->id)
                 ->first();
 
             // Jika ada barisnya dan is_completed bernilai 1, maka ditandai 'sudah_diambil'
             $trx->klaim_status = ($klaimCheck && $klaimCheck->is_completed == 1) ? 'sudah_diambil' : 'belum_diambil';
+
+            // 2. ALUR MURNI: Ambil status pengajuan refund dari tabel 'refunds' terpusat secara real-time
+            $refundCheck = DB::table('refunds')
+                ->where('transaction_merch_id', $trx->id)
+                ->first();
+
+            // Jika pembeli sudah mengisi form pengajuan, simpan statusnya (waiting/pending/refunded/rejected)
+            $trx->refund_status = $refundCheck ? $refundCheck->status : null;
         }
 
         return view('user.riwayat-merch', compact('transactions'));

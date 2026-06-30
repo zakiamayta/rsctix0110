@@ -78,7 +78,8 @@ class EventApprovalController extends Controller
         }
 
         $event->update([
-            'status' => 'cancelled'
+            'status' => 'cancelled',
+            'merch_cancel_decision' => null // Memastikan null agar alert penentu keputusan langsung mengunci dashboard EO
         ]);
 
         return redirect()

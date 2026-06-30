@@ -10,12 +10,17 @@ class ProfileController extends Controller
 {
     public function edit()
     {
-        $user = Auth::guard('user')->user();
+        $user = Auth::user();
 
         Log::info('OPEN COMPLETE PROFILE PAGE', [
             'user_id' => $user?->id,
             'email' => $user?->email,
         ]);
+
+        // 🎯 PERBAIKAN 1: Amankan jika user ternyata belum login / session habis
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu.');
+        }
 
         if ($user->profile_complete == 1) {
             return redirect('/');
@@ -31,7 +36,6 @@ class ProfileController extends Controller
         ]);
 
         try {
-
             $request->validate([
                 'name'       => 'required|string|max:100',
                 'phone'      => 'required|string|max:20',
@@ -39,7 +43,12 @@ class ProfileController extends Controller
                 'gender'     => 'nullable|in:male,female',
             ]);
 
-            $user = Auth::guard('user')->user();
+            $user = Auth::user();
+
+            // 🎯 PERBAIKAN 2: Amankan juga proses update dari user anonim
+            if (!$user) {
+                return redirect()->route('login')->with('error', 'Sesi Anda telah habis.');
+            }
 
             Log::info('USER BEFORE UPDATE', [
                 'id' => $user->id,
@@ -62,7 +71,6 @@ class ProfileController extends Controller
                 ->with('success', 'Profil berhasil dilengkapi');
 
         } catch (\Throwable $e) {
-
             Log::error('FAILED COMPLETE PROFILE', [
                 'message' => $e->getMessage(),
                 'line' => $e->getLine(),

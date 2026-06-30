@@ -4,19 +4,30 @@
 <div class="w-full p-4 bg-gray-50 text-gray-800 text-sm">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 border-b pb-3 gap-3">
         <div>
-            <h1 class="text-xl font-bold tracking-tight">Manajemen Batch Refund</h1>
-            <p class="text-xs text-gray-500">Kelola pembukuan pengembalian dana tiket massal per event.</p>
+            <h1 class="text-xl font-bold tracking-tight">
+                Manajemen Batch Refund ({{ $activeTab === 'ticket' ? 'Tiket' : 'Merchandise' }})
+            </h1>
+            <p class="text-xs text-gray-500">
+                Kelola pembukuan pengembalian dana komoditas {{ $activeTab === 'ticket' ? 'tiket massal' : 'merchandise' }} per event.
+            </p>
         </div>
         
-        {{-- AKSI MINI: BUKA GERBANG REFUND --}}
-        <form action="{{ route('admin.refunds.storeBatch') }}" method="POST" class="flex items-center gap-2 self-start md:self-auto">
+        {{-- Action URL form disinkronkan dengan parameter query string ?tab= --}}
+        <form action="{{ route('admin.refunds.storeBatch', ['tab' => $activeTab]) }}" method="POST" class="flex items-center gap-2 self-start md:self-auto">
             @csrf
+            {{-- Mengamankan parameter type lewat hidden input --}}
+            <input type="hidden" name="type" value="{{ $activeTab }}">
+
             <select name="event_id" required class="rounded border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white max-w-xs">
                 <option value="">-- Pilih Event Bermasalah --</option>
                 @foreach($eligibleEvents as $event)
                     <option value="{{ $event->id }}">
                         {{ $event->title }} 
-                        (@if($event->status === 'cancelled') Batal / Cancelled @else Reschedule @endif)
+                        @if($activeTab === 'ticket')
+                            (@if($event->status === 'cancelled') Batal / Cancelled @else Reschedule @endif)
+                        @else
+                            (Batal - Refund Merch)
+                        @endif
                     </option>
                 @endforeach
             </select>
@@ -40,6 +51,7 @@
         </div>
     @endif
 
+    {{-- TAB NAVIGATION --}}
     <div class="flex border-b border-gray-200 mb-5">
         <a href="{{ route('admin.refunds.index', ['tab' => 'ticket']) }}" 
            class="py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 {{ $activeTab === 'ticket' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
@@ -51,16 +63,15 @@
         </a>
     </div>
 
-    {{-- 📢 TABEL RIWAYAT / BERITA PROSES EVENT TERKINI (DENGAN MAX-HEIGHT & SCROLL VERTICAL) --}}
+    {{-- 📢 TABEL RIWAYAT / BERITA PROSES EVENT TERKINI --}}
     <div class="bg-white border border-gray-200 rounded overflow-hidden shadow-sm mb-3">
         <div class="bg-gray-100 px-3 py-2 border-b border-gray-200 flex items-center justify-between sticky top-0 z-10">
             <span class="text-xs font-bold uppercase text-gray-700 tracking-wider flex items-center gap-1.5">
-                📢 Riwayat Log Perubahan Status Kebijakan Event (Persetujuan Owner)
+                📢 Riwayat Log Perubahan Status Kebijakan Event (Kategori: {{ $activeTab === 'ticket' ? 'Tiket' : 'Merchandise' }})
             </span>
             <span class="text-[11px] text-gray-400 italic">Scroll ke bawah jika data lebih dari 3</span>
         </div>
         
-        {{-- 🎛️ CONTAINER PENGUNCI TINGGI MAKSIMAL (± 3 BARIS DATA) LENGKAP DENGAN SCROLLBAR --}}
         <div class="max-h-[200px] overflow-y-auto text-xs scrollbar-thin">
             <table class="w-full text-left border-collapse table-fixed">
                 <thead class="bg-gray-50 border-b border-gray-100 text-[11px] font-bold uppercase text-gray-500 sticky top-0 z-10 shadow-sm">
@@ -81,23 +92,31 @@
                             {{ $log->eo->nama_badan_usaha ?? 'N/A' }}
                         </td>
                         <td class="p-2 text-gray-900 break-words line-clamp-2 md:line-clamp-none">
-                            @if($log->status === 'cancelled')
-                                🚨 Event <span class="font-bold text-red-700">"{{ $log->title }}"</span> telah resmi melakukan <span class="underline font-semibold">Cancel acara</span> melalui persetujuan penuh oleh System Owner.
+                            @if($activeTab === 'ticket')
+                                @if($log->status === 'cancelled')
+                                    🚨 Event <span class="font-bold text-red-700">"{{ $log->title }}"</span> resmi melakukan <span class="underline font-semibold">Cancel acara</span> dan membuka gerbang refund tiket.
+                                @else
+                                    🔄 Event <span class="font-bold text-amber-700">"{{ $log->title }}"</span> berhasil melakukan <span class="underline font-semibold">Reschedule (ke-{{ $log->is_rescheduled }})</span> dengan opsi refund tiket.
+                                @endif
                             @else
-                                🔄 Event <span class="font-bold text-amber-700">"{{ $log->title }}"</span> telah berhasil melakukan <span class="underline font-semibold">Reschedule (ke-{{ $log->is_rescheduled }})</span> melalui persetujuan resmi oleh System Owner.
+                                🛍️ Merchandise untuk Event <span class="font-bold text-red-700">"{{ $log->title }}"</span> resmi diputuskan <span class="underline font-semibold text-red-600">Refund Dana</span> oleh pihak EO.
                             @endif
                         </td>
                         <td class="p-2 text-center whitespace-nowrap">
-                            @if($log->status === 'cancelled')
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">CANCELLED</span>
+                            @if($activeTab === 'ticket')
+                                @if($log->status === 'cancelled')
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">CANCELLED</span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">RESCHEDULED</span>
+                                @endif
                             @else
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">RESCHEDULED</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">MERCH REFUND</span>
                             @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="4" class="p-4 text-center text-gray-400 italic">Belum ada riwayat aktivitas pembatalan atau reschedule event akhir-akhir ini.</td>
+                        <td colspan="4" class="p-4 text-center text-gray-400 italic">Belum ada riwayat aktivitas kebijakan pengembalian pada tab komoditas ini.</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -108,6 +127,8 @@
     {{-- 🔍 PANEL FILTER BERDASARKAN PILIHAN EVENT --}}
     <div class="bg-white border border-gray-200 rounded p-3 mb-4 shadow-sm">
         <form action="{{ url()->current() }}" method="GET" class="flex flex-col sm:flex-row items-center justify-between gap-3">
+            {{-- Meneruskan tab aktif saat memfilter --}}
+            <input type="hidden" name="tab" value="{{ $activeTab }}">
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <div class="flex items-center gap-1.5 w-full sm:w-auto">
                     <label class="text-[11px] font-bold uppercase text-gray-500 tracking-wider shrink-0">Filter Event:</label>
@@ -122,7 +143,7 @@
                 </div>
 
                 @if(request('filter_event_id'))
-                    <a href="{{ url()->current() }}" class="text-xs text-red-600 hover:underline font-semibold ml-1 shrink-0">
+                    <a href="{{ route('admin.refunds.index', ['tab' => $activeTab]) }}" class="text-xs text-red-600 hover:underline font-semibold ml-1 shrink-0">
                         Reset Filter
                     </a>
                 @endif
@@ -169,12 +190,10 @@
                         {{ date('d/m/Y', strtotime($b->start_date)) }} s/d {{ date('d/m/Y', strtotime($b->end_date)) }}
                     </td>
                     <td class="p-2 text-center flex items-center justify-center gap-1.5">
-                        {{-- Tombol Detail --}}
                         <a href="{{ route('admin.refunds.show', $b->id) }}" class="bg-gray-800 hover:bg-black text-white px-2 py-1 rounded text-[11px] font-medium transition">
                             👁️ Periksa Data
                         </a>
 
-                        {{-- Tombol Toggle Pintu Gerbang --}}
                         @if($b->status !== 'completed')
                             <form action="{{ route('admin.refunds.toggleStatus', $b->id) }}" method="POST" class="inline">
                                 @csrf
@@ -196,7 +215,7 @@
                 @empty
                 <tr>
                     <td colspan="5" class="p-4 text-center text-gray-400">
-                        Tidak ada data batch refund untuk kriteria filter event ini.
+                        Tidak ada data batch refund untuk kriteria filter event ini pada kategori {{ $activeTab === 'ticket' ? 'Tiket' : 'Merchandise' }}.
                     </td>
                 </tr>
                 @endforelse
