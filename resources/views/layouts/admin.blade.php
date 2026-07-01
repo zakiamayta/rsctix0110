@@ -14,14 +14,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 
+    {{-- Tema admin terpadu (satu tema) — palet & komponen mengikuti light-theme.css --}}
+    <link href="{{ asset('css/admin-theme.css') }}" rel="stylesheet">
+
     <style>
         /* ─── RSC DESIGN TOKENS ─── */
         :root {
-            --rsc-orange:       #E8470A;
-            --rsc-orange-dark:  #C03A08;
-            --rsc-orange-mid:   #F97040;
-            --rsc-orange-light: #FFF0EB;
-            --rsc-orange-pale:  #FDF5F2;
+            --rsc-orange:       #f97316;
+            --rsc-orange-dark:  #ea580c;
+            --rsc-orange-mid:   #fb923c;
+            --rsc-orange-light: #fff7ed;
+            --rsc-orange-pale:  #fff7ed;
             --rsc-dark:         #1A1208;
             --rsc-ink:          #2D2519;
             --rsc-muted:        #7A6E66;
@@ -358,8 +361,8 @@
             <div class="nav-group">
                 <div class="nav-group-label">Tiket</div>
 
-                <a href="{{ route('admin.dashboard') }}"
-                   class="nav-link">
+                <a href="{{ route('admin.transactions') }}"
+                   class="nav-link {{ $current === 'admin.transactions' ? 'active' : '' }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="1" y="4" width="22" height="16" rx="2"/>
                         <line x1="1" y1="10" x2="23" y2="10"/>
@@ -376,14 +379,14 @@
                     Data Peserta
                 </a>
 
-                <a href="{{ route('admin.dashboard') }}"
+                <!-- <a href="{{ route('admin.transactions') }}"
                    class="nav-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 3v18h18"/>
                         <path d="M18 17l-5-5-4 4-3-3"/>
                     </svg>
                     Laporan Penjualan Tiket
-                </a>
+                </a> -->
             </div>
 
             {{-- Merchandise --}}
@@ -400,7 +403,7 @@
                     Transaksi Merchandise
                 </a>
 
-                <a href="{{ route('admin.merch.dashboard') }}"
+                <!-- <a href="{{ route('admin.merch.dashboard') }}"
                    class="nav-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 20V10"/>
@@ -408,7 +411,7 @@
                         <path d="M6 20v-6"/>
                     </svg>
                     Penjualan Merchandise
-                </a>
+                </a> -->
             </div>
 
             {{-- Monitoring --}}

@@ -67,7 +67,7 @@
             {{-- Card 1: Akumulasi Saldo Gabungan --}}
             <div class="bg-white border border-gray-200 rounded p-4 shadow-sm relative overflow-hidden">
                 <div class="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1">Total Saldo Bersih Gabungan (Total Balance)</div>
-                <div class="text-xl font-bold tracking-tight {{ $eoDetails->total_balance < 0 ? 'text-red-600' : 'text-indigo-600' }}">
+                <div class="text-xl font-bold tracking-tight {{ $eoDetails->total_balance < 0 ? 'text-red-600' : 'text-orange-600' }}">
                     Rp {{ number_format($eoDetails->total_balance, 0, ',', '.') }}
                 </div>
                 <p class="text-[10px] text-gray-400 mt-1">Akumulasi likuiditas gabungan (Available + Held) dari semua event.</p>
@@ -141,7 +141,7 @@
                             @endif
                         </td>
                         
-                        <td class="p-3 border-r text-right font-mono {{ ($ev->available_balance + $ev->held_balance) < 0 ? 'text-red-600 bg-red-50/30' : 'text-indigo-600' }}">
+                        <td class="p-3 border-r text-right font-mono {{ ($ev->available_balance + $ev->held_balance) < 0 ? 'text-red-600 bg-red-50/30' : 'text-orange-600' }}">
                             <div class="font-bold tracking-tight text-sm">
                                 Rp {{ number_format(($ev->available_balance + $ev->held_balance), 0, ',', '.') }}
                             </div>
@@ -164,7 +164,7 @@
                             @endif
                         </td>
                         <td class="p-3 text-center">
-                            <a href="{{ route('admin.finance.manageEvent', $ev->id) }}" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded text-[11px] tracking-wide transition shadow-sm shadow-indigo-100">
+                            <a href="{{ route('admin.finance.manageEvent', $ev->id) }}" class="inline-block bg-orange-600 hover:bg-orange-700 text-white font-bold py-1 px-3 rounded text-[11px] tracking-wide transition shadow-sm shadow-orange-100">
                                 ⚙️ Kelola Finansial
                             </a>
                         </td>

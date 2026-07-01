@@ -74,7 +74,7 @@
             {{-- Tombol --}}
             <div class="flex gap-2 items-end md:col-span-2">
                 <button type="submit"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold text-sm shadow-sm">
+                    class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md font-semibold text-sm shadow-sm">
                     Filter
                 </button>
                 <a href="{{ route('admin.absensi') }}"
@@ -88,7 +88,7 @@
     {{-- 🔹 Tabel Absensi --}}
     <div class="overflow-x-auto">
         <table class="min-w-full bg-white border border-gray-200 shadow-sm rounded-lg">
-            <thead class="bg-blue-50 text-left text-sm font-semibold text-gray-700">
+            <thead class="bg-orange-50 text-left text-sm font-semibold text-gray-700">
                 <tr>
                     <th class="px-4 py-3 border-b">No</th>
                     <th class="px-4 py-3 border-b">Nama Event</th>
@@ -116,7 +116,7 @@
                             <td class="px-4 py-3 text-center">
                                 @if ($attendee->transaction?->qr_code)
                                     <a href="{{ route('absen.form', $attendee->transaction->kode_unik) }}" target="_blank"
-                                        class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition">
+                                        class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 transition">
                                         QR
                                     </a>
                                 @else
@@ -129,7 +129,7 @@
                                 @if ($attendee->transaction)
                                     {{-- Detail Pembeli --}}
                                     <button onclick="showDetail({{ $attendee->id }})"
-                                        class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600"
+                                        class="p-2 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-600"
                                         title="Detail Pembeli">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
@@ -188,7 +188,7 @@
             <h3 class="text-xl font-bold text-gray-900 mb-4">Detail Pembeli Tiket</h3>
             <div id="modalContent" class="max-h-80 overflow-y-auto text-sm"></div>
             <button onclick="closeModal()"
-                class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold">
+                class="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md font-semibold">
                 Tutup
             </button>
         </div>

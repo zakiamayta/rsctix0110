@@ -249,10 +249,11 @@ public function showCheckout()
     {
         $transaction = TransactionMerch::findOrFail($id);
 
-        $transaction->update([
-            'payment_status' => 'failed'
-        ]);
-
+        // ⚠️ Sebelumnya di sini di-set payment_status = 'failed', padahal kolom ini berupa
+        // enum('unpaid','paid','refunded') — nilai 'failed' tidak valid (akan ditolak di mode
+        // strict, atau tersimpan sebagai string kosong). Status TIDAK diubah di halaman redirect
+        // ini; sumber kebenaran status adalah webhook Xendit. Biarkan tetap 'unpaid' sampai
+        // benar-benar dibayar atau invoice kedaluwarsa.
         return view('merch.failed', compact('transaction'));
     }
 

@@ -19,7 +19,23 @@ class WebhookController extends Controller
     public function handleCallback(Request $request)
     {
         // ✅ SOLUSI TIMEOUT: Berikan kelonggaran waktu eksekusi agar pengiriman SMTP & PDF tidak putus di tengah jalan
-        set_time_limit(180); 
+        set_time_limit(180);
+
+        // 🔐 VERIFIKASI TOKEN CALLBACK XENDIT (anti pemalsuan webhook)
+        // Xendit menyertakan header 'x-callback-token' di setiap notifikasi. Token ini
+        // dibandingkan dengan token rahasia di config (XENDIT_CALLBACK_TOKEN). Jika tidak
+        // cocok, request ditolak agar pihak luar tidak bisa memalsukan status "PAID".
+        // Perbandingan memakai hash_equals() agar aman dari serangan timing.
+        $expectedToken = config('services.xendit.callback_token');
+        if (!empty($expectedToken)) {
+            $incomingToken = (string) $request->header('x-callback-token');
+            if (!hash_equals((string) $expectedToken, $incomingToken)) {
+                Log::warning('Xendit webhook DITOLAK: x-callback-token tidak valid.', ['ip' => $request->ip()]);
+                return response()->json(['message' => 'Invalid callback token'], 403);
+            }
+        } else {
+            Log::warning('XENDIT_CALLBACK_TOKEN belum diset — verifikasi token webhook DINONAKTIFKAN.');
+        }
 
         $data = $request->all();
         Log::info('Xendit Webhook Received:', $data);
@@ -32,15 +48,28 @@ class WebhookController extends Controller
             $invoiceId = trim($data['id']);
             $paymentChannel = $data['payment_channel'] ?? ($data['payment_method'] ?? 'Xendit Gateway');
 
-            // 🎟️ 1. CEK TRANSAKSI TIKET 
+            // 🎟️ 1. CEK TRANSAKSI TIKET
             $transaction = \App\Models\Transaction::where('xendit_invoice_id', $invoiceId)->first();
             if ($transaction) {
-                $transaction->update([
-                    'payment_status' => 'paid',
-                    'paid_time' => now(),
-                    'payment_method' => $paymentChannel,
-                ]);
+                // 🔒 IDEMPOTEN: Xendit dapat mengirim callback PAID berkali-kali (retry).
+                // Transisi 'unpaid' → 'paid' dikunci di level query: bila tidak ada baris yang
+                // berubah, berarti sudah pernah diproses → JANGAN kirim email & QR lagi.
+                $affected = \App\Models\Transaction::where('id', $transaction->id)
+                    ->where(function ($q) {
+                        $q->where('payment_status', 'unpaid')->orWhereNull('payment_status');
+                    })
+                    ->update([
+                        'payment_status' => 'paid',
+                        'paid_time' => now(),
+                        'payment_method' => $paymentChannel,
+                    ]);
 
+                if ($affected === 0) {
+                    Log::info('Webhook PAID tiket duplikat diabaikan (sudah diproses).', ['invoice_id' => $invoiceId]);
+                    return response()->json(['message' => 'Ticket already processed'], 200);
+                }
+
+                $transaction->refresh();
                 $this->generateTicketQRCode($transaction);
                 $this->sendTicketEmail($transaction);
                 return response()->json(['message' => 'Ticket transaction updated'], 200);
@@ -49,11 +78,21 @@ class WebhookController extends Controller
             // 👕 2. CEK TRANSAKSI MERCHANDISE (DIUBAH KE ELOQUENT MODEL BIAR TIDAK TYPE ERROR)
             $merch = TransactionMerch::where('xendit_invoice_id', $invoiceId)->first();
             if ($merch) {
-                $merch->update([
-                    'payment_status' => 'paid',
-                    'paid_time' => now(),
-                    'payment_method' => $paymentChannel,
-                ]);
+                // 🔒 IDEMPOTEN: sama seperti tiket, cegah pemrosesan ganda saat Xendit retry.
+                // Catatan: tabel transaction_merch TIDAK punya kolom payment_method, jadi tidak diset.
+                $affected = TransactionMerch::where('id', $merch->id)
+                    ->where(function ($q) {
+                        $q->where('payment_status', 'unpaid')->orWhereNull('payment_status');
+                    })
+                    ->update([
+                        'payment_status' => 'paid',
+                        'paid_time' => now(),
+                    ]);
+
+                if ($affected === 0) {
+                    Log::info('Webhook PAID merch duplikat diabaikan (sudah diproses).', ['invoice_id' => $invoiceId]);
+                    return response()->json(['message' => 'Merch already processed'], 200);
+                }
 
                 // Ambil data terbaru berbasis Eloquent Model, bukan stdClass mentah lagi
                 $updatedMerch = TransactionMerch::with([
@@ -69,6 +108,28 @@ class WebhookController extends Controller
 
             Log::warning('Transaction not found for invoice ID: ' . $invoiceId);
             return response()->json(['message' => 'Transaction not found'], 404);
+        }
+
+        // ❌ INVOICE KEDALUWARSA / GAGAL → LEPASKAN KEMBALI STOK TIKET YANG TERTAHAN
+        // Saat checkout, stok tiket langsung dipotong walau status masih 'unpaid'. Jika
+        // pembeli tidak jadi membayar dan invoice Xendit kedaluwarsa, stok tersebut harus
+        // dikembalikan. Hanya transaksi TIKET yang memotong stok (merch tidak), sehingga
+        // hanya tabel transactions yang perlu diproses di sini.
+        if (in_array(strtoupper($data['status']), ['EXPIRED', 'FAILED'], true)) {
+            $invoiceId = trim($data['id']);
+
+            $transaction = \App\Models\Transaction::where('xendit_invoice_id', $invoiceId)->first();
+
+            if ($transaction) {
+                $released = $transaction->releaseExpiredStock();
+                Log::info('Xendit invoice expired/failed, pelepasan stok tiket', [
+                    'invoice_id'     => $invoiceId,
+                    'stock_released' => $released,
+                ]);
+                return response()->json(['message' => 'Ticket stock released'], 200);
+            }
+
+            return response()->json(['message' => 'No unpaid ticket to release'], 200);
         }
 
         return response()->json(['message' => 'Ignored webhook'], 200);

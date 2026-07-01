@@ -34,7 +34,7 @@
         </p>
     </div>
 
-    <div class="rounded-xl p-4"
+    <!-- <div class="rounded-xl p-4"
          style="background:#fff; border:1px solid #EDE8E3;">
         <p class="text-xs font-bold uppercase tracking-widest mb-1"
            style="color:#7A6E66;">
@@ -44,7 +44,7 @@
            style="font-family:'Sora',sans-serif; color:#1A1208;">
             {{ $events->where('status','approved')->count() }}
         </p>
-    </div>
+    </div> -->
 
     <div class="rounded-xl p-4"
          style="background:#fff; border:1px solid #EDE8E3;">

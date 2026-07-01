@@ -5,7 +5,7 @@
     {{-- NAVIGASI MINI HEADER --}}
     <div class="flex items-center justify-between border-b pb-2 mb-3">
         <div>
-            <a href="{{ route('admin.refunds.index') }}" class="text-xs text-indigo-600 hover:underline">← Kembali ke Daftar Batch</a>
+            <a href="{{ route('admin.refunds.index') }}" class="text-xs text-orange-600 hover:underline">← Kembali ke Daftar Batch</a>
             <h1 class="text-lg font-bold text-gray-900 mt-0.5">{{ $batch->name }}</h1>
             <div class="text-[11px] text-gray-500">
                 Event: <span class="font-medium text-gray-700">{{ $batch->event->title }}</span> | 
@@ -45,7 +45,7 @@
                     </div>
                     <div class="flex justify-between pt-0.5">
                         <span class="text-gray-600 font-medium text-[11px]">Kapasitas Kas:</span>
-                        <span class="font-bold text-indigo-700">Rp{{ number_format($availableBalance, 0, ',', '.') }}</span>
+                        <span class="font-bold text-orange-700">Rp{{ number_format($availableBalance, 0, ',', '.') }}</span>
                     </div>
                 </div>
             </div>
@@ -53,7 +53,7 @@
             {{-- 2. KOLOM SERVICE TAX EVENT --}}
             <div class="border-r border-gray-200 px-2 flex flex-col justify-center h-full">
                 <span class="text-gray-500 font-medium text-[11px] uppercase tracking-wider block mb-0.5">Service Tax Event Ini</span>
-                <span class="text-sm font-bold text-indigo-600">Rp{{ number_format($totalServiceTaxEvent, 0, ',', '.') }}</span>
+                <span class="text-sm font-bold text-orange-600">Rp{{ number_format($totalServiceTaxEvent, 0, ',', '.') }}</span>
                 <span class="text-[10px] text-gray-400 mt-0.5">*Pajak terakumulasi dari tiket penonton</span>
             </div>
 
@@ -98,7 +98,7 @@
                     @if($batch->status === 'closed' && $refunds->where('status', 'pending')->count() > 0)
                         <form action="{{ route('admin.refunds.completeBatch', $batch->id) }}" method="POST" class="w-full" onsubmit="return confirm('PENTING: Pastikan Anda sudah mentransfer sukses via file Xendit tadi. Selesaikan batch ini?')">
                             @csrf
-                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded text-[11px] transition whitespace-nowrap text-center">
+                            <button type="submit" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-1 px-2 rounded text-[11px] transition whitespace-nowrap text-center">
                                 ✔️ Selesai & Potong
                             </button>
                         </form>
@@ -110,7 +110,7 @@
 
     {{-- NOTIFIKASI REGULASI OPERASIONAL JIKA BELUM DIKUNCI --}}
     @if($batch->status === 'open')
-        <div class="bg-blue-50 border border-blue-200 text-blue-800 p-2 text-xs rounded mb-3 flex items-center gap-1.5">
+        <div class="bg-orange-50 border border-orange-200 text-orange-800 p-2 text-xs rounded mb-3 flex items-center gap-1.5">
             <span>ℹ️</span> 
             <span><strong>Informasi Kerja Admin:</strong> Silakan klik tombol <strong>"🔒 Kunci Batch"</strong> di halaman depan terlebih dahulu untuk membekukan pendaftaran pembeli, setelah itu tombol ekspor Xendit akan aktif otomatis.</span>
         </div>
@@ -140,7 +140,7 @@
                         <div class="text-[10px] text-gray-400">{{ $refund->transaction->email ?? 'Email N/A' }}</div>
                     </td>
                     <td class="p-2 border-r font-bold text-gray-700 uppercase">{{ $refund->bank_name }}</td>
-                    <td class="p-2 border-r font-mono font-bold text-indigo-600 tracking-wider">{{ $refund->account_number }}</td>
+                    <td class="p-2 border-r font-mono font-bold text-orange-600 tracking-wider">{{ $refund->account_number }}</td>
                     <td class="p-2 border-r text-right font-bold text-gray-900">
                         Rp{{ number_format($refund->grand_total_refunded, 0, ',', '.') }}
                     </td>

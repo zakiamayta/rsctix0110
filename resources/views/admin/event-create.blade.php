@@ -77,7 +77,7 @@
     <div class="flex justify-between items-center mb-3">
         <h3 class="font-bold text-lg text-gray-800">Jadwal Event</h3>
         <button type="button" onclick="addJadwal()"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm">
+                class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded text-sm">
             + Tambah Jadwal
         </button>
     </div>
@@ -94,7 +94,7 @@
 
     <button type="submit"
             onclick="this.disabled=true; this.innerText='Menyimpan...'; this.form.submit();"
-            class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded">
+            class="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded">
         Simpan Event
     </button>
 </div>
@@ -138,7 +138,7 @@ function addJadwal() {
                 <p class="text-sm font-semibold text-gray-700">Tiket</p>
                 <button type="button"
                         onclick="addTicket(${jadwalIndex})"
-                        class="text-blue-600 text-sm hover:underline">
+                        class="text-orange-600 text-sm hover:underline">
                     + Tambah Tiket
                 </button>
             </div>

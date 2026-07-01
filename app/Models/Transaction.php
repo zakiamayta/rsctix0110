@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model
 {
@@ -42,5 +43,50 @@ class Transaction extends Model
     public function attendees()
     {
         return $this->hasMany(TicketAttendee::class, 'transaction_id', 'id');
+    }
+
+    /**
+     * Lepaskan kembali stok tiket untuk transaksi yang GAGAL/KEDALUWARSA dibayar.
+     *
+     * Mengembalikan stok sesuai jumlah peserta lalu menghapus transaksi & pesertanya,
+     * mengikuti pola yang sama dengan TicketController::cancel(). Karena kolom
+     * payment_status berupa enum('unpaid','paid','refunded'), status "expired" tidak
+     * bisa disimpan, sehingga record dihapus (bukan ditandai).
+     *
+     * Aman dipanggil berkali-kali (idempotent) dan tahan balapan (race-safe): baris
+     * dikunci lalu dipastikan masih 'unpaid' sebelum diproses, jadi webhook PAID,
+     * webhook EXPIRED, dan sweep terjadwal tidak akan mengembalikan stok dua kali.
+     *
+     * @return bool true jika stok benar-benar dilepas pada pemanggilan ini.
+     */
+    public function releaseExpiredStock(): bool
+    {
+        return DB::transaction(function () {
+            $trx = static::where('id', $this->id)
+                ->where('payment_status', 'unpaid')
+                ->lockForUpdate()
+                ->first();
+
+            // Sudah dibayar, atau sudah dilepas oleh proses lain → tidak melakukan apa-apa.
+            if (!$trx) {
+                return false;
+            }
+
+            // Kembalikan stok: 1 peserta = 1 tiket (sesuai cara store() memotong stok).
+            $attendees = DB::table('ticket_attendees')
+                ->where('transaction_id', $trx->id)
+                ->get();
+
+            foreach ($attendees as $attendee) {
+                DB::table('tickets')
+                    ->where('id', $attendee->ticket_id)
+                    ->increment('stock', 1);
+            }
+
+            DB::table('ticket_attendees')->where('transaction_id', $trx->id)->delete();
+            DB::table('transactions')->where('id', $trx->id)->delete();
+
+            return true;
+        });
     }
 }

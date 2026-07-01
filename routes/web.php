@@ -211,6 +211,7 @@ Route::middleware('auth')->group(function () {
         // Admin Dashboard & Exports Utama
         Route::controller(DashboardController::class)->group(function () {
             Route::get('/dashboard', 'index')->name('dashboard');
+            Route::get('/transactions', 'transactions')->name('transactions');
             Route::get('/dashboard/export-excel', 'exportSimpleExcel')->name('dashboard.export.excel');
             Route::get('/dashboard/export-pdf', 'exportPDF')->name('dashboard.export.pdf');
             Route::post('/transactions/{id}/regenerate-qr', 'regenerateQR')->name('transactions.regenerateQR');

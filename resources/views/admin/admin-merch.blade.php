@@ -7,7 +7,7 @@
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <h2 class="text-3xl font-bold text-gray-800">Kelola Merchandise</h2>
         <button onclick="openAddModal()" 
-                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                class="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-5 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
@@ -20,7 +20,7 @@
             <div>
                 <label for="event_filter" class="block text-sm font-semibold text-gray-700 mb-1">Filter Event</label>
                 <select id="event_filter" name="event_id" 
-                        class="form-select w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 transition">
+                        class="form-select w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500 transition">
                     <option value="">-- Semua Event --</option>
                     @foreach($events as $event)
                         <option value="{{ $event->id }}" {{ request('event_id') == $event->id ? 'selected' : '' }}>
@@ -34,12 +34,12 @@
                 <label for="search" class="block text-sm font-semibold text-gray-700 mb-1">Pencarian</label>
                 <input type="text" id="search" name="search" placeholder="Cari nama produk..."
                        value="{{ request('search') }}"
-                       class="form-input w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 transition"/>
+                       class="form-input w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500 transition"/>
             </div>
 
             <div class="flex gap-4">
                 <button type="submit" 
-                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold text-sm transition-colors shadow-sm">
+                        class="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg font-semibold text-sm transition-colors shadow-sm">
                     Filter
                 </button>
                 <a href="{{ route('admin.merch.index') }}" 
@@ -67,7 +67,7 @@
 
                 <div class="flex gap-2 mt-4">
                     <button onclick="openDetailModal({{ $product->id }})" 
-                            class="flex-1 bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors">
+                            class="flex-1 bg-orange-100 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors">
                         Detail
                     </button>
 
@@ -113,12 +113,12 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Produk</label>
-                    <input type="text" name="name" id="productName" class="form-input w-full rounded-xl border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" required>
+                    <input type="text" name="name" id="productName" class="form-input w-full rounded-xl border border-gray-300 p-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition" required>
                 </div>
 
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Event</label>
-                    <select name="event_id" id="productEvent" class="form-select w-full rounded-xl border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" required>
+                    <select name="event_id" id="productEvent" class="form-select w-full rounded-xl border border-gray-300 p-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition" required>
                         @foreach($events as $event)
                             <option value="{{ $event->id }}">{{ $event->title }}</option>
                         @endforeach
@@ -128,12 +128,12 @@
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Deskripsi</label>
-                <textarea name="description" id="productDescription" rows="4" class="form-textarea w-full rounded-xl border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"></textarea>
+                <textarea name="description" id="productDescription" rows="4" class="form-textarea w-full rounded-xl border border-gray-300 p-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"></textarea>
             </div>
 
             <div id="variansContainer" class="space-y-6"></div>
             
-            <button type="button" onclick="tambahVarian()" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold px-4 py-3 rounded-xl transition-colors flex items-center justify-center space-x-2">
+            <button type="button" onclick="tambahVarian()" class="w-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-semibold px-4 py-3 rounded-xl transition-colors flex items-center justify-center space-x-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
                 </svg>
@@ -144,7 +144,7 @@
                 <button type="button" onclick="closeModal()" class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-colors">
                     Batal
                 </button>
-                <button type="submit" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors">
+                <button type="submit" class="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition-colors">
                     Simpan Produk
                 </button>
             </div>
@@ -231,7 +231,7 @@
     function tambahVarian(varianData = null, ukuranList = []) {
         let html = `<div class="varianBlock border border-gray-200 rounded-xl p-6 mb-6 bg-gray-50 shadow-sm relative">
             <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Varian</label>
-            <input type="text" name="varians[${varianIndex}][varian]" class="form-input w-full rounded-lg mb-4 p-2 border-gray-300 focus:ring-blue-500" value="${varianData ? varianData.varian : ''}" required>
+            <input type="text" name="varians[${varianIndex}][varian]" class="form-input w-full rounded-lg mb-4 p-2 border-gray-300 focus:ring-orange-500" value="${varianData ? varianData.varian : ''}" required>
             
             <label class="block text-sm font-semibold text-gray-700 mb-1">Gambar Varian</label>
             <input type="file" name="varians[${varianIndex}][image]" class="form-input w-full rounded-lg mb-4">

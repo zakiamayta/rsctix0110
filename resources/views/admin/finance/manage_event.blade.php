@@ -62,7 +62,7 @@
             <div class="mt-4 pt-3 border-t border-gray-100">
                 <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
                     <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Total Saldo Tersedia (+ Held)</div>
-                    <div class="text-lg font-bold text-indigo-700">Rp {{ number_format(($event->available_balance ?? 0) + ($event->held_balance ?? 0), 0, ',', '.') }}</div>
+                    <div class="text-lg font-bold text-orange-700">Rp {{ number_format(($event->available_balance ?? 0) + ($event->held_balance ?? 0), 0, ',', '.') }}</div>
                     <div class="text-[10px] text-gray-500 mt-1 font-sans">
                         Tersedia: Rp {{ number_format($event->available_balance ?? 0, 0, ',', '.') }} | Ditahan (Held): Rp {{ number_format($event->held_balance ?? 0, 0, ',', '.') }}
                     </div>
@@ -78,16 +78,16 @@
                 @csrf
                 <div>
                     <label class="block text-[11px] font-bold text-gray-600 mb-1">Jumlah Dana yang Diminta (Rp):</label>
-                    <input type="number" name="amount_requested" required min="1000" placeholder="Contoh: 15000000" class="w-full rounded border border-gray-300 p-2 font-mono text-xs focus:outline-none focus:border-indigo-500 bg-white text-gray-800">
+                    <input type="number" name="amount_requested" required min="1000" placeholder="Contoh: 15000000" class="w-full rounded border border-gray-300 p-2 font-mono text-xs focus:outline-none focus:border-orange-500 bg-white text-gray-800">
                     <span class="text-[10px] text-gray-400 mt-0.5 block leading-normal">Tagihan ini akan otomatis muncul di dashboard EO terkait.</span>
                 </div>
 
                 <div>
                     <label class="block text-[11px] font-bold text-gray-600 mb-1">Catatan Instruksi Admin:</label>
-                    <textarea name="admin_note" rows="2" placeholder="Contoh: Saldo dompet event Anda minus akibat pengajuan refund massal..." class="w-full rounded border border-gray-300 p-2 text-xs focus:outline-none focus:border-indigo-500 bg-white text-gray-800"></textarea>
+                    <textarea name="admin_note" rows="2" placeholder="Contoh: Saldo dompet event Anda minus akibat pengajuan refund massal..." class="w-full rounded border border-gray-300 p-2 text-xs focus:outline-none focus:border-orange-500 bg-white text-gray-800"></textarea>
                 </div>
 
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                <button type="submit" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded text-xs transition shadow-sm flex items-center justify-center gap-1.5">
                     🚀 Tembak Tagihan ke EO
                 </button>
             </form>
@@ -143,7 +143,7 @@
                             @elseif($t->status === 'pending_verification')
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">⏳ PENDING VERIFY</span>
                             @else
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">📋 REQUESTED</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200">📋 REQUESTED</span>
                             @endif
                         </td>
                         <td class="p-3 border-r text-gray-600 text-xs" style="max-w: 200px; word-wrap: break-word; white-space: normal;">
@@ -218,7 +218,7 @@
                 </p>
                 <div>
                     <label class="block text-[11px] font-bold text-gray-600 mb-1">Catatan Tambahan Admin (Opsional):</label>
-                    <textarea name="admin_note" id="modalAdminNote" rows="3" placeholder="Contoh: Transfer sudah sesuai dan mutasi bank valid / Struk palsu terindikasi blur..." class="w-full rounded border border-gray-300 p-2 text-xs focus:outline-none focus:border-indigo-500 bg-white text-gray-800"></textarea>
+                    <textarea name="admin_note" id="modalAdminNote" rows="3" placeholder="Contoh: Transfer sudah sesuai dan mutasi bank valid / Struk palsu terindikasi blur..." class="w-full rounded border border-gray-300 p-2 text-xs focus:outline-none focus:border-orange-500 bg-white text-gray-800"></textarea>
                 </div>
             </div>
             

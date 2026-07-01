@@ -1,5 +1,7 @@
 @extends('layouts.admin')
 
+@section('title', 'Transaksi Tiket')
+
 @push('styles')
 <link href="{{ asset('css/admin_dashboard.css') }}" rel="stylesheet">
 @endpush
@@ -19,12 +21,12 @@
 
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 min-h-screen">
+<body class="bg-gradient-to-br from-gray-50 via-orange-50 to-amber-50 min-h-screen">
 
 <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header Section -->
     <div class="mb-8 animate-fade-in-up">
-        <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mb-2">
+        <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500 mb-2">
             Dashboard Transaksi
         </h2>
         <p class="text-gray-600 text-sm">Kelola dan monitoring seluruh transaksi tiket event</p>
@@ -37,7 +39,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex-1"> 
                     <div class="flex items-center gap-2 mb-2">
-                        <div class="w-2 h-2 rounded-full bg-blue-500 badge-pulse"></div>
+                        <div class="w-2 h-2 rounded-full bg-orange-500 badge-pulse"></div>
                         <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Uang Masuk</h3>
                     </div>
                     <p class="text-3xl font-extrabold text-gray-900 mb-1">
@@ -95,18 +97,18 @@
     {{-- Filter Section --}}
     <div class="glass-effect rounded-2xl p-6 card-shadow-lg mb-6 animate-slide-in">
         <div class="flex items-center gap-2 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
             <h3 class="text-lg font-bold text-gray-900">Filter & Pencarian</h3>
         </div>
         
-        <form method="GET" action="{{ route('admin.dashboard') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <form method="GET" action="{{ route('admin.transactions') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {{-- Pilih Event --}}
             <div>
                 <label for="event_id" class="block text-xs font-semibold text-gray-700 mb-1.5">Pilih Event</label>
                 <select id="event_id" name="event_id"
-                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
                     <option value="">Semua Event</option>
                     @foreach($events as $event)
                         <option value="{{ $event->id }}" {{ request('event_id') == $event->id ? 'selected' : '' }}>
@@ -121,7 +123,7 @@
                 <label for="start_date" class="block text-xs font-semibold text-gray-700 mb-1.5">Tanggal Mulai</label>
                 <input type="date" id="start_date" name="start_date"
                        value="{{ request('start_date') }}"
-                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
             </div>
 
             {{-- Tanggal Selesai --}}
@@ -129,14 +131,14 @@
                 <label for="end_date" class="block text-xs font-semibold text-gray-700 mb-1.5">Tanggal Selesai</label>
                 <input type="date" id="end_date" name="end_date"
                        value="{{ request('end_date') }}"
-                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
             </div>
 
             {{-- Status Pembayaran --}}
             <div>
                 <label for="payment_status" class="block text-xs font-semibold text-gray-700 mb-1.5">Status Pembayaran</label>
                 <select id="payment_status" name="payment_status"
-                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
                     <option value="">Semua Status</option>
                     <option value="paid" {{ request('payment_status') === 'paid' ? 'selected' : '' }}>Paid</option>
                     <option value="unpaid" {{ request('payment_status') === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
@@ -147,7 +149,7 @@
             <div>
                 <label for="sort_by" class="block text-xs font-semibold text-gray-700 mb-1.5">Urutkan Berdasarkan</label>
                 <select id="sort_by" name="sort_by"
-                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
                     <option value="">Urutkan</option>
                     <option value="event_title" {{ request('sort_by') === 'event_title' ? 'selected' : '' }}>Judul Acara</option>
                     <option value="email" {{ request('sort_by') === 'email' ? 'selected' : '' }}>Email</option>
@@ -162,19 +164,19 @@
                 <label for="q" class="block text-xs font-semibold text-gray-700 mb-1.5">Pencarian</label>
                 <input type="text" id="q" name="q" placeholder="Cari email/nama"
                        value="{{ request('q') }}"
-                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"/>
+                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"/>
             </div>
 
             {{-- Tombol --}}
             <div class="lg:col-span-6 flex flex-wrap gap-3 pt-2">
                 <button type="submit"
-                        class="btn-ripple px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2">
+                        class="btn-ripple px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
                     Terapkan Filter
                 </button>
-                <a href="{{ route('admin.dashboard') }}"
+                <a href="{{ route('admin.transactions') }}"
                    class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -259,7 +261,7 @@
                             <td class="px-3 py-2 whitespace-nowrap">
                                 @if($transaction->qr_code)
                                     <a href="{{ route('guests.qr', $transaction->kode_unik) }}" target="_blank"
-                                       class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+                                       class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                         </svg>
@@ -270,14 +272,14 @@
                                 @endif
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
-                                <span class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">
+                                <span class="inline-flex items-center px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold">
                                     {{ $transaction->attendees->count() }} tiket
                                 </span>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <div class="flex flex-col space-y-2">
                                     <button onclick="showDetail({{ $transaction->id }})"
-                                            class="inline-flex items-center justify-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+                                            class="inline-flex items-center justify-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -322,7 +324,7 @@
 {{-- Modal Detail --}}
 <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
     <div class="glass-effect rounded-2xl shadow-2xl max-w-3xl w-full transform transition-all duration-300 scale-95 opacity-0" id="modalContentWrapper">
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 rounded-t-2xl">
+        <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 rounded-t-2xl">
             <h3 class="text-xl font-bold text-white flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -415,11 +417,11 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
                         ${transaction.attendees.map((a, index) => `
-                            <tr class="hover:bg-blue-50 transition-colors duration-150">
+                            <tr class="hover:bg-orange-50 transition-colors duration-150">
                                 <td class="px-4 py-3 font-medium text-gray-900">${a.name}</td>
                                 <td class="px-4 py-3 text-gray-600">${a.phone_number ?? '-'}</td>
                                 <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-semibold">
+                                    <span class="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded-md text-xs font-semibold">
                                         ${a.ticket_id}
                                     </span>
                                 </td>

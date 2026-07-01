@@ -46,7 +46,12 @@ class GoogleAuthController extends Controller
             $user->save();
         }
 
+        // Autentikasi ke DUA guard yang dipakai aplikasi:
+        // - 'web' (default) → dibaca RoleMiddleware (admin/owner/eo) & ProfileController.
+        // - 'user' → dibaca view complete-profile dan fitur user-facing (TicketController,
+        //   HomeController, CheckEoApproved, dll). Tanpa ini auth('user')->user() bernilai null.
         Auth::login($user);
+        Auth::guard('user')->login($user);
 
         request()->session()->regenerate();
         request()->session()->save();

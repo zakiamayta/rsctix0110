@@ -12,13 +12,13 @@
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
     <link href="{{ asset('css/admin_dashboard.css') }}" rel="stylesheet">
 </head>
-<body class="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 min-h-screen">
+<body class="bg-gradient-to-br from-gray-50 via-orange-50 to-amber-50 min-h-screen">
 
 <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
     <!-- Header -->
 <div class="mb-8 animate-fade-in-up">
-    <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mb-2">
+    <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500 mb-2">
         Dashboard Transaksi Merchandise
     </h2>
     <p class="text-gray-600 text-sm">Monitoring transaksi merch, status pembayaran, dan detail pembelian</p>
@@ -31,10 +31,10 @@
         <div class="flex items-center justify-between">
             <div class="flex-1">
                 <div class="flex items-center gap-2 mb-2">
-                    <div class="w-2 h-2 rounded-full bg-blue-500 badge-pulse"></div>
+                    <div class="w-2 h-2 rounded-full bg-orange-500 badge-pulse"></div>
                     <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Uang Masuk</h3>
                 </div>
-                <p class="text-3xl font-extrabold text-blue-700 mb-1">
+                <p class="text-3xl font-extrabold text-orange-700 mb-1">
                     Rp{{ number_format($totalPaidAmount, 0, ',', '.') }}
                 </p>
                 <p class="text-xs text-gray-500">Dari pembayaran berhasil</p>
@@ -96,7 +96,7 @@
         <div>
             <label for="payment_status" class="block text-xs font-semibold text-gray-700 mb-1.5">Status Pembayaran</label>
             <select id="payment_status" name="payment_status"
-                    class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
                 <option value="">-- Semua Status --</option>
                 <option value="paid" {{ request('payment_status') === 'paid' ? 'selected' : '' }}>Paid</option>
                 <option value="unpaid" {{ request('payment_status') === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
@@ -107,14 +107,14 @@
         <div>
             <label for="start_date" class="block text-xs font-semibold text-gray-700 mb-1.5">Tanggal Mulai</label>
             <input type="date" id="start_date" name="start_date" value="{{ request('start_date') }}"
-                   class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"/>
+                   class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"/>
         </div>
 
         {{-- Tanggal Selesai --}}
         <div>
             <label for="end_date" class="block text-xs font-semibold text-gray-700 mb-1.5">Tanggal Selesai</label>
             <input type="date" id="end_date" name="end_date" value="{{ request('end_date') }}"
-                   class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"/>
+                   class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"/>
         </div>
 
         {{-- Pencarian --}}
@@ -122,13 +122,13 @@
             <label for="q" class="block text-xs font-semibold text-gray-700 mb-1.5">Pencarian</label>
             <input type="text" id="q" name="q" placeholder="Cari email/nama"
                    value="{{ request('q') }}"
-                   class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"/>
+                   class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"/>
         </div>
 
         {{-- Tombol --}}
         <div class="lg:col-span-6 flex flex-wrap gap-3 pt-2">
             <button type="submit"
-                    class="btn-ripple px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2">
+                    class="btn-ripple px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
@@ -191,7 +191,7 @@
                 @forelse ($transactions as $transaction)
                     <tr class="table-row-hover">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $loop->iteration }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">{{ $transaction->details->first()->product->title ?? '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">{{ $transaction->details->first()?->product?->name ?? '-' }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $transaction->email }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $transaction->checkout_time }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $transaction->paid_time ?? '-' }}</td>
@@ -207,7 +207,7 @@
                         <td class="px-3 py-2 whitespace-nowrap">
                             @if($transaction->qr_code)
                                 <a href="{{ route('guests.merch.qr', $transaction->kode_unik) }}" target="_blank"
-                                   class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+                                   class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
                                     Lihat QR
                                 </a>
                             @else
@@ -215,14 +215,14 @@
                             @endif
                         </td>
                         <td class="px-3 py-2 whitespace-nowrap">
-                            <span class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">
+                            <span class="inline-flex items-center px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold">
                                 {{ $transaction->details->sum('quantity') }} pcs
                             </span>
                         </td>
                         <td class="px-3 py-2 whitespace-nowrap">
                             <div class="flex flex-col space-y-2">
                                 <button onclick="showDetail({{ $transaction->id }})"
-                                        class="inline-flex items-center justify-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+                                        class="inline-flex items-center justify-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200">
                                     Detail
                                 </button>
                                 <form id="regenerate-form-{{ $transaction->id }}"

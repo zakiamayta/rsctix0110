@@ -370,52 +370,52 @@ textarea.rsc-input {
 
         <div class="field-group">
           <label>Judul Event</label>
-          <input type="text" name="title" class="rsc-input" placeholder="Nama event kamu" required>
+          <input type="text" name="title" class="rsc-input" placeholder="Nama event kamu" value="{{ old('title') }}" required>
         </div>
 
         <div class="field-group">
           <label>Tanggal Event</label>
-          <input type="datetime-local"id="eventDate" name="date" class="rsc-input"required>
+          <input type="datetime-local" id="eventDate" name="date" class="rsc-input" value="{{ old('date') }}" required>
         </div>
 
         <div class="field-group">
           <label>Instagram</label>
-          <input type="text" name="instagram" class="rsc-input" placeholder="@username">
+          <input type="text" name="instagram" class="rsc-input" placeholder="@username" value="{{ old('instagram') }}">
         </div>
 
         <div class="field-group">
           <label>Lineup</label>
-          <input type="text" name="lineup" class="rsc-input" placeholder="Nama artis / performer">
+          <input type="text" name="lineup" class="rsc-input" placeholder="Nama artis / performer" value="{{ old('lineup') }}">
         </div>
 
         <div class="field-group">
           <label>Minimal Umur</label>
-          <input type="number" name="min_age" class="rsc-input" placeholder="Contoh: 17">
+          <input type="number" name="min_age" class="rsc-input" placeholder="Contoh: 17" value="{{ old('min_age') }}">
         </div>
 
         <div class="field-group">
           <label>Maks Tiket / Email</label>
-          <input type="number" name="max_tickets_per_email" value="3" class="rsc-input">
+          <input type="number" name="max_tickets_per_email" value="{{ old('max_tickets_per_email', 3) }}" class="rsc-input">
         </div>
 
         <div class="field-group">
           <label>Mulai Penjualan Tiket</label>
-          <input type="datetime-local" name="ticket_sale_start" class="rsc-input">
+          <input type="datetime-local" name="ticket_sale_start" class="rsc-input" value="{{ old('ticket_sale_start') }}">
         </div>
 
         <div class="field-group">
           <label>Mulai Redeem Tiket</label>
-          <input type="datetime-local" name="ticket_redeem_start" class="rsc-input">
+          <input type="datetime-local" name="ticket_redeem_start" class="rsc-input" value="{{ old('ticket_redeem_start') }}">
         </div>
 
         <div class="field-group span2">
           <label>Lokasi</label>
-          <input type="text" name="location" class="rsc-input" placeholder="Venue lengkap" required>
+          <input type="text" name="location" class="rsc-input" placeholder="Venue lengkap" value="{{ old('location') }}" required>
         </div>
 
         <div class="field-group span2">
           <label>Deskripsi</label>
-          <textarea name="description" class="rsc-input" placeholder="Ceritakan event kamu…"></textarea>
+          <textarea name="description" class="rsc-input" placeholder="Ceritakan event kamu…">{{ old('description') }}</textarea>
         </div>
 
       <div class="field-group span2">
@@ -518,13 +518,24 @@ document.querySelector(
 });
 
 let jadwalIndex = 0;
+let ticketUid = 0;
 
-function addJadwal()
+// Escape nilai agar aman dimasukkan ke atribut/teks HTML (mencegah markup rusak & XSS)
+function esc(v){
+    return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;');
+}
+
+function addJadwal(data = null)
 {
 
     let defaultDate = getEventDate();
 
-    if(jadwalIndex > 0){
+    if(jadwalIndex > 0 && !data){
 
         const previousInput =
             document.querySelector(
@@ -545,6 +556,11 @@ function addJadwal()
                 .toISOString()
                 .slice(0,16);
         }
+    }
+
+    // Saat restore (setelah error validasi), gunakan tanggal lama
+    if(data && data.tanggal){
+        defaultDate = data.tanggal;
     }
 
 
@@ -588,6 +604,7 @@ function addJadwal()
                     type="text"
                     name="jadwal[${jadwalIndex}][info]"
                     class="rsc-input"
+                    value="${data ? esc(data.info) : ''}"
                     required>
 
             </div>
@@ -612,7 +629,7 @@ function addJadwal()
 
                 <textarea
                     name="jadwal[${jadwalIndex}][deskripsi]"
-                    class="rsc-input"></textarea>
+                    class="rsc-input">${data ? esc(data.deskripsi) : ''}</textarea>
 
             </div>
 
@@ -650,13 +667,17 @@ function addJadwal()
         html
     );
 
-
-
-    addTicket(jadwalIndex);
-
-        updateTicketSaleInputs();
-
+    const idx = jadwalIndex;
     jadwalIndex++;
+
+    // Restore tiket lama bila ada, jika tidak tambahkan satu tiket kosong (perilaku semula)
+    if(data && data.tickets){
+        Object.values(data.tickets).forEach(t => addTicket(idx, t));
+    } else {
+        addTicket(idx);
+    }
+
+    updateTicketSaleInputs();
 }
 
 document
@@ -955,9 +976,15 @@ document.addEventListener('change', function(e){
 
 });
 
-function addTicket(jadwalId) {
+function addTicket(jadwalId, data = null) {
   const wrapper = document.getElementById(`ticket-wrapper-${jadwalId}`);
-  const ticketId = Date.now();
+  const ticketId = `${Date.now()}_${ticketUid++}`;
+
+  const nameVal  = data ? esc(data.name)       : '';
+  const priceVal = data ? esc(data.price)      : '';
+  const stockVal = data ? esc(data.stock)      : '';
+  const startVal = data ? esc(data.start_sale) : '';
+  const endVal   = data ? esc(data.end_sale)   : '';
 
   const html = `
   <div class="ticket-item">
@@ -966,19 +993,19 @@ function addTicket(jadwalId) {
         <label>Nama Tiket</label>
         <input type="text"
                name="jadwal[${jadwalId}][tickets][${ticketId}][name]"
-               class="rsc-input" placeholder="Reguler / VIP" required>
+               class="rsc-input" placeholder="Reguler / VIP" value="${nameVal}" required>
       </div>
       <div class="field-group">
         <label>Harga (Rp)</label>
         <input type="number"
                name="jadwal[${jadwalId}][tickets][${ticketId}][price]"
-               class="rsc-input" placeholder="0" required>
+               class="rsc-input" placeholder="0" value="${priceVal}" required>
       </div>
       <div class="field-group">
         <label>Stok</label>
         <input type="number"
                name="jadwal[${jadwalId}][tickets][${ticketId}][stock]"
-               class="rsc-input" placeholder="100" required>
+               class="rsc-input" placeholder="100" value="${stockVal}" required>
       </div>
       <button type="button"
               class="btn-remove-ticket"
@@ -993,6 +1020,7 @@ function addTicket(jadwalId) {
         <input type="datetime-local"
               name="jadwal[${jadwalId}][tickets][${ticketId}][start_sale]"
               class="rsc-input ticket-start-sale"
+              value="${startVal}"
               disabled>
       </div>
       <div class="field-group">
@@ -1000,6 +1028,7 @@ function addTicket(jadwalId) {
         <input type="datetime-local"
               name="jadwal[${jadwalId}][tickets][${ticketId}][end_sale]"
               class="rsc-input ticket-end-sale"
+              value="${endVal}"
               disabled>
       </div>
     </div>
@@ -1051,7 +1080,26 @@ function previewPoster(event) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-  addJadwal();
+  let restored = false;
+
+  try {
+    // Data jadwal+tiket lama yang diflash Laravel setelah error validasi
+    const oldJadwal = @json(old('jadwal'));
+
+    if (oldJadwal && Object.keys(oldJadwal).length > 0) {
+      Object.values(oldJadwal).forEach(j => addJadwal(j));
+      restored = true;
+    }
+  } catch (e) {
+    console.error('Gagal memulihkan jadwal lama:', e);
+  }
+
+  // Fallback: pastikan minimal ada satu jadwal jika tidak ada data lama / restore gagal
+  if (!restored && document.querySelectorAll('.jadwal-item').length === 0) {
+    addJadwal();
+  }
+
+  updateTicketSaleInputs();
 });
 </script>
 

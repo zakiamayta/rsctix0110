@@ -11,7 +11,7 @@
         <div class="bg-white border border-gray-200 rounded-2xl shadow-xl hover:shadow-2xl transition duration-300 ease-in-out">
             
             {{-- HEADER CARD: Menggunakan warna Blue-600 untuk meniru gradient-blue --}}
-            <div class="bg-blue-600 text-white text-center py-4 rounded-t-2xl">
+            <div class="bg-orange-600 text-white text-center py-4 rounded-t-2xl">
                 <h4 class="mb-0 text-xl font-semibold">QR Code Merchandise</h4>
             </div>
 
@@ -22,22 +22,22 @@
                     <div class="w-full max-w-sm">
                         {{-- Menggunakan list-group-flush simulasi dengan div flex --}}
                         <div class="space-y-2 text-left">
-                            <div class="flex justify-between p-2 border-b border-gray-100 hover:bg-blue-50 transition duration-150 rounded">
+                            <div class="flex justify-between p-2 border-b border-gray-100 hover:bg-orange-50 transition duration-150 rounded">
                                 <span class="font-medium text-gray-500">Kode Unik Transaksi:</span>
                                 <span class="uppercase font-bold text-gray-800">{{ $transaction->kode_unik }}</span>
                             </div>
-                            <div class="flex justify-between p-2 border-b border-gray-100 hover:bg-blue-50 transition duration-150 rounded">
+                            <div class="flex justify-between p-2 border-b border-gray-100 hover:bg-orange-50 transition duration-150 rounded">
                                 <span class="font-medium text-gray-500">Email:</span>
                                 <span class="text-gray-600">{{ $transaction->email }}</span>
                             </div>
-                            <div class="flex justify-between items-center p-2 hover:bg-blue-50 transition duration-150 rounded">
+                            <div class="flex justify-between items-center p-2 hover:bg-orange-50 transition duration-150 rounded">
                                 <span class="font-medium text-gray-500">Status Pembayaran:</span>
                                 {{-- Badge Status: Meniru warna dari Blade sebelumnya --}}
                                 @php
                                     $status_class = match ($transaction->payment_status) {
                                         'paid' => 'bg-green-600',
                                         'failed' => 'bg-red-600',
-                                        default => 'bg-purple-600',
+                                        default => 'bg-orange-600',
                                     };
                                 @endphp
                                 <span class="px-3 py-1 text-sm font-semibold rounded-full text-white {{ $status_class }}">
@@ -61,7 +61,7 @@
                         <div class="mt-6 flex flex-wrap justify-center gap-3">
                             <a href="{{ asset($transaction->qr_code) }}"
                                target="_blank"
-                               class="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md transition duration-200">
+                               class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md transition duration-200">
                                 🔍 Lihat QR Code
                             </a>
                             <a href="{{ asset($transaction->qr_code) }}"
@@ -76,7 +76,7 @@
                             <p class="text-gray-500 text-sm mb-2">Scan QR di atas atau buka link berikut:</p>
                             <a href="{{ asset($transaction->qr_code) }}"
                                target="_blank"
-                               class="inline-block bg-blue-100 text-blue-700 font-semibold px-3 py-2 rounded-lg text-xs break-all hover:bg-blue-200 transition duration-150">
+                               class="inline-block bg-orange-100 text-orange-700 font-semibold px-3 py-2 rounded-lg text-xs break-all hover:bg-orange-200 transition duration-150">
                                 {{ asset($transaction->qr_code) }}
                             </a>
                         </div>
@@ -107,7 +107,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach($transaction->details as $detail)
-                                <tr class="hover:bg-blue-50 transition duration-150">
+                                <tr class="hover:bg-orange-50 transition duration-150">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">{{ $detail->product->name ?? 'Produk tidak ditemukan' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{{ $detail->quantity }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Rp {{ number_format($detail->price, 0, ',', '.') }}</td>

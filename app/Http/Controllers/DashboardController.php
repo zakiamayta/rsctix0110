@@ -9,6 +9,8 @@ use Spatie\SimpleExcel\SimpleExcelWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\TicketAttendee;
 use App\Models\Event; // pastikan di atas ada ini
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 
 class DashboardController extends Controller
@@ -74,7 +76,146 @@ public function __construct()
         ]);
     }
 
+/**
+ * 📊 DASHBOARD RINGKASAN PLATFORM (Tab "Dashboard")
+ *
+ * Semua angka dihitung langsung dari tabel sumber agar selalu akurat,
+ * tidak bergantung pada kolom cache yang mungkin belum tersinkron.
+ */
 public function index(Request $request)
+{
+    // ===================== TIKET =====================
+    $ticket = DB::table('transactions')->selectRaw("
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN grand_total  ELSE 0 END), 0) AS gmv,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN service_tax  ELSE 0 END), 0) AS tax,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS eo_rev,
+        SUM(CASE WHEN payment_status = 'paid'     THEN 1 ELSE 0 END) AS paid_count,
+        SUM(CASE WHEN payment_status = 'unpaid'   THEN 1 ELSE 0 END) AS unpaid_count,
+        SUM(CASE WHEN payment_status = 'refunded' THEN 1 ELSE 0 END) AS refunded_count
+    ")->first();
+
+    // ===================== MERCHANDISE =====================
+    $merch = DB::table('transaction_merch')->selectRaw("
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN grand_total  ELSE 0 END), 0) AS gmv,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN service_tax  ELSE 0 END), 0) AS tax,
+        SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_count
+    ")->first();
+
+    // Tiket terjual (1 peserta = 1 tiket) dari transaksi lunas
+    $ticketsSold = DB::table('ticket_attendees')
+        ->join('transactions', 'ticket_attendees.transaction_id', '=', 'transactions.id')
+        ->where('transactions.payment_status', 'paid')
+        ->count();
+
+    // ===================== FINANSIAL =====================
+    $refundFeesSpent  = (float) DB::table('refunds')->where('status', 'refunded')->sum('refunds_tax');
+    $refundedToBuyers = (float) DB::table('refunds')->where('status', 'refunded')->sum('grand_total_refunded');
+    $platformRevenue  = (float) $ticket->tax + (float) $merch->tax;        // pendapatan platform (service tax)
+    $platformNet      = $platformRevenue - $refundFeesSpent;              // bersih setelah biaya refund
+    $eoDebtOutstanding = (float) DB::table('eo_debts')->where('status', '!=', 'paid')->sum('remaining_debt');
+    $withdrawnToEo = (float) DB::table('withdrawals')->where('status', 'approved')->sum('amount')
+                   + (float) DB::table('merch_withdrawals')->where('status', 'approved')->sum('amount');
+
+    // ===================== OPERASIONAL =====================
+    $eventStatus = DB::table('events')
+        ->select('status', DB::raw('COUNT(*) as total'))
+        ->groupBy('status')->pluck('total', 'status');
+
+    $summary = [
+        'platform_revenue' => $platformRevenue,
+        'total_gmv'        => (float) $ticket->gmv + (float) $merch->gmv,
+        'tickets_sold'     => (int) $ticketsSold,
+        'paid_count'       => (int) $ticket->paid_count + (int) $merch->paid_count,
+
+        'ticket_paid'      => (int) $ticket->paid_count,
+        'ticket_unpaid'    => (int) $ticket->unpaid_count,
+        'ticket_refunded'  => (int) $ticket->refunded_count,
+        'ticket_gmv'       => (float) $ticket->gmv,
+        'ticket_tax'       => (float) $ticket->tax,
+        'merch_paid'       => (int) $merch->paid_count,
+        'merch_gmv'        => (float) $merch->gmv,
+        'merch_tax'        => (float) $merch->tax,
+
+        'refund_fees'      => $refundFeesSpent,
+        'refunded_buyers'  => $refundedToBuyers,
+        'platform_net'     => $platformNet,
+        'eo_debt'          => $eoDebtOutstanding,
+        'withdrawn_eo'     => $withdrawnToEo,
+
+        'total_events'     => (int) array_sum($eventStatus->all()),
+        'total_eo'         => (int) DB::table('eo')->count(),
+        'total_users'      => (int) DB::table('users')->where('role', 'user')->count(),
+    ];
+
+    $pending = [
+        'events'      => (int) ($eventStatus['pending'] ?? 0),
+        'refunds'     => (int) DB::table('refunds')->whereIn('status', ['waiting', 'pending'])->count(),
+        'withdrawals' => (int) DB::table('withdrawals')->where('status', 'pending')->count()
+                       + (int) DB::table('merch_withdrawals')->where('status', 'pending')->count(),
+    ];
+
+    // ===================== TREN PENDAPATAN 6 BULAN (tiket + merch) =====================
+    $since  = Carbon::now()->startOfMonth()->subMonths(5);
+    $months = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $m = Carbon::now()->startOfMonth()->subMonths($i);
+        $months[$m->format('Y-m')] = ['label' => $m->translatedFormat('M Y'), 'total' => 0.0];
+    }
+
+    $applyTrend = function ($rows) use (&$months) {
+        foreach ($rows as $r) {
+            if (isset($months[$r->ym])) {
+                $months[$r->ym]['total'] += (float) $r->total;
+            }
+        }
+    };
+
+    $applyTrend(DB::table('transactions')
+        ->where('payment_status', 'paid')->whereNotNull('paid_time')->where('paid_time', '>=', $since)
+        ->selectRaw("DATE_FORMAT(paid_time, '%Y-%m') as ym, SUM(grand_total) as total")
+        ->groupBy('ym')->get());
+
+    $applyTrend(DB::table('transaction_merch')
+        ->where('payment_status', 'paid')->whereNotNull('paid_time')->where('paid_time', '>=', $since)
+        ->selectRaw("DATE_FORMAT(paid_time, '%Y-%m') as ym, SUM(grand_total) as total")
+        ->groupBy('ym')->get());
+
+    $trendLabels = array_values(array_map(fn ($m) => $m['label'], $months));
+    $trendData   = array_values(array_map(fn ($m) => round($m['total']), $months));
+
+    // ===================== TOP EVENT =====================
+    $topEvents = DB::table('transactions')
+        ->join('events', 'transactions.event_id', '=', 'events.id')
+        ->leftJoin('eo', 'events.eo_id', '=', 'eo.id')
+        ->where('transactions.payment_status', 'paid')
+        ->select(
+            'events.title',
+            'eo.nama_badan_usaha as eo_name',
+            DB::raw('SUM(transactions.total_amount) as revenue'),
+            DB::raw('COUNT(transactions.id) as trx_count')
+        )
+        ->groupBy('events.id', 'events.title', 'eo.nama_badan_usaha')
+        ->orderByDesc('revenue')
+        ->limit(5)->get();
+
+    // ===================== TRANSAKSI TERBARU =====================
+    $recent = DB::table('transactions')
+        ->leftJoin('events', 'transactions.event_id', '=', 'events.id')
+        ->where('transactions.payment_status', 'paid')
+        ->select('transactions.email', 'transactions.grand_total', 'transactions.paid_time', 'events.title as event_title')
+        ->orderByDesc('transactions.paid_time')
+        ->limit(8)->get();
+
+    return view('admin.admin-overview', compact(
+        'summary', 'eventStatus', 'pending', 'trendLabels', 'trendData', 'topEvents', 'recent'
+    ));
+}
+
+/**
+ * 🎟️ DAFTAR TRANSAKSI TIKET (Tab "Transaksi Tiket")
+ * Sebelumnya ini adalah isi index(); dipindah agar dashboard bisa jadi ringkasan.
+ */
+public function transactions(Request $request)
 {
     $transactions = $this->getAllTransactionData($request);
 
@@ -251,7 +392,7 @@ public function regenerateAllQR()
     }
 
     return redirect()
-        ->route('admin.dashboard')
+        ->route('admin.transactions')
         ->with('success', "QR Code berhasil diregenerate ulang. Sukses: {$success}, Gagal: {$failed}");
 }
 

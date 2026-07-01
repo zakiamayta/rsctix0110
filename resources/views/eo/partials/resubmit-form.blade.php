@@ -248,59 +248,59 @@
       <div class="rs-field">
         <label>Judul Event</label>
         <input type="text" name="title" class="rs-input"
-               value="{{ $event->title }}" placeholder="Nama event" required>
+               value="{{ old('title', $event->title) }}" placeholder="Nama event" required>
       </div>
 
       <div class="rs-field">
         <label>Tanggal Event</label>
-        <input type="datetime-local" id="eventDate" name="date" class="rs-input" value="{{ \Carbon\Carbon::parse($event->date)->format('Y-m-d\TH:i') }}" required>
+        <input type="datetime-local" id="eventDate" name="date" class="rs-input" value="{{ old('date', \Carbon\Carbon::parse($event->date)->format('Y-m-d\TH:i')) }}" required>
       </div>
 
       <div class="rs-field">
         <label>Instagram</label>
         <input type="text" name="instagram" class="rs-input"
-               value="{{ $event->instagram }}" placeholder="@username">
+               value="{{ old('instagram', $event->instagram) }}" placeholder="@username">
       </div>
 
       <div class="rs-field">
         <label>Lineup</label>
         <input type="text" name="lineup" class="rs-input"
-               value="{{ $event->lineup }}" placeholder="Nama artis / performer">
+               value="{{ old('lineup', $event->lineup) }}" placeholder="Nama artis / performer">
       </div>
 
       <div class="rs-field">
         <label>Minimal Umur</label>
         <input type="number" name="min_age" class="rs-input"
-               value="{{ $event->min_age }}" placeholder="17">
+               value="{{ old('min_age', $event->min_age) }}" placeholder="17">
       </div>
 
       <div class="rs-field">
         <label>Maks Tiket / Email</label>
         <input type="number" name="max_tickets_per_email" class="rs-input"
-               value="{{ $event->max_tickets_per_email }}" required>
+               value="{{ old('max_tickets_per_email', $event->max_tickets_per_email) }}" required>
       </div>
 
       <div class="rs-field">
         <label>Mulai Penjualan Tiket</label>
         <input type="datetime-local" name="ticket_sale_start" class="rs-input"
-               value="{{ $event->ticket_sale_start ? \Carbon\Carbon::parse($event->ticket_sale_start)->format('Y-m-d\TH:i') : '' }}">
+               value="{{ old('ticket_sale_start', $event->ticket_sale_start ? \Carbon\Carbon::parse($event->ticket_sale_start)->format('Y-m-d\TH:i') : '') }}">
       </div>
 
       <div class="rs-field">
         <label>Mulai Redeem Tiket</label>
         <input type="datetime-local" name="ticket_redeem_start" class="rs-input"
-               value="{{ $event->ticket_redeem_start ? \Carbon\Carbon::parse($event->ticket_redeem_start)->format('Y-m-d\TH:i') : '' }}">
+               value="{{ old('ticket_redeem_start', $event->ticket_redeem_start ? \Carbon\Carbon::parse($event->ticket_redeem_start)->format('Y-m-d\TH:i') : '') }}">
       </div>
 
       <div class="rs-field rs-span2">
         <label>Lokasi</label>
         <input type="text" name="location" class="rs-input"
-               value="{{ $event->location }}" placeholder="Venue lengkap" required>
+               value="{{ old('location', $event->location) }}" placeholder="Venue lengkap" required>
       </div>
 
       <div class="rs-field rs-span2">
         <label>Deskripsi</label>
-        <textarea name="description" class="rs-input" required>{{ $event->description }}</textarea>
+        <textarea name="description" class="rs-input" required>{{ old('description', $event->description) }}</textarea>
       </div>
 
       <div class="rs-field rs-span2">
@@ -349,7 +349,7 @@
             <input type="text"
                    name="jadwal[{{ $i }}][info]"
                    class="rs-input"
-                   value="{{ $jadwal->info }}"
+                   value="{{ old("jadwal.$i.info", $jadwal->info) }}"
                    placeholder="Misal: Hari 1 / Stage A" required>
           </div>
           <div class="rs-field">
@@ -357,7 +357,7 @@
             <input type="datetime-local"
                   name="jadwal[{{ $i }}][tanggal]"
                   class="rs-input jadwal-date"
-                  value="{{ \Carbon\Carbon::parse($jadwal->tanggal)->format('Y-m-d\TH:i') }}"
+                  value="{{ old("jadwal.$i.tanggal", \Carbon\Carbon::parse($jadwal->tanggal)->format('Y-m-d\TH:i')) }}"
                   required>
           </div>
         </div>
@@ -366,7 +366,7 @@
           <label>Deskripsi Jadwal</label>
           <textarea name="jadwal[{{ $i }}][deskripsi]"
                     class="rs-input"
-                    style="min-height:56px;">{{ $jadwal->deskripsi }}</textarea>
+                    style="min-height:56px;">{{ old("jadwal.$i.deskripsi", $jadwal->deskripsi) }}</textarea>
         </div>
 
         <div class="rs-ticket-box">
@@ -379,7 +379,7 @@
                 <div class="rs-ticket-lbl">Nama Tiket</div>
                 <input type="text"
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][name]"
-                       value="{{ $ticket->name }}"
+                       value="{{ old("jadwal.$i.tickets.$t.name", $ticket->name) }}"
                        class="rs-input"
                        placeholder="Reguler / VIP" required>
               </div>
@@ -387,7 +387,7 @@
                 <div class="rs-ticket-lbl">Harga (Rp)</div>
                 <input type="number"
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][price]"
-                       value="{{ $ticket->price }}"
+                       value="{{ old("jadwal.$i.tickets.$t.price", $ticket->price) }}"
                        class="rs-input"
                        placeholder="0" required>
               </div>
@@ -395,7 +395,7 @@
                 <div class="rs-ticket-lbl">Stok</div>
                 <input type="number"
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][stock]"
-                       value="{{ $ticket->stock }}"
+                       value="{{ old("jadwal.$i.tickets.$t.stock", $ticket->stock) }}"
                        class="rs-input"
                        placeholder="0" required>
               </div>
@@ -406,7 +406,7 @@
                           type="datetime-local"
                           class="rs-input"
                           name="jadwal[{{ $i }}][tickets][{{ $t }}][start_sale]"
-                          value="{{ $ticket->start_sale ? \Carbon\Carbon::parse($ticket->start_sale)->format('Y-m-d\TH:i') : '' }}">
+                          value="{{ old("jadwal.$i.tickets.$t.start_sale", $ticket->start_sale ? \Carbon\Carbon::parse($ticket->start_sale)->format('Y-m-d\TH:i') : '') }}">
                   </div>
 
                   <div class="rs-field">
@@ -415,7 +415,7 @@
                           type="datetime-local"
                           class="rs-input"
                           name="jadwal[{{ $i }}][tickets][{{ $t }}][end_sale]"
-                          value="{{ $ticket->end_sale ? \Carbon\Carbon::parse($ticket->end_sale)->format('Y-m-d\TH:i') : '' }}">
+                          value="{{ old("jadwal.$i.tickets.$t.end_sale", $ticket->end_sale ? \Carbon\Carbon::parse($ticket->end_sale)->format('Y-m-d\TH:i') : '') }}">
                   </div>
               </div>
             </div>

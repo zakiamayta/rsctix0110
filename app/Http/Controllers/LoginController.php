@@ -43,8 +43,11 @@ public function login(Request $request)
         }
     }
 
-    // 4. Login menggunakan Guard 'user' (agar sinkron dengan ProfileController)
+    // 4. Login ke guard 'web' (default, untuk RoleMiddleware) DAN guard 'user' (dibaca
+    //    ProfileController/view complete-profile & fitur user-facing). Sebelumnya hanya
+    //    Auth::login() (guard 'web'), sehingga auth('user')->user() null → error di view.
     Auth::login($user);
+    Auth::guard('user')->login($user);
     $request->session()->regenerate();
 
     Log::info('Login success', [

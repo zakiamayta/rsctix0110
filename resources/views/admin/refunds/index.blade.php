@@ -18,7 +18,7 @@
             {{-- Mengamankan parameter type lewat hidden input --}}
             <input type="hidden" name="type" value="{{ $activeTab }}">
 
-            <select name="event_id" required class="rounded border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white max-w-xs">
+            <select name="event_id" required class="rounded border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white max-w-xs">
                 <option value="">-- Pilih Event Bermasalah --</option>
                 @foreach($eligibleEvents as $event)
                     <option value="{{ $event->id }}">
@@ -31,7 +31,7 @@
                     </option>
                 @endforeach
             </select>
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded text-xs transition shrink-0">
+            <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-medium px-3 py-1.5 rounded text-xs transition shrink-0">
                 + Buka Batch Baru
             </button>
         </form>
@@ -54,7 +54,7 @@
     {{-- TAB NAVIGATION --}}
     <div class="flex border-b border-gray-200 mb-5">
         <a href="{{ route('admin.refunds.index', ['tab' => 'ticket']) }}" 
-           class="py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 {{ $activeTab === 'ticket' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+           class="py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 {{ $activeTab === 'ticket' ? 'border-orange-600 text-orange-600 bg-orange-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
             🎫 Refund Tiket Penonton
         </a>
         <a href="{{ route('admin.refunds.index', ['tab' => 'merch']) }}" 
@@ -110,7 +110,7 @@
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">RESCHEDULED</span>
                                 @endif
                             @else
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">MERCH REFUND</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200">MERCH REFUND</span>
                             @endif
                         </td>
                     </tr>
@@ -132,7 +132,7 @@
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <div class="flex items-center gap-1.5 w-full sm:w-auto">
                     <label class="text-[11px] font-bold uppercase text-gray-500 tracking-wider shrink-0">Filter Event:</label>
-                    <select name="filter_event_id" onchange="this.form.submit()" class="w-full sm:w-72 rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50 font-medium truncate">
+                    <select name="filter_event_id" onchange="this.form.submit()" class="w-full sm:w-72 rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 bg-gray-50 font-medium truncate">
                         <option value="">📋 Tampilkan Semua Event</option>
                         @foreach($allEventsWithBatches as $ev)
                             <option value="{{ $ev->id }}" {{ request('filter_event_id') == $ev->id ? 'selected' : '' }}>
@@ -183,7 +183,7 @@
                             <span class="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-300 text-gray-500 text-[11px]">Selesai (Completed)</span>
                         @endif
                     </td>
-                    <td class="p-2 border-r text-center font-bold text-sm text-indigo-600">
+                    <td class="p-2 border-r text-center font-bold text-sm text-orange-600">
                         {{ $b->total_pengajuan }} Trx
                     </td>
                     <td class="p-2 border-r text-center text-gray-500 text-[11px]">
