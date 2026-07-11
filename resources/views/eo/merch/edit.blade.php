@@ -9,7 +9,7 @@
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500&display=swap');
   :root {
     --rsc-bg: #F7F4F1; --rsc-surface: #FFFFFF; --rsc-surface2: #F2EEE9;
-    --rsc-border: #E2DBD4; --rsc-accent: #E8470A; --rsc-accent-dim: rgba(232,71,10,0.08);
+    --rsc-border: #E2DBD4; --rsc-accent: #f97316; --rsc-accent-dim: rgba(232,71,10,0.08);
     --rsc-text: #1A1208; --rsc-muted: #8A7E76; --radius: 14px;
   }
   .rsc-wrap * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }

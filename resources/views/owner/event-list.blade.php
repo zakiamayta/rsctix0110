@@ -12,7 +12,7 @@
     --rsc-surface: #FFFFFF;
     --rsc-surface2: #F2EEE9;
     --rsc-border: #E2DBD4;
-    --rsc-accent: #E8470A;
+    --rsc-accent: #f97316;
     --rsc-accent-dim: rgba(232,71,10,0.08);
     --rsc-text: #1A1208;
     --rsc-muted: #8A7E76;
@@ -319,7 +319,7 @@
                 </p>
                 <div class="td-arrow">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                       stroke="#E8470A" stroke-width="2.5">
+                       stroke="#f97316" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                   </svg>
                   {{ \Carbon\Carbon::parse($event->proposed_date)->translatedFormat('d M Y') }}
@@ -365,7 +365,7 @@
           <tr>
             <td colspan="5" class="empty-cell">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
-                   stroke="#E8470A" stroke-width="1">
+                   stroke="#f97316" stroke-width="1">
                 <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
               </svg>
               <p>Tidak ada pengajuan yang perlu ditinjau saat ini</p>

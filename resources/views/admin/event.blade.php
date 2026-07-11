@@ -11,7 +11,7 @@
     </div>
 
     <!-- <a href="{{ route('admin.event.create') }}"
-       class="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700">
+       class="px-4 py-2 bg-orange-600 text-white rounded-lg shadow hover:bg-orange-700">
         + Tambah Event
     </a> -->
 </div>
@@ -39,7 +39,7 @@
                 <td class="p-3 text-center">{{ $event->date }}</td>
                 <td class="p-3 text-center">{{ $event->location }}</td>
                 <td class="p-3 text-center">
-                    <a href="#" class="text-blue-500">Edit</a>
+                    <a href="#" class="text-orange-500">Edit</a>
                     |
                     <form action="{{ route('admin.event.destroy', $event->id) }}"
                           method="POST" class="inline">

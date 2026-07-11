@@ -18,7 +18,7 @@
     <style>
         /* ─── RSC DESIGN TOKENS ─── */
         :root {
-            --rsc-orange:       #E8470A;
+            --rsc-orange:       #f97316;
             --rsc-orange-dark:  #C03A08;
             --rsc-orange-mid:   #F97040;
             --rsc-orange-light: #FFF0EB;
@@ -593,6 +593,16 @@
                     </svg>
                     Riwayat Withdraw Merch
                 </a>
+
+                            {{-- Tombol Menuju Halaman Index Keuangan EO (Satu Tema & Sinkron) --}}
+            <a href="{{ route('eo.finance.index') }}" 
+               class="nav-link {{ request()->routeIs('eo.finance.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Pusat Keuangan & Tagihan
+            </a>
             </div>
 
             {{-- Pembatalan & Refund --}}
@@ -685,35 +695,16 @@
                             <div class="dropdown-email">{{ $user->email }}</div>
                         </div>
 
-                        @if($eo && $eo->status === 'approved')
-                        <a href="{{ route('eo.dashboard') }}" class="dropdown-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                                <rect x="14" y="14" width="7" height="7" rx="1"/>
-                            </svg>
-                            Dashboard EO
-                        </a>
-                        @endif
+                    <a href="{{ route('home') }}" class="dropdown-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                        Kembali ke Home
+                    </a>
 
-                        <a href="{{ route('eo.event.index') }}" class="dropdown-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                            Event Saya
-                        </a>
-
-                        <a href="{{ route('eo.status') }}" class="dropdown-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 12l2 2 4-4"/>
-                                <path d="M21 12c0 5-4 9-9 9S3 17 3 12 7 3 12 3s9 4 9 9z"/>
-                            </svg>
-                            Status Persetujuan
-                        </a>
 
                         <div class="dropdown-divider"></div>
 
@@ -827,6 +818,65 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 @stack('scripts')
+{{-- POPUP GLOBAL DI SELURUH HALAMAN EO UNTUK KEPUTUSAN MERCHANDISE EVENT CANCEL --}}
+@if(isset($globalPendingMerchEvent) && $globalPendingMerchEvent)
+<div id="globalMerchDecisionModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 m-4 border border-gray-200 text-sm text-gray-800" style="font-family: 'DM Sans', sans-serif;">
+        
+        <div class="flex items-center gap-3 border-b pb-3 mb-4">
+            <span class="text-2xl">⚠️</span>
+            <div>
+                <h3 class="text-base font-bold text-gray-900" style="font-family: 'Sora', sans-serif;">Keputusan Komoditas Merchandise</h3>
+                <p class="text-xs text-red-600 font-semibold">Event: <strong>{{ $globalPendingMerchEvent->title }}</strong> Resmi Dibatalkan</p>
+            </div>
+        </div>
 
+        <form action="{{ route('eo.event.submit-merch-decision', $globalPendingMerchEvent->id) }}" method="POST">
+            @csrf
+
+            <p class="text-xs text-gray-600 mb-4 leading-relaxed">
+                Pengajuan pembatalan event Anda telah disetujui oleh Owner. Karena event ini menjual produk merchandise terikat, Anda <strong>wajib</strong> menetapkan metode penyelesaian dana merchandise penonton di bawah ini sebelum melanjutkan aktivitas di dashboard:
+            </p>
+
+            <div class="space-y-3 mb-4">
+                <label class="block p-3 border rounded-xl hover:bg-orange-50 cursor-pointer transition border-gray-200">
+                    <div class="flex items-start gap-3">
+                        <input type="radio" name="merch_decision" value="refund" required class="mt-1 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="text-xs font-bold text-gray-800 block">Proses Pengembalian Dana (Refund via Platform)</span>
+                            <span class="text-[11px] text-gray-500 leading-normal block mt-0.5">
+                                Seluruh nominal transaksi merchandise penonton akan dialihkan ke antrean Batch Refund Admin Platform untuk dikembalikan penuh ke pembeli. Dompet merchandise event Anda akan disesuaikan.
+                            </span>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="block p-3 border rounded-xl hover:bg-orange-50 cursor-pointer transition border-gray-200">
+                    <div class="flex items-start gap-3">
+                        <input type="radio" name="merch_decision" value="ship_independently" required class="mt-1 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="text-xs font-bold text-gray-800 block">Kirim Mandiri ke Alamat Pembeli (Ship Independently)</span>
+                            <span class="text-[11px] text-gray-500 leading-normal block mt-0.5">
+                                Dana penjualan merchandise tetap diteruskan ke dompet Anda. Anda berkomitmen memproduksi barang secara mandiri sesuai kuota pesanan yang sah.
+                            </span>
+                        </div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-lg text-[11px] leading-relaxed mb-5">
+                <strong>💡 Disclaimer Pengiriman Mandiri:</strong><br>
+                Segala bentuk biaya operasional, logistik kurir, produksi, dan pendistribusian produk dilakukan sepenuhnya oleh pihak penyelenggara (EO) sendiri di luar platform. Setelah barang sukses dikirim ke alamat pembeli, Anda wajib memperbarui manifes dengan <strong>mencentang lembar absen klaim merchandise</strong> di dasbor Anda sebagai bukti penuntasan kewajiban.
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs font-bold py-2.5 px-5 rounded-lg hover:opacity-90 shadow-md transition w-full sm:w-auto">
+                    Konfirmasi Kebijakan Merchandise
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 </body>
 </html>

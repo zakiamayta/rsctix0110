@@ -10,7 +10,7 @@
   /* section title */
   #resubmitForm .rs-section-title {
     font-size:.72rem; font-weight:800; text-transform:uppercase;
-    letter-spacing:1.4px; color:#E8470A;
+    letter-spacing:1.4px; color:#f97316;
     display:flex; align-items:center; gap:8px; margin:0 0 14px;
   }
   #resubmitForm .rs-section-title::after {
@@ -20,7 +20,7 @@
   /* Badge tambahan untuk menegaskan mode edit */
   #resubmitForm .rs-edit-badge {
     font-size: 0.58rem; background: rgba(232,71,10,.1); 
-    color: #E8470A; padding: 2px 6px; border-radius: 4px; margin-left: auto;
+    color: #f97316; padding: 2px 6px; border-radius: 4px; margin-left: auto;
   }
 
   /* grid */
@@ -79,7 +79,7 @@
   
   /* Focus state saat mulai mengetik */
   #resubmitForm .rs-input:focus {
-    border-color:#E8470A !important;
+    border-color:#f97316 !important;
     box-shadow:0 0 0 3px rgba(232,71,10,.15) !important;
     background:#fff !important;
   }
@@ -93,7 +93,7 @@
     display:flex; gap:11px; align-items:flex-start;
     background:#FFF7F3;
     border:1px solid rgba(232,71,10,.25);
-    border-left:4px solid #E8470A;
+    border-left:4px solid #f97316;
     border-radius:10px; padding:12px 14px;
   }
   #resubmitForm .rs-note-icon {
@@ -103,7 +103,7 @@
   }
   #resubmitForm .rs-note-tag {
     font-size:.63rem; font-weight:800; text-transform:uppercase;
-    letter-spacing:1px; color:#E8470A; margin-bottom:3px;
+    letter-spacing:1px; color:#f97316; margin-bottom:3px;
   }
   #resubmitForm .rs-note-text {
     font-size:.81rem; color:#5A3A28; line-height:1.6; margin:0;
@@ -136,14 +136,14 @@
     transition:border-color .2s, background .2s, transform .1s;
   }
   #resubmitForm .rs-file-zone:hover {
-    border-color:#E8470A; background:rgba(232,71,10,.04);
+    border-color:#f97316; background:rgba(232,71,10,.04);
     transform: scale(0.995);
   }
   #resubmitForm .rs-file-zone input[type="file"] {
     position:absolute; inset:0; opacity:0; cursor:pointer; width:100%;
   }
   #resubmitForm .rs-file-zone-txt { font-size:.78rem; color:#6E635C; }
-  #resubmitForm .rs-file-zone-txt span { color:#E8470A; font-weight:700; }
+  #resubmitForm .rs-file-zone-txt span { color:#f97316; font-weight:700; }
   #resubmitForm .rs-file-zone-sub { font-size:.65rem; color:#B5AEA8; margin-top:3px; }
 
   /* jadwal */
@@ -154,7 +154,7 @@
   }
   #resubmitForm .rs-jadwal-num {
     font-size:.65rem; font-weight:800; text-transform:uppercase;
-    letter-spacing:1px; color:#E8470A;
+    letter-spacing:1px; color:#f97316;
     display:flex; align-items:center; gap:8px; margin-bottom:14px;
   }
   #resubmitForm .rs-jadwal-num span {
@@ -191,7 +191,7 @@
   /* submit button */
   #resubmitForm .rs-btn-submit {
     display:inline-flex; align-items:center; gap:8px;
-    background:#E8470A; color:#fff; border:none;
+    background:#f97316; color:#fff; border:none;
     border-radius:9px; padding:12px 26px;
     font-size:.85rem; font-weight:800; cursor:pointer;
     letter-spacing:.5px; transition:opacity .15s, transform .12s, box-shadow .15s;
@@ -234,12 +234,12 @@
 @if(
     $event->status === 'rejected'
     &&
-    ($event->rejection_reason || $event->owner_note)
+    ($event->rejected_reason || $event->rejection_reason || $event->owner_note)
 )
   <div class="rs-note">
     <div class="rs-note-icon">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-           stroke="#E8470A" stroke-width="2.3">
+           stroke="#f97316" stroke-width="2.3">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -248,7 +248,7 @@
     <div>
       <div class="rs-note-tag">Catatan Penolakan Admin</div>
       <p class="rs-note-text">
-        {{ $event->rejection_reason ?? $event->owner_note }}
+        {{ $event->rejected_reason ?? $event->rejection_reason ?? $event->owner_note }}
       </p>
     </div>
   </div>
@@ -290,42 +290,42 @@
       <div class="rs-field">
         <label>Lineup</label>
         <input type="text" name="lineup" class="rs-input"
-               value="{{ $event->lineup }}" placeholder="Nama artis / performer">
+               value="{{ old('lineup', $event->lineup) }}" placeholder="Nama artis / performer">
       </div>
 
       <div class="rs-field">
         <label>Minimal Umur</label>
         <input type="number" name="min_age" class="rs-input"
-               value="{{ $event->min_age }}" placeholder="17">
+               value="{{ old('min_age', $event->min_age) }}" placeholder="17">
       </div>
 
       <div class="rs-field">
         <label>Maks Tiket / Email</label>
         <input type="number" name="max_tickets_per_email" class="rs-input"
-               value="{{ $event->max_tickets_per_email }}" required>
+               value="{{ old('max_tickets_per_email', $event->max_tickets_per_email) }}" required>
       </div>
 
       <div class="rs-field">
         <label>Mulai Penjualan Tiket</label>
         <input type="datetime-local" name="ticket_sale_start" class="rs-input"
-               value="{{ $event->ticket_sale_start ? \Carbon\Carbon::parse($event->ticket_sale_start)->format('Y-m-d\TH:i') : '' }}">
+               value="{{ old('ticket_sale_start', $event->ticket_sale_start ? \Carbon\Carbon::parse($event->ticket_sale_start)->format('Y-m-d\TH:i') : '') }}">
       </div>
 
       <div class="rs-field">
         <label>Mulai Redeem Tiket</label>
         <input type="datetime-local" name="ticket_redeem_start" class="rs-input"
-               value="{{ $event->ticket_redeem_start ? \Carbon\Carbon::parse($event->ticket_redeem_start)->format('Y-m-d\TH:i') : '' }}">
+               value="{{ old('ticket_redeem_start', $event->ticket_redeem_start ? \Carbon\Carbon::parse($event->ticket_redeem_start)->format('Y-m-d\TH:i') : '') }}">
       </div>
 
       <div class="rs-field rs-span2">
         <label>Lokasi</label>
         <input type="text" name="location" class="rs-input"
-               value="{{ $event->location }}" placeholder="Venue lengkap" required>
+               value="{{ old('location', $event->location) }}" placeholder="Venue lengkap" required>
       </div>
 
       <div class="rs-field rs-span2">
         <label>Deskripsi</label>
-        <textarea name="description" class="rs-input" required>{{ $event->description }}</textarea>
+        <textarea name="description" class="rs-input" required>{{ old('description', $event->description) }}</textarea>
       </div>
 
       <div class="rs-field rs-span2">
@@ -374,7 +374,7 @@
             <input type="text"
                    name="jadwal[{{ $i }}][info]"
                    class="rs-input"
-                   value="{{ $jadwal->info }}"
+                   value="{{ old("jadwal.$i.info", $jadwal->info) }}"
                    placeholder="Misal: Hari 1 / Stage A" required>
           </div>
           <div class="rs-field">
@@ -382,7 +382,7 @@
             <input type="datetime-local"
                   name="jadwal[{{ $i }}][tanggal]"
                   class="rs-input jadwal-date"
-                  value="{{ \Carbon\Carbon::parse($jadwal->tanggal)->format('Y-m-d\TH:i') }}"
+                  value="{{ old("jadwal.$i.tanggal", \Carbon\Carbon::parse($jadwal->tanggal)->format('Y-m-d\TH:i')) }}"
                   required>
           </div>
         </div>
@@ -391,7 +391,7 @@
           <label>Deskripsi Jadwal</label>
           <textarea name="jadwal[{{ $i }}][deskripsi]"
                     class="rs-input"
-                    style="min-height:56px;">{{ $jadwal->deskripsi }}</textarea>
+                    style="min-height:56px;">{{ old("jadwal.$i.deskripsi", $jadwal->deskripsi) }}</textarea>
         </div>
 
         <div class="rs-ticket-box">
@@ -404,7 +404,7 @@
                 <div class="rs-ticket-lbl">Nama Tiket</div>
                 <input type="text"
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][name]"
-                       value="{{ $ticket->name }}"
+                       value="{{ old("jadwal.$i.tickets.$t.name", $ticket->name) }}"
                        class="rs-input"
                        placeholder="Reguler / VIP" required>
               </div>
@@ -412,7 +412,7 @@
                 <div class="rs-ticket-lbl">Harga (Rp)</div>
                 <input type="number"
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][price]"
-                       value="{{ $ticket->price }}"
+                       value="{{ old("jadwal.$i.tickets.$t.price", $ticket->price) }}"
                        class="rs-input"
                        placeholder="0" required>
               </div>
@@ -420,7 +420,7 @@
                 <div class="rs-ticket-lbl">Stok</div>
                 <input type="number"
                        name="jadwal[{{ $i }}][tickets][{{ $t }}][stock]"
-                       value="{{ $ticket->stock }}"
+                       value="{{ old("jadwal.$i.tickets.$t.stock", $ticket->stock) }}"
                        class="rs-input"
                        placeholder="0" required>
               </div>
@@ -431,7 +431,7 @@
                           type="datetime-local"
                           class="rs-input"
                           name="jadwal[{{ $i }}][tickets][{{ $t }}][start_sale]"
-                          value="{{ $ticket->start_sale ? \Carbon\Carbon::parse($ticket->start_sale)->format('Y-m-d\TH:i') : '' }}">
+                          value="{{ old("jadwal.$i.tickets.$t.start_sale", $ticket->start_sale ? \Carbon\Carbon::parse($ticket->start_sale)->format('Y-m-d\TH:i') : '') }}">
                   </div>
 
                   <div class="rs-field">
@@ -440,7 +440,7 @@
                           type="datetime-local"
                           class="rs-input"
                           name="jadwal[{{ $i }}][tickets][{{ $t }}][end_sale]"
-                          value="{{ $ticket->end_sale ? \Carbon\Carbon::parse($ticket->end_sale)->format('Y-m-d\TH:i') : '' }}">
+                          value="{{ old("jadwal.$i.tickets.$t.end_sale", $ticket->end_sale ? \Carbon\Carbon::parse($ticket->end_sale)->format('Y-m-d\TH:i') : '') }}">
                   </div>
               </div>
             </div>

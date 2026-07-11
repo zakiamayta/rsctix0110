@@ -33,13 +33,14 @@ class DashboardMerchController extends Controller
         $allowedSorts = ['email', 'payment_status', 'checkout_time', 'event_title', 'name'];
 
         $transactions = TransactionMerch::with([
-                'product.event',
+                'event',
                 'details.product',
                 'details.varian',
                 'details.ukuran'
             ])
+            // transaction_merch punya kolom event_id langsung (relasi 'product' tidak ada di model ini)
             ->when($request->event_id, fn($q) =>
-                $q->whereHas('product', fn($pq) => $pq->where('event_id', $request->event_id))
+                $q->where('event_id', $request->event_id)
             )
             ->when($request->payment_status, fn($q) =>
                 $q->where('payment_status', $request->payment_status)
@@ -62,8 +63,7 @@ class DashboardMerchController extends Controller
         // Sorting
         if ($sortBy && in_array($sortBy, $allowedSorts)) {
             if ($sortBy === 'event_title') {
-                $transactions->join('products', 'transaction_merch.product_id', '=', 'products.id')
-                             ->join('events', 'products.event_id', '=', 'events.id')
+                $transactions->join('events', 'transaction_merch.event_id', '=', 'events.id')
                              ->addSelect('transaction_merch.*')
                              ->orderBy('events.title', 'asc');
             } elseif ($sortBy !== 'name') {

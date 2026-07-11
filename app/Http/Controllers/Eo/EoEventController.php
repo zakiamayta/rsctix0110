@@ -29,8 +29,9 @@ class EoEventController extends Controller
         });
     }
 
-    /**
+/**
      * 📌 Event milik EO (Approved & Cancelled)
+     * Ditambahkan fitur deteksi otomatis event batal yang membutuhkan keputusan merchandise
      */
     public function index()
     {
@@ -40,6 +41,7 @@ class EoEventController extends Controller
             ->where('user_id', $user->id)
             ->first();
 
+        // 1. Ambil list event disetujui & batal untuk ditampilkan di tabel/grid utama seperti biasa
         $events = Event::where('eo_id', $eo->id)
             ->whereIn('status', [
                 'approved',
@@ -48,7 +50,18 @@ class EoEventController extends Controller
             ->latest()
             ->get();
 
-        return view('eo.event-show', compact('events'));
+        // 2. 🔥 DETEKSI POPUP: Cari apakah ada event yang sudah disetujui BATAL (cancelled) oleh Owner,
+        // namun keputusan penanganan dana merchandise-nya belum dipilih (masih NULL)
+        $pendingMerchEvent = Event::where('eo_id', $eo->id)
+            ->where('status', 'cancelled')
+            ->whereNull('merch_cancel_decision')
+            ->whereHas('products', function ($q) {
+                $q->where('type', 'merch');
+            })
+            ->first(); // Ambil satu event gantung terlama untuk dipaksa diselesaikan lewat modal popup
+
+        // Kirim $pendingMerchEvent ke halaman blade eo.event-show
+        return view('eo.event-show', compact('events', 'pendingMerchEvent'));
     }
 
     /**
@@ -530,6 +543,7 @@ class EoEventController extends Controller
             'status' => 'pending_reschedule',
             'proposed_date' => $request->proposed_date,
             'reschedule_reason' => $request->reschedule_reason,
+            'reschedule_rejected_reason' => null, // bersihkan alasan penolakan pengajuan sebelumnya
         ]);
 
         return back()->with('success', 'Request reschedule berhasil dikirim.');
@@ -625,6 +639,88 @@ class EoEventController extends Controller
                     }
                 }
             }
+        }
+    }
+
+/**
+     * ✅ Menyimpan keputusan pembatalan merchandise dari EO (Refund / Ship)
+     * ALUR MURNI: Tidak ada potong saldo, tidak ada utang, tidak ada auto-insert refunds.
+     * Tugas EO hanya mengunci status keputusan agar gerbang pengajuan pembeli terbuka.
+     */
+    public function submitMerchDecision(Request $request, Event $event)
+    {
+        // 1. Validasi input keputusan EO
+        $request->validate([
+            'merch_decision' => 'required|in:refund,ship_independently'
+        ]);
+
+        $user = auth()->user();
+
+        // 2. Ambil data profil EO untuk validasi kepemilikan
+        $eo = DB::table('eo')->where('user_id', $user->id)->first();
+
+        if (!$eo) {
+            return redirect()->back()->with('error', 'Akses ditolak. Profil EO Anda tidak ditemukan.');
+        }
+
+        // 3. Pastikan Event ini benar milik EO yang sedang login
+        if ($event->eo_id !== $eo->id) {
+            return redirect()->back()->with('error', 'Anda tidak memiliki hak akses untuk event ini.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // 4. Update keputusan merchandise langsung ke kolom event terkait
+            $event->update([
+                'merch_cancel_decision' => $request->merch_decision
+            ]);
+
+            $eventId = $event->id;
+
+            // 5. JIKA EO MEMILIH KIRIM MANDIRI, barulah kita buat manifes absensi fisiknya
+            if ($request->merch_decision === 'ship_independently') {
+                
+                $merchDetails = DB::table('transaction_merch_details')
+                    ->join('transaction_merch', 'transaction_merch_details.transaction_merch_id', '=', 'transaction_merch.id')
+                    ->where('transaction_merch.event_id', $eventId)
+                    ->where('transaction_merch.payment_status', 'paid')
+                    ->select('transaction_merch_details.id as detail_id', 'transaction_merch.id as tx_id')
+                    ->get();
+
+                foreach ($merchDetails as $detail) {
+                    // Hindari duplikasi insert manifes
+                    $existsAttendee = DB::table('merch_attendees')
+                        ->where('transaction_merch_id', $detail->tx_id)
+                        ->where('transaction_merch_detail_id', $detail->detail_id)
+                        ->exists();
+
+                    if (!$existsAttendee) {
+                        DB::table('merch_attendees')->insert([
+                            'transaction_merch_id'        => $detail->tx_id,
+                            'transaction_merch_detail_id' => $detail->detail_id,
+                            'is_completed'                => 0, // Default awal belum dicentang
+                            'created_at'                  => now(),
+                            'updated_at'                  => now()
+                        ]);
+                    }
+                }
+            }
+
+            // PENTING: JIKA EO MEMILIH 'refund', KITA TIDAK MELAKUKAN KODE FINANSIAL ATAU INSERT APAPUN DI SINI!
+            // Urusan potong dana/utang diproses terpusat di AdminRefunds.
+            // Dengan mengosongkan ini, BuyerMerchRefundController milik pembeli berfungsi 100%.
+
+            DB::commit();
+
+            $msg = $request->merch_decision === 'refund'
+                ? 'Keputusan disimpan. Formulir pengisian rekening pengembalian dana (refund) kini telah dibuka untuk para pembeli merchandise.'
+                : 'Keputusan disimpan. Silakan lakukan pengiriman mandiri dan kelola pencentangan manifes di dashboard Anda.';
+
+            return redirect()->back()->with('success', $msg);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal menyimpan keputusan: ' . $e->getMessage());
         }
     }
 }

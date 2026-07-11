@@ -12,7 +12,7 @@
     --rsc-surface: #FFFFFF;
     --rsc-surface2: #F2EEE9;
     --rsc-border: #E2DBD4;
-    --rsc-accent: #E8470A;
+    --rsc-accent: #f97316;
     --rsc-accent-dim: rgba(232,71,10,0.08);
     --rsc-text: #1A1208;
     --rsc-muted: #8A7E76;
@@ -399,12 +399,13 @@
       <h2><span class="accent-dot"></span>Kelola Merchandise</h2>
       <p>Tambah dan kelola produk merch untuk event kamu</p>
     </div>
-    <button type="button" class="btn-primary" onclick="openModal('createMerchModal')">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      Tambah Merch
-    </button>
+    <a href="{{ route('eo.merch.create') }}" class="btn-primary" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" style="display: block;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Tambah Merch</span>
+    </a>
   </div>
 
   {{-- Filter --}}
@@ -451,7 +452,7 @@
           <img src="{{ asset($firstVarian->images->first()->url) }}" alt="{{ $product->name }}">
         @else
           <div class="poster-placeholder">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8470A" stroke-width="1.2" opacity=".25">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.2" opacity=".25">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
@@ -497,7 +498,7 @@
     </div>
     @empty
     <div class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E8470A" stroke-width="1">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1">
         <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
       </svg>
       <p>Belum ada merchandise</p>

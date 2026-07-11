@@ -23,7 +23,7 @@
 <div class="grid grid-cols-4 gap-3 mb-6">
 
     <div class="rounded-xl p-4"
-         style="background:#E8470A; color:#fff;">
+         style="background:#f97316; color:#fff;">
         <p class="text-xs font-bold uppercase tracking-widest mb-1"
            style="opacity:.7;">
             Total Event
@@ -34,7 +34,7 @@
         </p>
     </div>
 
-    <div class="rounded-xl p-4"
+    <!-- <div class="rounded-xl p-4"
          style="background:#fff; border:1px solid #EDE8E3;">
         <p class="text-xs font-bold uppercase tracking-widest mb-1"
            style="color:#7A6E66;">
@@ -44,7 +44,7 @@
            style="font-family:'Sora',sans-serif; color:#1A1208;">
             {{ $events->where('status','approved')->count() }}
         </p>
-    </div>
+    </div> -->
 
     <div class="rounded-xl p-4"
          style="background:#fff; border:1px solid #EDE8E3;">
@@ -97,7 +97,7 @@
                      height="36"
                      viewBox="0 0 24 24"
                      fill="none"
-                     stroke="#E8470A"
+                     stroke="#f97316"
                      stroke-width="1.5"
                      opacity="0.35">
                     <path d="M21 10V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3m18 0H3m18 0l-2 11H5L3 10"/>
@@ -201,7 +201,7 @@
             <a
                 href="{{ route('eo.event.edit-rejected', $event->id) }}"
                 class="w-full block text-center text-xs font-bold py-2 rounded-md transition-colors hover:bg-orange-50"
-                style="border:1px solid #E8470A; color:#E8470A;">
+                style="border:1px solid #f97316; color:#f97316;">
                 Edit & Re-Submit
             </a>
         @else

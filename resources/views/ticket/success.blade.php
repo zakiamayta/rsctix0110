@@ -25,7 +25,7 @@
     <!-- Info Transaksi -->
     <div class="row g-3 text-sm mb-4 bg-light border rounded-3 p-3">
       <div class="col-md-6">
-        <strong>Email:</strong><br>
+        <strong>Email Pemesan:</strong><br>
         {{ $transaction->email ?? '-' }}
       </div>
 
@@ -47,18 +47,51 @@
       </div>
     </div>
 
+    <!-- Daftar Peserta & Tujuan E-Tiket -->
+    @if(isset($details) && count($details))
+      <h6 class="fw-bold mb-3">Daftar Peserta &amp; Tujuan E-Tiket</h6>
+
+      <div class="mb-4">
+        @foreach($details as $d)
+          <div class="d-flex align-items-start p-3 mb-2 rounded border bg-white shadow-sm">
+            <div class="btn-orange-circle me-3">
+              <i class="bi bi-ticket-perforated"></i>
+            </div>
+
+            <div class="flex-grow-1">
+              <p class="fw-semibold mb-0">
+                {{ $d->ticket_name ?? 'Tiket' }} - {{ $d->name ?? 'Tanpa Nama' }}
+              </p>
+
+              <small class="text-muted d-block">
+                <i class="bi bi-telephone me-1"></i>
+                {{ $d->phone_number ?? '-' }}
+              </small>
+
+              <small class="text-muted d-block">
+                <i class="bi bi-envelope me-1"></i>
+                E-Tiket dikirim ke:
+                <strong>{{ $d->attendee_email ?? $d->email ?? '-' }}</strong>
+              </small>
+            </div>
+          </div>
+        @endforeach
+      </div>
+    @endif
+
     <!-- Pesan -->
     <p class="text-center mb-4">
       Terima kasih telah memesan tiket.<br>
-      <strong>E-Ticket</strong> akan dikirim ke email Anda
-      <span class="text-success fw-semibold">setelah pembayaran terverifikasi</span>.
+      <strong>E-Ticket</strong> untuk setiap peserta akan dikirim ke
+      <span class="text-success fw-semibold">email masing-masing yang telah diisi saat pemesanan</span>,
+      setelah pembayaran terverifikasi.
     </p>
 
     <!-- Catatan -->
     <div class="alert alert-warning text-start">
       <strong>Catatan:</strong><br>
-      Jika dalam waktu <strong>24 jam</strong> E-Ticket belum diterima,
-      silakan hubungi kami melalui WhatsApp:
+      Pastikan email setiap peserta di atas sudah benar. Jika dalam waktu <strong>24 jam</strong>
+      E-Ticket belum diterima, silakan hubungi kami melalui WhatsApp:
       <a href="https://wa.me/6285230088828" target="_blank" class="fw-semibold text-decoration-none">
         +62 852-3008-8828
       </a>

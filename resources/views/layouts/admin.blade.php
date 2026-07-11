@@ -14,14 +14,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 
+    {{-- Tema admin terpadu (satu tema) — palet & komponen mengikuti light-theme.css --}}
+    <link href="{{ asset('css/admin-theme.css') }}" rel="stylesheet">
+
     <style>
         /* ─── RSC DESIGN TOKENS ─── */
         :root {
-            --rsc-orange:       #E8470A;
-            --rsc-orange-dark:  #C03A08;
-            --rsc-orange-mid:   #F97040;
-            --rsc-orange-light: #FFF0EB;
-            --rsc-orange-pale:  #FDF5F2;
+            --rsc-orange:       #f97316;
+            --rsc-orange-dark:  #ea580c;
+            --rsc-orange-mid:   #fb923c;
+            --rsc-orange-light: #fff7ed;
+            --rsc-orange-pale:  #fff7ed;
             --rsc-dark:         #1A1208;
             --rsc-ink:          #2D2519;
             --rsc-muted:        #7A6E66;
@@ -286,6 +289,63 @@
             .admin-main { margin-left: 0; }
             .sidebar-overlay.open { display: block; }
         }
+
+        /* Avatar + dropdown */
+.topbar-avatar-wrap { position: relative; }
+.topbar-avatar-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 9px;
+    border: 1px solid var(--rsc-border);
+    background: var(--rsc-surface);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.topbar-avatar-btn:hover { background: var(--rsc-orange-light); border-color: #F5C4A0; }
+.topbar-avatar-img { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; }
+.topbar-avatar-name { font-size: 12px; font-weight: 600; color: var(--rsc-dark); }
+.topbar-avatar-chevron { width: 12px; height: 12px; color: var(--rsc-muted); }
+
+.topbar-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 220px;
+    background: var(--rsc-surface);
+    border: 1px solid var(--rsc-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(26,18,8,0.1);
+    overflow: hidden;
+    display: none;
+    z-index: 100;
+}
+.topbar-dropdown.open { display: block; animation: dropIn 0.15s ease; }
+@keyframes dropIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.dropdown-header { padding: 14px 16px; border-bottom: 1px solid var(--rsc-border); }
+.dropdown-name { font-size: 13px; font-weight: 700; color: var(--rsc-dark); font-family: var(--font-main); }
+.dropdown-email { font-size: 11px; color: var(--rsc-muted); margin-top: 2px; }
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--rsc-ink);
+    font-weight: 500;
+    transition: background 0.1s;
+    cursor: pointer;
+}
+.dropdown-item:hover { background: var(--rsc-bg); }
+.dropdown-item svg { width: 14px; height: 14px; color: var(--rsc-muted); flex-shrink: 0; }
+.dropdown-divider { height: 1px; background: var(--rsc-border); margin: 4px 0; }
+.dropdown-item-danger { color: #B92929; }
+.dropdown-item-danger svg { color: #B92929; }
+.dropdown-item-danger:hover { background: #FFF0F0; }
     </style>
 
     @stack('styles')
@@ -293,6 +353,7 @@
 <body>
 
 @php
+    $user = auth()->user();
     $current = request()->route()?->getName();
 @endphp
 
@@ -329,63 +390,72 @@
                 </a>
             </div>
 
-            {{-- Manajemen Event --}}
+                        {{-- Monitoring --}}
             <div class="nav-group">
-                <div class="nav-group-label">Manajemen Event</div>
+                <div class="nav-group-label">Monitoring</div>
 
-                <a href="{{ route('admin.event.index') }}"
-                   class="nav-link {{ request()->routeIs('admin.event.*') ? 'active' : '' }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 12l2 2 4-4"/>
-                        <path d="M21 12c0 5-4 9-9 9S3 17 3 12 7 3 12 3s9 4 9 9z"/>
-                    </svg>
-                    Persetujuan Event
-                </a>
-
-                <a href="{{ route('admin.event.index') }}"
+                <a href="{{ route('admin.monitoring.index') }}"
                    class="nav-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="4" width="18" height="18" rx="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/>
-                        <line x1="8" y1="2" x2="8" y2="6"/>
-                        <line x1="3" y1="10" x2="21" y2="10"/>
+                        <path d="M3 3v18h18"/>
+                        <path d="M7 14l4-4 4 4 5-5"/>
                     </svg>
-                    Event Disetujui
+                    Monitoring EO & Event
                 </a>
+
+                <!-- <a href="{{ route('admin.dashboard') }}"
+                   class="nav-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        <path d="M21 21v-2a4 4 0 0 0-3-3.87"/>
+                    </svg>
+                    Performa Event Organizer
+                </a> -->
             </div>
 
             {{-- Tiket --}}
             <div class="nav-group">
-                <div class="nav-group-label">Tiket</div>
+                <div class="nav-group-label">Transaksi</div>
 
-                <a href="{{ route('admin.dashboard') }}"
-                   class="nav-link">
+                <a href="{{ route('admin.transactions') }}"
+                   class="nav-link {{ $current === 'admin.transactions' ? 'active' : '' }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="1" y="4" width="22" height="16" rx="2"/>
                         <line x1="1" y1="10" x2="23" y2="10"/>
                     </svg>
                     Transaksi Tiket
                 </a>
+                <a href="{{ route('admin.merch.dashboard') }}"
+                   class="nav-link {{ request()->routeIs('admin.merch.*') ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <path d="M16 10a4 4 0 0 1-8 0"/>
+                    </svg>
+                    Transaksi Merchandise
+                </a>
 
-                <a href="{{ route('admin.absensi') }}"
+                <!-- <a href="{{ route('admin.absensi') }}"
                    class="nav-link {{ $current === 'admin.absensi' ? 'active' : '' }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="8" r="4"/>
                         <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
                     </svg>
                     Data Peserta
-                </a>
+                </a> -->
 
-                <a href="{{ route('admin.dashboard') }}"
+                <!-- <a href="{{ route('admin.transactions') }}"
                    class="nav-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 3v18h18"/>
                         <path d="M18 17l-5-5-4 4-3-3"/>
                     </svg>
                     Laporan Penjualan Tiket
-                </a>
+                </a> -->
             </div>
-
+<!-- 
             {{-- Merchandise --}}
             <div class="nav-group">
                 <div class="nav-group-label">Merchandise</div>
@@ -409,46 +479,32 @@
                     </svg>
                     Penjualan Merchandise
                 </a>
-            </div>
+            </div> -->
 
-            {{-- Monitoring --}}
-            <div class="nav-group">
-                <div class="nav-group-label">Monitoring</div>
 
-                <a href="{{ route('admin.dashboard') }}"
-                   class="nav-link">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 3v18h18"/>
-                        <path d="M7 14l4-4 4 4 5-5"/>
-                    </svg>
-                    Ringkasan Penjualan Global
-                </a>
+        <div class="nav-group">
+            <div class="nav-group-label">Saldo</div>
 
-                <a href="{{ route('admin.dashboard') }}"
-                   class="nav-link">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        <path d="M21 21v-2a4 4 0 0 0-3-3.87"/>
-                    </svg>
-                    Performa Event Organizer
-                </a>
-            </div>
+            {{-- UPDATE: Tombol Dompet & Finansial EO Sudah Satu Tema Menggunakan nav-link & SVG Icon --}}
+            <a href="{{ route('admin.finance.index') }}" 
+               class="nav-link {{ request()->routeIs('admin.finance.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Dompet & Finansial EO
+            </a>
 
-<div class="nav-group">
-    <div class="nav-group-label">Saldo</div>
-
-    <a href="{{ route('platform.wallet.index') }}"
-       class="nav-link {{ request()->routeIs('platform.wallet.*') ? 'active' : '' }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/>
-            <path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/>
-            <path d="M18 12a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4v-6z"/>
-        </svg>
-        Dompet Platform
-    </a>
-</div>
+            <a href="{{ route('platform.wallet.index') }}"
+               class="nav-link {{ request()->routeIs('platform.wallet.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/>
+                    <path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/>
+                    <path d="M18 12a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4v-6z"/>
+                </svg>
+                Dompet Platform
+            </a>
+        </div>
 
             {{-- Refund --}}
             <div class="nav-group">
@@ -461,6 +517,21 @@
                         <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
                     </svg>
                     Persetujuan Refund
+                </a>
+            </div>
+                         {{-- 🆕 MANAJEMEN PENGGUNA (INTEGRASI FITUR KELOLA USER) --}}
+            <div class="nav-group">
+                <div class="nav-group-label">Pengguna</div>
+                
+                <a href="{{ route('admin.users.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.users.*') || $current === 'admin.users.index' ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Kelola Data User
                 </a>
             </div>
 
@@ -489,19 +560,51 @@
                 <h1 class="topbar-page-title">@yield('title', 'Dashboard')</h1>
             </div>
 
-            <div class="topbar-right">
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit" class="btn-logout">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                            <polyline points="16 17 21 12 16 7"/>
-                            <line x1="21" y1="12" x2="9" y2="12"/>
-                        </svg>
-                        Logout
-                    </button>
-                </form>
+<div class="topbar-right">
+    <div class="topbar-avatar-wrap">
+        <button id="topbar-avatar-btn" type="button" class="topbar-avatar-btn">
+            <img src="{{ $user->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($user->name) }}"
+                 class="topbar-avatar-img"
+                 referrerpolicy="no-referrer"
+                 alt="{{ $user->name }}">
+            <span class="topbar-avatar-name">{{ explode(' ', $user->name)[0] }}</span>
+            <svg class="topbar-avatar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="6 9 12 15 18 9"/>
+            </svg>
+        </button>
+
+        <div id="topbar-dropdown" class="topbar-dropdown">
+            <div class="dropdown-header">
+                <div class="dropdown-name">{{ $user->name }}</div>
+                <div class="dropdown-email">{{ $user->email }}</div>
             </div>
+
+            <a href="{{ route('home') }}" class="dropdown-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+                Kembali ke Home
+            </a>
+
+            <div class="dropdown-divider"></div>
+
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="dropdown-item dropdown-item-danger" style="width:100%; background:none; border:none; text-align:left; cursor:pointer; font-family:var(--font-main);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Logout
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
 
         </header>
 
@@ -578,3 +681,49 @@ document.addEventListener("DOMContentLoaded", function () {
 
 </body>
 </html>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Dropdown Avatar Topbar
+    const avatarBtn = document.getElementById('topbar-avatar-btn');
+    const dropdown  = document.getElementById('topbar-dropdown');
+
+    if (avatarBtn && dropdown) {
+        avatarBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!dropdown.contains(e.target) && e.target !== avatarBtn) {
+                dropdown.classList.remove('open');
+            }
+        });
+    }
+
+    // Toggle Sidebar Mobile (sudah ada sebelumnya)
+    const mobileToggleBtn = document.getElementById('mobile-toggle-btn');
+    const sidebar         = document.getElementById('admin-sidebar');
+    const overlay         = document.getElementById('sidebar-overlay');
+
+    if (mobileToggleBtn && sidebar && overlay) {
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+        }
+        mobileToggleBtn.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+    }
+
+    // ESC key untuk menutup dropdown & sidebar
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (dropdown) dropdown.classList.remove('open');
+            if (sidebar && sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('open');
+            }
+        }
+    });
+});
+</script>

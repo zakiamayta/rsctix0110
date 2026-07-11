@@ -1,3 +1,10 @@
+@if(!empty($event->reschedule_rejected_reason))
+    <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+        <strong>Pengajuan reschedule sebelumnya ditolak Owner.</strong>
+        <p class="mt-1">Alasan: {{ $event->reschedule_rejected_reason }}</p>
+    </div>
+@endif
+
 <form method="POST"
       action="{{ route('eo.event.request-reschedule', $event->id) }}">
     @csrf

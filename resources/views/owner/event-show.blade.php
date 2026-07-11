@@ -222,9 +222,16 @@
                 </button>
             </form>
 
-            <form method="POST" action="{{ route('owner.events.reject', $event->id) }}">
+            <form method="POST" action="{{ route('owner.events.reject', $event->id) }}"
+                  class="w-full sm:w-auto">
                 @csrf
-                <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-sm font-semibold">
+                <textarea name="rejected_reason" rows="3" required
+                          placeholder="Tulis alasan penolakan event untuk EO..."
+                          class="w-full sm:w-80 rounded-xl border px-3 py-2 text-sm mb-2 @error('rejected_reason') border-red-500 @enderror">{{ old('rejected_reason') }}</textarea>
+                @error('rejected_reason')
+                    <p class="text-red-500 text-xs mb-2">{{ $message }}</p>
+                @enderror
+                <button class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl text-sm font-semibold block">
                     Reject Event
                 </button>
             </form>
@@ -264,11 +271,18 @@
             </form>
 
             <form method="POST"
-                  action="{{ route('owner.events.reject-reschedule', $event->id) }}">
+                  action="{{ route('owner.events.reject-reschedule', $event->id) }}"
+                  class="w-full sm:w-auto">
                 @csrf
                 @method('PUT')
 
-                <button class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-xl text-sm font-semibold">
+                <textarea name="reschedule_rejected_reason" rows="3" required
+                          placeholder="Tulis alasan penolakan reschedule untuk EO..."
+                          class="w-full sm:w-80 rounded-xl border px-3 py-2 text-sm mb-2 @error('reschedule_rejected_reason') border-red-500 @enderror">{{ old('reschedule_rejected_reason') }}</textarea>
+                @error('reschedule_rejected_reason')
+                    <p class="text-red-500 text-xs mb-2">{{ $message }}</p>
+                @enderror
+                <button class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-xl text-sm font-semibold block">
                     Tolak Reschedule
                 </button>
             </form>

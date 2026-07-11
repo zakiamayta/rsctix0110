@@ -22,7 +22,7 @@
 
         /* Header */
         .ticket-header {
-            background: #1e3a8a; /* biru navy solid */
+            background: #1e3a8a;
             color: #ffffff;
             padding: 28px;
             text-align: center;
@@ -104,58 +104,52 @@
     </style>
 </head>
 <body>
+    @php
+        $ticket = $guest->ticket ?? null;
+        $jadwal = $ticket ? $ticket->jadwal : null;
+    @endphp
+
     <div class="ticket">
         {{-- Header --}}
         <div class="ticket-header">
             <img src="{{ public_path('logo.PNG') }}" alt="Logo">
-            <h1>{{ $guest->event->title ?? 'Nama Acara' }}</h1>
+            <h1>{{ $transaction->event->title ?? 'Nama Acara' }}</h1>
         </div>
 
         {{-- Body --}}
         <div class="ticket-body">
             <div class="details">
-                <p class="email">Email Transaksi: {{ $guest->email ?? '-' }}</p>
+                <p class="email">Email Peserta: {{ $guest->email ?? '-' }}</p>
                 <hr>
                 <p>
-                    <strong>Tanggal Acara:</strong> 
-                    {{ $guest->event->date ? \Carbon\Carbon::parse($guest->event->date)->translatedFormat('d F Y') : '-' }}
+                    <strong>Tanggal Acara:</strong>
+                    {{ $transaction->event->date ? \Carbon\Carbon::parse($transaction->event->date)->translatedFormat('d F Y') : '-' }}
                 </p>
                 <hr>
-                @foreach($guest->attendees as $attendee)
 
-                    @php
-                        $ticket = $attendee->ticket ?? null;
-                        $jadwal = $ticket ? $ticket->jadwal : null;
-                    @endphp
+                <p><strong>Nama:</strong> {{ $guest->name ?? '-' }}</p>
+                <p><strong>No. HP:</strong> {{ $guest->phone_number ?? '-' }}</p>
 
-                    <p><strong>Nama:</strong> {{ $attendee->name ?? '-' }}</p>
-                    <p><strong>No. HP:</strong> {{ $attendee->phone_number ?? '-' }}</p>
+                <p>
+                    <strong>Jenis Tiket:</strong>
+                    {{ $ticket->name ?? '-' }}
+                </p>
 
-                    <p>
-                        <strong>Jenis Tiket:</strong> 
-                        {{ $ticket->name ?? '-' }}
-                    </p>
-
-                    <p>
-                        <strong>Jadwal:</strong> 
-                        {{ $jadwal->info ?? '-' }} —
-                        {{ $jadwal && $jadwal->tanggal 
-                            ? \Carbon\Carbon::parse($jadwal->tanggal)->translatedFormat('d F Y H:i') 
-                            : '-' }}
-                    </p>
-
-                    @if(!$loop->last)
-                        <hr>
-                    @endif
-                @endforeach
+                <p>
+                    <strong>Jadwal:</strong>
+                    {{ $jadwal->info ?? '-' }} —
+                    {{ $jadwal && $jadwal->tanggal
+                        ? \Carbon\Carbon::parse($jadwal->tanggal)->translatedFormat('d F Y H:i')
+                        : '-' }}
+                </p>
             </div>
 
             <div class="qrcode">
-                <img src="{{ base_path('public_html/qrcodes/ticket_' . $guest->kode_unik . '.png') }}" width="200" height="200" alt="QR Code">
+                <img src="{{ public_path($guest->qr_code ?? ('images/qrcodes/ticket_' . $guest->kode_unik . '.png')) }}" width="200" height="200" alt="QR Code">
             </div>
 
             <p class="note">
-                Tiket Anda untuk <strong>{{ $guest->event->title ?? 'Acara' }}</strong> sudah terdaftar. <br>
+                Tiket Anda untuk <strong>{{ $transaction->event->title ?? 'Acara' }}</strong> sudah terdaftar. <br>
                 Simpan tiket ini dan tunjukkan QR Code kepada petugas saat memasuki acara.
             </p>
         </div>
@@ -163,7 +157,7 @@
         {{-- Footer --}}
         <div class="ticket-footer">
             Tiket ini sah tanpa tanda tangan maupun cap resmi.<br>
-            © {{ date('Y') }} {{ $guest->event->title ?? 'Event' }} Committee
+            © {{ date('Y') }} {{ $transaction->event->title ?? 'Event' }} Committee
         </div>
     </div>
 </body>

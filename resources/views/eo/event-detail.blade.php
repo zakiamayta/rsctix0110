@@ -10,7 +10,7 @@
     @if($event->status == 'rejected')
         <div class="p-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200">
             <strong>Event Ditolak.</strong>
-            {{ $event->rejection_reason ?? 'Tidak ada alasan penolakan.' }}
+            {{ $event->rejected_reason ?? $event->rejection_reason ?? 'Tidak ada alasan penolakan.' }}
         </div>
 
     @elseif($event->status == 'pending_cancel')

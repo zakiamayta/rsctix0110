@@ -33,6 +33,10 @@ class Refund extends Model
     {
         return $this->belongsTo(Transaction::class, 'transaction_id');
     }
+    public function transactionMerch(): BelongsTo
+    {
+        return $this->belongsTo(TransactionMerch::class, 'transaction_merch_id');
+    }
 
     /**
      * Relasi Balik ke Batch Refund Terkait (Mendukung Nullable untuk status 'waiting')

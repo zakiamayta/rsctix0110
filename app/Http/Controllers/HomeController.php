@@ -2,21 +2,44 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Auth;
 use App\Models\Event;
 use App\Models\Product;
 
 class HomeController extends Controller
 {
-    public function index()
+
+public function __construct()
     {
-        // ✅ HANYA tampilkan event yang sudah di-approve
-        $events = Event::where('status', 'approved')
-            ->orderBy('date')
-            ->get();
+        // Jalankan filter otomatis untuk setiap request yang masuk ke HomeController
+        $this->middleware(function ($request, $next) {
+            
+            // Cek apakah user menggunakan guard 'user' dan sudah login
+            if (Auth::guard('user')->check()) {
+                $user = Auth::guard('user')->user();
+                
+                // Jika profile_complete masih 0, tendang ke halaman profil
+                if ($user && $user->profile_complete == 0) {
+                    return redirect()->route('profile.complete')
+                        ->with('warning', 'Lengkapi profil Anda terlebih dahulu.');
+                }
+            }
 
-        $tickets = Product::where('type', 'ticket')->get();
-        $merchandise = Product::where('type', 'merch')->get();
-
-        return view('home', compact('events', 'tickets', 'merchandise'));
+            return $next($request);
+        });
     }
+
+public function index()
+{
+    // ✅ HANYA tampilkan event yang sudah di-approve, sekaligus load relasi jadwals
+    $events = Event::where('status', 'approved')
+        ->with('jadwals') // <- tambahkan ini
+        ->orderBy('date')
+        ->get();
+
+    $tickets = Product::where('type', 'ticket')->get();
+    $merchandise = Product::where('type', 'merch')->get();
+
+    return view('home', compact('events', 'tickets', 'merchandise'));
+}
 }

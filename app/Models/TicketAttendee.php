@@ -14,8 +14,18 @@ class TicketAttendee extends Model
         'transaction_id',
         'name',
         'phone_number',
+        'email',
+        'kode_unik',
+        'qr_code',
+        'is_registered',
+        'registered_at',
         'ticket_id',
-        'jadwal_id', // ✅ Ditambahkan sesuai database
+        'jadwal_id',
+    ];
+
+    protected $casts = [
+        'is_registered' => 'boolean',
+        'registered_at' => 'datetime',
     ];
 
     public function transaction()
@@ -28,7 +38,6 @@ class TicketAttendee extends Model
         return $this->belongsTo(Ticket::class, 'ticket_id', 'id');
     }
 
-    // ✅ Ditambahkan relasi ke Jadwal sesuai database
     public function jadwal()
     {
         return $this->belongsTo(Jadwal::class, 'jadwal_id', 'id');

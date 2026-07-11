@@ -37,38 +37,53 @@
             </div>
         @endif
 
-        {{-- FORM --}}
-        <form action="{{ route('absen.submit', ['kode' => $transaction->kode_unik]) }}" method="POST" class="space-y-6">
-            @csrf
-            
-            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                <p class="font-semibold mb-1">Pengunjung Tujuan:</p>
-                <p class="font-mono">{{ $transaction->kode_unik }}</p>
-            </div>
+        {{-- INFO PESERTA (identitas QR yang sedang di-scan) --}}
+        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 mb-6">
+            <p class="font-semibold mb-1">Peserta:</p>
+            <p class="font-semibold text-base text-blue-900">{{ $attendee->name ?? '-' }}</p>
+            <p class="text-xs text-blue-700 mb-1">{{ $attendee->phone_number ?? '-' }}</p>
+            <p class="font-mono text-xs mt-2 pt-2 border-t border-blue-100">{{ $attendee->kode_unik ?? '-' }}</p>
+        </div>
 
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
-                    Password Petugas
-                </label>
-                <div class="relative">
-                    <input type="password" 
-                           name="password" 
-                           id="password"
-                           required 
-                           autocomplete="current-password"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 
-                                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base" />
+        {{-- STATUS SUDAH ABSEN (cek langsung dari attendee, sebelum submit) --}}
+        @if($attendee->is_registered)
+            <div class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-6 text-sm font-medium">
+                Tiket ini sudah pernah digunakan untuk absensi
+                @if($attendee->registered_at)
+                    pada {{ \Carbon\Carbon::parse($attendee->registered_at)->translatedFormat('d F Y H:i') }}.
+                @else
+                    sebelumnya.
+                @endif
+            </div>
+        @else
+            {{-- FORM --}}
+            <form action="{{ route('absen.submit', ['kode' => $attendee->kode_unik]) }}" method="POST" class="space-y-6">
+                @csrf
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+                        Password Petugas
+                    </label>
+                    <div class="relative">
+                        <input type="password" 
+                               name="password" 
+                               id="password"
+                               required 
+                               autocomplete="current-password"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 
+                                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base" />
+                    </div>
                 </div>
-            </div>
 
-            <button type="submit" 
-                    class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out shadow-md hover:shadow-lg">
-                Konfirmasi dan Absen
-            </button>
-        </form>
+                <button type="submit" 
+                        class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out shadow-md hover:shadow-lg">
+                    Konfirmasi dan Absen
+                </button>
+            </form>
+        @endif
         
         <div class="mt-8 text-center">
-            <p class="text-xs text-gray-400">Pastikan kode absensi: <span class="font-mono text-gray-600">{{ $transaction->kode_unik }}</span> sudah benar.</p>
+            <p class="text-xs text-gray-400">Pastikan kode tiket: <span class="font-mono text-gray-600">{{ $attendee->kode_unik ?? '-' }}</span> sudah benar.</p>
         </div>
     </div>
 
@@ -95,7 +110,7 @@
                         </div>
                         <h3 class="text-xl font-bold text-red-700 mb-2">Sudah Absen!</h3>
                         <p class="text-gray-600 mb-6">Tiket dengan kode 
-                            <span class="font-mono font-semibold">{{ session('transaction_kode_unik', $transaction->kode_unik) }}</span> 
+                            <span class="font-mono font-semibold">{{ session('transaction_kode_unik', $attendee->kode_unik ?? '-') }}</span> 
                             sudah digunakan untuk absensi.
                         </p>
 
@@ -111,7 +126,6 @@
                             <p class="text-sm"><span class="font-semibold text-gray-700">Nama:</span> <span class="float-right text-gray-900 font-medium">{{ session('attendee_name') }}</span></p>
                             <p class="text-sm"><span class="font-semibold text-gray-700">Kode Unik:</span> <span class="float-right text-gray-900 font-mono">{{ session('transaction_kode_unik') }}</span></p>
                             <p class="text-sm"><span class="font-semibold text-gray-700">No. Telepon:</span> <span class="float-right text-gray-900">{{ session('attendee_phone') }}</span></p>
-                            <p class="text-sm border-t pt-2 mt-2 border-green-100"><span class="font-bold text-green-700">Jumlah Tiket:</span> <span class="float-right text-green-800 font-bold text-lg">{{ session('ticket_count') ?? 1 }}</span></p>
                         </div>
 
                     {{-- GAGAL --}}

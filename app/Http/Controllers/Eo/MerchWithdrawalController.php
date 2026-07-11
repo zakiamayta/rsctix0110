@@ -398,11 +398,11 @@ class MerchWithdrawalController extends Controller
             if ($request->hasFile('invoice')) {
                 $file = $request->file('invoice');
                 $filename = 'invoice_merch_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/invoices_merch', $filename);
-                $invoicePath = 'invoices_merch/' . $filename;
+                $file->move(public_path('images/invoices_withdrawal'), $filename);
+                $invoicePath = 'images/invoices_withdrawal/' . $filename;
             }
 
-            $adminReviewNote = "[Web Log Merch] Skala Omset Potensial: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%" . ($isHMinus10 ? " | Darurat H-10 Terbuka" : "");
+            $adminReviewNote = "Skala Omset Potensial: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%" . ($isHMinus10 ? " | Darurat H-10 Terbuka" : "");
 
             // Insert data withdrawal baru
             DB::table('merch_withdrawals')->insert([

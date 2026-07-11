@@ -1,0 +1,277 @@
+/* =====================================================================
+   RSCTix — ADMIN THEME (satu tema)
+   Melengkapi Bootstrap 5 + light-theme.css. Palet mengikuti light-theme:
+   oranye #f97316, Poppins, border #e5e7eb, kartu putih, bg #f9fafb.
+   Semua komponen khusus admin (yang tidak ada di Bootstrap) ada di sini.
+   ===================================================================== */
+
+:root {
+    --a-orange:      #f97316;
+    --a-orange-dark: #ea580c;
+    --a-orange-soft: #fff7ed;
+    --a-ink:         #111827;
+    --a-text:        #374151;
+    --a-muted:       #6b7280;
+    --a-subtle:      #9ca3af;
+    --a-border:      #e5e7eb;
+    --a-bg:          #f9fafb;
+    --a-surface:     #ffffff;
+    --a-radius:      14px;
+
+    --a-green:    #15803d;  --a-green-bg:  #dcfce7;
+    --a-red:      #b91c1c;  --a-red-bg:    #fee2e2;
+    --a-amber:    #b45309;  --a-amber-bg:  #fef3c7;
+    --a-blue:     #1d4ed8;  --a-blue-bg:   #dbeafe;
+    --a-violet:   #6d28d9;  --a-violet-bg: #ede9fe;
+    --a-slate:    #475569;  --a-slate-bg:  #f1f5f9;
+}
+
+/* ---------- Kanvas konten ---------- */
+.admin-content { color: var(--a-text); }
+.admin-content .fw-800 { font-weight: 800; }
+
+/* ---------- Header halaman ---------- */
+.page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.page-head .ph-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--a-ink);
+    line-height: 1.2;
+    margin: 0;
+}
+.page-head .ph-sub {
+    font-size: .82rem;
+    color: var(--a-muted);
+    margin-top: 3px;
+}
+.page-head .ph-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- Kartu dasar ---------- */
+.a-card {
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-radius);
+    padding: 18px;
+}
+.a-card-flush { padding: 0; overflow: hidden; }
+.a-section-title { font-size: .95rem; font-weight: 700; color: var(--a-ink); margin: 0; }
+.a-section-sub   { font-size: .74rem; color: var(--a-muted); margin-top: 2px; }
+
+/* ---------- Stat / KPI card ---------- */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+}
+.stat-card {
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-radius);
+    padding: 18px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.stat-card .st-label {
+    font-size: .68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--a-muted);
+}
+.stat-card .st-value { font-size: 1.5rem; font-weight: 800; color: var(--a-ink); line-height: 1.15; margin-top: 6px; }
+.stat-card .st-sub   { font-size: .7rem; color: var(--a-subtle); margin-top: 5px; }
+.stat-icon {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--a-orange-soft); color: var(--a-orange);
+}
+.stat-icon svg { width: 22px; height: 22px; }
+.stat-icon.is-green  { background: var(--a-green-bg);  color: var(--a-green); }
+.stat-icon.is-red    { background: var(--a-red-bg);    color: var(--a-red); }
+.stat-icon.is-amber  { background: var(--a-amber-bg);  color: var(--a-amber); }
+.stat-icon.is-blue   { background: var(--a-blue-bg);   color: var(--a-blue); }
+.stat-icon.is-violet { background: var(--a-violet-bg); color: var(--a-violet); }
+
+/* ---------- Filter bar ---------- */
+.filter-card {
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-radius);
+    padding: 16px 18px;
+    margin-bottom: 18px;
+}
+.filter-card .form-label {
+    font-size: .7rem; font-weight: 600; color: var(--a-muted);
+    text-transform: uppercase; letter-spacing: .3px; margin-bottom: 5px;
+}
+.admin-content .form-control,
+.admin-content .form-select {
+    border-radius: 9px;
+    font-size: .85rem;
+    border-color: #d1d5db;
+}
+.admin-content .form-control:focus,
+.admin-content .form-select:focus {
+    border-color: var(--a-orange);
+    box-shadow: 0 0 0 .2rem rgba(249, 115, 22, .18);
+}
+
+/* ---------- Tabel data ---------- */
+.table-card {
+    background: var(--a-surface);
+    border: 1px solid var(--a-border);
+    border-radius: var(--a-radius);
+    overflow: hidden;
+}
+.table-admin { width: 100%; margin: 0; border-collapse: collapse; font-size: .82rem; }
+.table-admin thead th {
+    background: #f9fafb;
+    color: var(--a-muted);
+    font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--a-border);
+    text-align: left;
+    white-space: nowrap;
+}
+.table-admin tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--a-border);
+    color: var(--a-text);
+    vertical-align: middle;
+}
+.table-admin tbody tr:last-child td { border-bottom: none; }
+.table-admin tbody tr { transition: background .12s ease; }
+.table-admin tbody tr:hover { background: var(--a-orange-soft); }
+.table-admin .td-strong { font-weight: 600; color: var(--a-ink); }
+.table-admin .td-money  { font-weight: 700; color: var(--a-ink); white-space: nowrap; }
+
+/* ---------- Badge status (soft) ---------- */
+.badge-soft {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: .7rem; font-weight: 700; line-height: 1;
+}
+.badge-soft svg { width: 12px; height: 12px; }
+.badge-green  { background: var(--a-green-bg);  color: var(--a-green); }
+.badge-red    { background: var(--a-red-bg);    color: var(--a-red); }
+.badge-amber  { background: var(--a-amber-bg);  color: var(--a-amber); }
+.badge-blue   { background: var(--a-blue-bg);   color: var(--a-blue); }
+.badge-violet { background: var(--a-violet-bg); color: var(--a-violet); }
+.badge-slate  { background: var(--a-slate-bg);  color: var(--a-slate); }
+.badge-orange { background: var(--a-orange-soft); color: var(--a-orange-dark); }
+
+/* ---------- Chip kecil ---------- */
+.a-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: .72rem; font-weight: 600;
+    background: var(--a-slate-bg); color: var(--a-slate);
+}
+
+/* ---------- Tombol tema (pelengkap light-theme) ---------- */
+.btn-orange {
+    background: var(--a-orange); border: 1px solid var(--a-orange); color: #fff;
+    font-weight: 600; border-radius: 9px; padding: 8px 16px; font-size: .84rem;
+    display: inline-flex; align-items: center; gap: 7px; transition: background .15s, box-shadow .15s;
+}
+.btn-orange:hover { background: var(--a-orange-dark); border-color: var(--a-orange-dark); color: #fff; box-shadow: 0 4px 12px rgba(249,115,22,.25); }
+.btn-ghost {
+    background: #fff; border: 1px solid var(--a-border); color: var(--a-text);
+    font-weight: 600; border-radius: 9px; padding: 8px 16px; font-size: .84rem;
+    display: inline-flex; align-items: center; gap: 7px; transition: background .15s, border-color .15s;
+}
+.btn-ghost:hover { background: #f9fafb; border-color: #d1d5db; color: var(--a-ink); }
+.btn-orange svg, .btn-ghost svg { width: 15px; height: 15px; }
+
+/* ---------- Empty state ---------- */
+.empty-state {
+    text-align: center;
+    padding: 44px 20px;
+    color: var(--a-subtle);
+}
+.empty-state svg { width: 46px; height: 46px; color: #d1d5db; margin-bottom: 12px; }
+.empty-state .es-title { font-size: .9rem; font-weight: 600; color: var(--a-muted); }
+.empty-state .es-sub { font-size: .78rem; color: var(--a-subtle); margin-top: 3px; }
+
+/* ---------- Progress bar tipis ---------- */
+.a-bar { height: 7px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.a-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--a-orange); }
+
+/* ---------- Grid util ringan ---------- */
+.a-grid { display: grid; gap: 16px; }
+@media (max-width: 991px) {
+    .a-grid-2, .a-grid-3 { grid-template-columns: 1fr !important; }
+}
+
+/* ---------- Helper teks ---------- */
+.text-orange { color: var(--a-orange) !important; }
+
+/* ---------- Netralkan sisa gaya BIRU lama (admin_dashboard.css) ke oranye ---------- */
+.gradient-blue { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important; }
+.table-row-hover:hover { background: var(--a-orange-soft) !important; transform: none !important; }
+
+/* ---------- Warna primary Bootstrap (biru bawaan) → oranye ---------- */
+.admin-content .btn-primary {
+    --bs-btn-bg: #f97316; --bs-btn-border-color: #f97316;
+    --bs-btn-hover-bg: #ea580c; --bs-btn-hover-border-color: #ea580c;
+    --bs-btn-active-bg: #ea580c; --bs-btn-active-border-color: #ea580c;
+    --bs-btn-disabled-bg: #f97316; --bs-btn-disabled-border-color: #f97316;
+}
+.admin-content .btn-outline-primary {
+    --bs-btn-color: #f97316; --bs-btn-border-color: #f97316;
+    --bs-btn-hover-bg: #f97316; --bs-btn-hover-border-color: #f97316;
+    --bs-btn-active-bg: #ea580c; --bs-btn-active-border-color: #ea580c;
+}
+.admin-content .text-primary { color: #f97316 !important; }
+.admin-content .bg-primary { background-color: #f97316 !important; }
+.admin-content .badge.bg-primary { background-color: #f97316 !important; }
+.admin-content .link-primary, .admin-content a.text-primary { color: #f97316 !important; }
+.admin-content .border-primary { border-color: #f97316 !important; }
+.admin-content .nav-pills { --bs-nav-pills-link-active-bg: #f97316; }
+.admin-content .page-item.active .page-link { background-color: #f97316; border-color: #f97316; }
+.admin-content .page-link { color: #f97316; }
+.admin-content .form-check-input:checked { background-color: #f97316; border-color: #f97316; }
+.admin-content .spinner-border.text-primary { color: #f97316 !important; }
+
+/* ---------- Kartu Bootstrap disamakan dengan light-theme ---------- */
+.admin-content .card { border: 1px solid var(--a-border); border-radius: 12px; }
+.admin-content .card-header { background: #f3f4f6; border-bottom: 1px solid var(--a-border); font-weight: 600; }
+
+/* =====================================================================
+   Tombol oranye — DISALIN dari light-theme.css agar seragam dgn seluruh app
+   ===================================================================== */
+.btn-gradient-orange {
+    padding: 8px 20px;
+    background: linear-gradient(to right, #f97316, #facc15);
+    color: #fff; font-weight: 600; border-radius: 9999px; border: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,.15);
+    transition: transform .2s ease, box-shadow .2s ease, background .2s ease; cursor: pointer;
+}
+.btn-gradient-orange:hover { background: linear-gradient(to right, #ea580c, #eab308); transform: scale(1.05); box-shadow: 0 6px 14px rgba(0,0,0,.2); color: #fff; }
+.btn-gradient-orange:active { transform: scale(.97); }
+
+.btn-orange-pill {
+    display: inline-block; padding: 8px 16px; background: #f97316; color: #fff;
+    font-size: 14px; font-weight: 600; border-radius: 9999px; border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15); transition: background .2s ease, transform .2s ease; cursor: pointer;
+}
+.btn-orange-pill:hover { background: #ea580c; color: #fff; }
+.btn-orange-pill:active { transform: scale(.97); }
+
+.btn-outline-orange {
+    border: 1px solid #f97316 !important; color: #f97316 !important; border-radius: 6px;
+    padding: 6px 14px; font-size: .9rem; display: inline-block; transition: all .2s ease; background: transparent;
+}
+.btn-outline-orange:hover, .btn-outline-orange:focus, .btn-outline-orange:active { background: #f97316 !important; color: #fff !important; }
+
+.btn-cancel {
+    background: transparent; color: #6b7280; border: 2px solid #9ca3af; border-radius: 8px;
+    padding: 6px 20px; font-weight: 500; font-size: 14px; transition: all .3s ease;
+}
+.btn-cancel:hover { background: #6b7280; color: #fff; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,.15); }

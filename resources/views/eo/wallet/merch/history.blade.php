@@ -4,21 +4,117 @@
 
 @section('content')
 
-<div class="container py-4">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500&display=swap');
 
-    <h3 class="mb-4 fw-bold">
-        Riwayat Withdraw Merch
-    </h3>
+  :root {
+    --rsc-bg: #F7F4F1;
+    --rsc-surface: #FFFFFF;
+    --rsc-surface2: #F2EEE9;
+    --rsc-border: #E2DBD4;
+    --rsc-accent: #f97316;
+    --rsc-accent-dim: rgba(232,71,10,0.08);
+    --rsc-text: #1A1208;
+    --rsc-muted: #8A7E76;
+    --radius: 14px;
+  }
 
-    <div class="card border-0 shadow-sm">
+  .rsc-wrap * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
 
-        <div class="table-responsive">
+  .rsc-wrap {
+    background: var(--rsc-bg);
+    min-height: 100vh;
+    padding: 28px 24px 60px;
+    color: var(--rsc-text);
+  }
 
-            <table class="table table-hover align-middle mb-0">
+  /* ── Page header ── */
+  .page-header { margin-bottom: 24px; }
+  .page-header h2 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.6rem; font-weight: 800;
+    color: var(--rsc-text); letter-spacing: -.5px; margin: 0;
+  }
+  .accent-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--rsc-accent);
+    margin-right: 8px; vertical-align: middle;
+  }
 
-                <thead class="table-light text-uppercase small font-monospace">
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--rsc-surface);
+    border: 1px solid var(--rsc-border);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .rsc-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  .rsc-table thead tr {
+    background: var(--rsc-surface2);
+    border-bottom: 1px solid var(--rsc-border);
+  }
+  .rsc-table th {
+    padding: 11px 14px; text-align: left;
+    font-size: .65rem; font-weight: 700;
+    color: var(--rsc-muted); text-transform: uppercase; letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  .rsc-table th.text-center, .rsc-table td.text-center { text-align: center; }
+  .rsc-table tbody tr {
+    border-bottom: 1px solid var(--rsc-border);
+    transition: background .12s;
+  }
+  .rsc-table tbody tr:last-child { border-bottom: none; }
+  .rsc-table tbody tr:hover { background: #FAFAF8; }
+  .rsc-table td {
+    padding: 11px 14px; font-size: .82rem;
+    color: var(--rsc-text); vertical-align: middle;
+  }
+  .td-bold { font-weight: 700; }
+  .td-muted { color: var(--rsc-muted); }
+  .td-amount { font-weight: 700; color: #1A7A44; }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: .68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .7px;
+    padding: 4px 10px; border-radius: 20px;
+  }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .badge-approved { background: #E8F5EE; color: #1A7A44; }
+  .badge-rejected { background: #FEF2F2; color: #B91C1C; }
+  .badge-pending  { background: #FEF3E2; color: #B45309; }
+
+  /* ── Action button ── */
+  .btn-detail {
+    background: var(--rsc-accent-dim); color: var(--rsc-accent);
+    border: none; border-radius: 7px;
+    padding: 6px 16px; font-size: .74rem; font-weight: 700;
+    font-family: 'Sora', sans-serif;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    transition: background .15s;
+  }
+  .btn-detail:hover { background: rgba(232,71,10,.15); color: var(--rsc-accent); }
+
+  /* ── Empty state ── */
+  .empty-cell { padding: 48px 24px; text-align: center; color: var(--rsc-muted); font-size: .88rem; font-weight: 600; }
+</style>
+
+<div class="rsc-wrap">
+
+    <div class="page-header">
+        <h2><span class="accent-dot"></span>Riwayat Withdraw Merch</h2>
+    </div>
+
+    <div class="table-wrap">
+        <div style="overflow-x:auto;">
+            <table class="rsc-table">
+
+                <thead>
                 <tr>
-                    <th class="ps-3">Tanggal</th>
+                    <th>Tanggal</th>
                     <th>Nama Event</th>
                     <th>Nominal Penarikan</th>
                     <th>Status Berjalan</th>
@@ -32,36 +128,36 @@
 
                     <tr>
 
-                        <td class="ps-3">
+                        <td class="td-muted">
                             {{ CarbonCarbon::parse($item->created_at)->format('d M Y H:i') }}
                         </td>
 
-                        <td class="fw-semibold">
+                        <td class="td-bold">
                             {{ $item->event_name ?? 'Event Tidak Diketahui' }}
                         </td>
 
-                        <td class="text-success fw-bold">
+                        <td class="td-amount">
                             Rp {{ number_format($item->amount, 0, ',', '.') }}
                         </td>
 
                         <td>
                             @if($item->status == 'approved')
-                                <span class="badge bg-success px-2 py-1.5">
-                                    Approved
+                                <span class="badge badge-approved">
+                                    <span class="badge-dot"></span>Approved
                                 </span>
                             @elif($item->status == 'rejected')
-                                <span class="badge bg-danger px-2 py-1.5">
-                                    Rejected
+                                <span class="badge badge-rejected">
+                                    <span class="badge-dot"></span>Rejected
                                 </span>
                             @else
-                                <span class="badge bg-warning text-dark px-2 py-1.5">
-                                    Pending
+                                <span class="badge badge-pending">
+                                    <span class="badge-dot"></span>Pending
                                 </span>
                             @endif
                         </td>
 
                         <td class="text-center">
-                            <a href="{{ route('eo.merch-withdrawal.show', $item->id) }}" class="btn btn-sm btn-outline-primary px-3">
+                            <a href="{{ route('eo.merch-withdrawal.show', $item->id) }}" class="btn-detail">
                                 Detail
                             </a>
                         </td>
@@ -71,7 +167,7 @@
                 @empty
 
                     <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">
+                        <td colspan="5" class="empty-cell">
                             Belum ditemukan riwayat transaksi penarikan merch.
                         </td>
                     </tr>
@@ -81,9 +177,7 @@
                 </tbody>
 
             </table>
-
         </div>
-
     </div>
 
 </div>
