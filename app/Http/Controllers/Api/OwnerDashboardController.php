@@ -11,10 +11,6 @@ use Carbon\Carbon;
 
 class OwnerDashboardController extends Controller
 {
-    /**
-     * Mengambil data khusus halaman Owner beserta data statistik finansial, volume item terjual,
-     * status approval, akumulasi data global, serta jumlah event yang sedang berjalan.
-     */
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -27,9 +23,6 @@ class OwnerDashboardController extends Controller
             ], 403);
         }
 
-        // =====================================================================
-        // GENERATE FULL URL AVATAR AGAR BISA DIBACA FLUTTER (GOOGLE AUTH FRIENDLY)
-        // =====================================================================
         $avatarUrl = null;
         if ($user->avatar) {
             if (filter_var($user->avatar, FILTER_VALIDATE_URL)) {
@@ -39,106 +32,111 @@ class OwnerDashboardController extends Controller
             }
         }
 
-        // =====================================================================
-        // PROSES FILTER TANGGAL BERDASARKAN PARAMETER FILTER TIME (DENGAN BINDINGS)
-        // =====================================================================
         $filter = $request->query('filter', 'all');
         
         $txCondition = "1=1";
         $tmCondition = "1=1";
+        $rfCondition = "1=1"; // Tambahan kondisi untuk tabel refunds
         $bindings = [];
 
         switch ($filter) {
             case 'today':
                 $txCondition = "DATE(transactions.paid_time) = CURDATE()";
                 $tmCondition = "DATE(transaction_merch.paid_time) = CURDATE()";
+                $rfCondition = "DATE(refunds.created_at) = CURDATE()";
                 break;
             case 'week':
                 $txCondition = "transactions.paid_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
                 $tmCondition = "transaction_merch.paid_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                $rfCondition = "refunds.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
                 break;
             case 'month':
                 $txCondition = "transactions.paid_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
                 $tmCondition = "transaction_merch.paid_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                $rfCondition = "refunds.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
                 break;
             case 'custom':
                 if ($request->has('start_date') && $request->has('end_date')) {
                     $startDate = Carbon::parse($request->query('start_date'))->startOfDay()->toDateTimeString();
                     $endDate = Carbon::parse($request->query('end_date'))->endOfDay()->toDateTimeString();
                     
-                    // Menggunakan placeholder ? untuk mencegah SQL Injection
                     $txCondition = "transactions.paid_time BETWEEN ? AND ?";
                     $tmCondition = "transaction_merch.paid_time BETWEEN ? AND ?";
+                    $rfCondition = "refunds.created_at BETWEEN ? AND ?";
                     
-                    // Diisi berulang menyesuaikan jumlah placeholder di sub-query finansial & volume barang
-                    $bindings[] = $startDate;
-                    $bindings[] = $endDate;
-                    $bindings[] = $startDate;
-                    $bindings[] = $endDate;
-                    $bindings[] = $startDate;
-                    $bindings[] = $endDate;
-                    $bindings[] = $startDate;
-                    $bindings[] = $endDate;
+                    // Binding untuk query stats (disusun berurutan sesuai urutan pemanggilan di SQL bawah)
+                    $bindings[] = $startDate; $bindings[] = $endDate; // total_ticket_revenue (paid)
+                    $bindings[] = $startDate; $bindings[] = $endDate; // total_ticket_revenue (refunded)
+                    $bindings[] = $startDate; $bindings[] = $endDate; // total_merch_revenue
+                    $bindings[] = $startDate; $bindings[] = $endDate; // ticket_service_tax (paid)
+                    $bindings[] = $startDate; $bindings[] = $endDate; // ticket_service_tax (refunded)
+                    $bindings[] = $startDate; $bindings[] = $endDate; // refund_tax_spent
+                    $bindings[] = $startDate; $bindings[] = $endDate; // merch_service_tax
+                    $bindings[] = $startDate; $bindings[] = $endDate; // total_tickets_sold
+                    $bindings[] = $startDate; $bindings[] = $endDate; // total_merch_sold
                 }
                 break;
         }
 
-        // =====================================================================
-        // QUERY STATISTIK REAL-TIME (DENGAN KONDISI TANGGAL YANG DINAMIS)
-        // =====================================================================
-        
         $hasWithdrawals = Schema::hasTable('withdrawals');
         $hasMerchWithdrawals = Schema::hasTable('merch_withdrawals');
 
         $sqlWithdrawals = $hasWithdrawals ? "(SELECT COUNT(*) FROM withdrawals WHERE status = 'pending')" : "0";
         $sqlMerchWithdrawals = $hasMerchWithdrawals ? "(SELECT COUNT(*) FROM merch_withdrawals WHERE status = 'pending')" : "0";
 
-        // Jalankan raw query dengan bindings parameter yang aman
+        // JALANKAN SINKRONISASI QUERY MATANG
         $stats = DB::select("
             SELECT 
-                -- Finansial Berdasarkan Filter Periode
-                (SELECT COALESCE(SUM(grand_total), 0) FROM transactions WHERE payment_status = 'paid' AND $txCondition) AS total_ticket_revenue,
+                -- Finansial Berdasarkan Filter Periode (Kotor) - Menyertakan hitungan paid & refunded
+                (SELECT COALESCE(SUM(grand_total), 0) FROM transactions WHERE payment_status = 'paid' AND $txCondition) AS ticket_revenue_paid,
+                (SELECT COALESCE(SUM(grand_total), 0) FROM transactions WHERE payment_status = 'refunded' AND $txCondition) AS ticket_revenue_refunded,
                 (SELECT COALESCE(SUM(grand_total), 0) FROM transaction_merch WHERE payment_status = 'paid' AND $tmCondition) AS total_merch_revenue,
 
-                -- Volume Total Kuantitas Item Terjual Berdasarkan Filter Periode
+                -- Service Tax Bersih (Ikut menyisir data refunds)
+                (SELECT COALESCE(SUM(service_tax), 0) FROM transactions WHERE payment_status = 'paid' AND $txCondition) AS ticket_tax_paid,
+                (SELECT COALESCE(SUM(service_tax), 0) FROM transactions WHERE payment_status = 'refunded' AND $txCondition) AS ticket_tax_refunded,
+                (SELECT COALESCE(SUM(refunds_tax), 0) FROM refunds WHERE $rfCondition) AS refund_tax_spent,
+                (SELECT COALESCE(SUM(service_tax), 0) FROM transaction_merch WHERE payment_status = 'paid' AND $tmCondition) AS merch_service_tax,
+
+                -- Volume Total Kuantitas Item Terjual (Paid + Refunded agar record list tetap muncul)
                 (SELECT COUNT(*) FROM ticket_attendees 
-                 JOIN transactions ON ticket_attendees.transaction_id = transactions.id 
-                 WHERE transactions.payment_status = 'paid' AND $txCondition) AS total_tickets_sold,
+                JOIN transactions ON ticket_attendees.transaction_id = transactions.id 
+                WHERE transactions.payment_status IN ('paid', 'refunded') AND $txCondition) AS total_tickets_sold,
 
                 (SELECT COALESCE(SUM(tmd.quantity), 0) FROM transaction_merch_details tmd
-                 JOIN transaction_merch ON tmd.transaction_merch_id = transaction_merch.id 
-                 WHERE transaction_merch.payment_status = 'paid' AND $tmCondition) AS total_merch_sold,
+                JOIN transaction_merch ON tmd.transaction_merch_id = transaction_merch.id 
+                WHERE transaction_merch.payment_status = 'paid' AND $tmCondition) AS total_merch_sold,
 
-                -- Antrean Approval Real-time (Global/Aktual)
+                -- Antrean Approval
                 (SELECT COUNT(*) FROM eo WHERE status = 'pending') AS pending_eo,
                 (SELECT COUNT(*) FROM events WHERE status = 'pending') AS pending_events,
                 (SELECT COUNT(*) FROM events WHERE status IN ('pending_cancel', 'pending_reschedule')) AS pending_data_changes,
                 ($sqlWithdrawals + $sqlMerchWithdrawals) AS pending_withdraws,
 
-                -- Akumulasi Total Data Global (Seluruh Baris)
+                -- Akumulasi Total Data Global
                 (SELECT COUNT(*) FROM users WHERE role = 'user') AS total_users_count,
                 (SELECT COUNT(*) FROM eo) AS total_eo_count,
                 (SELECT COUNT(*) FROM events) AS total_events_count,
 
-                -- LOGIKANYA DISAMAKAN DENGAN HOMEAPICONTROLLER (Mengecek End Date dari Jadwal / Hari Ini)
+                -- Event Aktif
                 (SELECT COUNT(*) FROM events 
-                 WHERE status = 'approved' 
-                 AND (
-                     -- Kondisi A: Jika punya jadwal, ambil tanggal paling akhir dari tabel jadwal dan pastikan >= hari ini (DATE format)
-                     COALESCE(
-                         (SELECT MAX(DATE(jadwal.tanggal)) FROM jadwal WHERE jadwal.event_id = events.id), 
-                         DATE(events.date)
-                     ) >= CURDATE()
-                 )
-                ) AS active_events_count
+                WHERE status = 'approved' 
+                AND (
+                    COALESCE(
+                        (SELECT MAX(DATE(jadwal.tanggal)) FROM jadwal WHERE jadwal.event_id = events.id), 
+                        DATE(events.date)
+                    ) >= CURDATE()
+                )) AS active_events_count
         ", $bindings)[0];
 
-        // Hitung total gabungan revenue platform secara dinamis
-        $totalRevenue = (int)$stats->total_ticket_revenue + (int)$stats->total_merch_revenue;
+        // Hitung Akumulasi Revenue Total Gabungan (Kotor)
+        $totalTicketRevenueTotal = (int)$stats->ticket_revenue_paid + (int)$stats->ticket_revenue_refunded;
+        $totalGrossRevenue = $totalTicketRevenueTotal + (int)$stats->total_merch_revenue;
 
-        // =====================================================================
-        // RESPONSE JSON UNTUK FLUTTER
-        // =====================================================================
+        // Hitung Pendapatan Murni Pajak Layanan Platform (Original - Operational Refund Fee)
+        $totalOriginalServiceTax = (int)$stats->ticket_tax_paid + (int)$stats->ticket_tax_refunded;
+        $netPlatformRevenue = ($totalOriginalServiceTax + (int)$stats->merch_service_tax) - (int)$stats->refund_tax_spent;
+
         return response()->json([
             'success' => true,
             'message' => 'Berhasil memuat data dashboard owner secara real-time berdasarkan filter periode',
@@ -151,25 +149,29 @@ class OwnerDashboardController extends Controller
                 'profile_complete' => (bool) $user->profile_complete,
             ],
             'statistics' => [
-                'active_filter'         => $filter,
-                'total_revenue'         => $totalRevenue,
-                'total_ticket_revenue'  => (int) $stats->total_ticket_revenue,
-                'total_merch_revenue'   => (int) $stats->total_merch_revenue,
+                'active_filter'          => $filter,
+                'total_revenue'          => $totalGrossRevenue, 
+                'total_ticket_revenue'   => $totalTicketRevenueTotal,
+                'total_merch_revenue'    => (int) $stats->total_merch_revenue,
                 
-                'total_tickets_sold'    => (int) $stats->total_tickets_sold,
-                'total_merch_sold'      => (int) $stats->total_merch_sold,
-                
-                'pending_eo'            => (int) $stats->pending_eo,
-                'pending_events'        => (int) $stats->pending_events,
-                'pending_data_changes'  => (int) $stats->pending_data_changes,
-                'pending_withdraws'     => (int) $stats->pending_withdraws,
+                'total_service_tax'      => $netPlatformRevenue, // Aman disinkronkan ke Flutter
+                'net_platform_revenue'   => $netPlatformRevenue,
+                'ticket_service_tax'     => (int)$stats->ticket_tax_paid,
+                'merch_service_tax'      => (int)$stats->merch_service_tax,
 
-                'total_users'           => (int) $stats->total_users_count,
-                'total_eo'              => (int) $stats->total_eo_count,
-                'total_events'          => (int) $stats->total_events_count,
+                'total_tickets_sold'     => (int) $stats->total_tickets_sold,
+                'total_merch_sold'       => (int) $stats->total_merch_sold,
                 
-                // UBAH KEY INI AGAR SESUAI DENGAN FLUTTER:
-                'total_active_events'   => (int) $stats->active_events_count, 
+                'pending_eo'             => (int) $stats->pending_eo,
+                'pending_events'         => (int) $stats->pending_events,
+                'pending_data_changes'   => (int) $stats->pending_data_changes,
+                'pending_withdraws'      => (int) $stats->pending_withdraws,
+
+                'total_users'            => (int) $stats->total_users_count,
+                'total_eo'               => (int) $stats->total_eo_count,
+                'total_events'           => (int) $stats->total_events_count,
+                
+                'total_active_events'    => (int) $stats->active_events_count, 
             ]
         ], 200);
     }
@@ -274,6 +276,111 @@ class OwnerDashboardController extends Controller
                 'success' => false,
                 'message' => 'Gagal memuat log history',
                 'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function getPlatformRevenueDetail(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user || $user->role !== 'owner') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak.'
+            ], 403);
+        }
+
+        $filter = $request->query('filter', 'all');
+        $txCondition = "1=1";
+        $tmCondition = "1=1";
+        $bindings = [];
+
+        switch ($filter) {
+            case 'today':
+                $txCondition = "DATE(t.paid_time) = CURDATE()";
+                $tmCondition = "DATE(tm.paid_time) = CURDATE()";
+                break;
+            case 'week':
+                $txCondition = "t.paid_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                $tmCondition = "tm.paid_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                break;
+            case 'month':
+                $txCondition = "t.paid_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                $tmCondition = "tm.paid_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                break;
+            case 'custom':
+                if ($request->has('start_date') && $request->has('end_date')) {
+                    $startDate = Carbon::parse($request->query('start_date'))->startOfDay()->toDateTimeString();
+                    $endDate = Carbon::parse($request->query('end_date'))->endOfDay()->toDateTimeString();
+                    $txCondition = "t.paid_time BETWEEN ? AND ?";
+                    $bindings[] = $startDate;
+                    $bindings[] = $endDate;
+                }
+                break;
+        }
+
+        try {
+            // 🔥 Ambil list detail tiket dengan logika net_service_tax yang lurus dan jujur
+            $ticketTransactions = DB::select("
+                SELECT 
+                    t.kode_unik,
+                    e.title as event_name,
+                    t.payment_status,
+                    t.service_tax as original_service_tax,
+                    IF(t.payment_status = 'refunded', COALESCE(r.refunds_tax, 0), 0) as refund_operational_cost,
+                    -- Logika net_service_tax disamakan dengan dashboard:
+                    -- Jika refunded, service_tax tetap dihitung masuk (karena di dashboard dijumlahkan), namun nanti di total ringkasan dikurangi biaya refund
+                    t.service_tax as net_service_tax,
+                    IF(t.payment_status = 'refunded', JSON_OBJECT(
+                        'status', r.status,
+                        'account_name', r.account_name,
+                        'bank_name', r.bank_name,
+                        'account_number', r.account_number,
+                        'grand_total_refunded', r.grand_total_refunded
+                    ), NULL) as refund_info,
+                    'tiket' as product_type
+                FROM transactions t
+                JOIN events e ON t.event_id = e.id
+                LEFT JOIN refunds r ON t.id = r.transaction_id
+                WHERE t.payment_status IN ('paid', 'refunded') AND $txCondition
+            ", $bindings);
+
+            // 🔥 Masukkan juga transaksi merchandise (karena omset merch masuk hitungan service_tax dashboard!)
+            $merchTransactions = DB::select("
+                SELECT 
+                    tm.kode_unik,
+                    'Pembelian Merchandise' as event_name,
+                    tm.payment_status,
+                    tm.service_tax as original_service_tax,
+                    0 as refund_operational_cost,
+                    tm.service_tax as net_service_tax,
+                    NULL as refund_info,
+                    'merchandise' as product_type
+                FROM transaction_merch tm
+                WHERE tm.payment_status = 'paid' AND $tmCondition
+            ");
+
+            // Gabungkan data tiket & merchandise agar adil sesuai cakupan dashboard
+            $allTransactions = array_merge($ticketTransactions, $merchTransactions);
+
+            $formattedData = array_map(function($item) {
+                $item->original_service_tax = (int) $item->original_service_tax;
+                $item->refund_operational_cost = (int) $item->refund_operational_cost;
+                $item->net_service_tax = (int) $item->net_service_tax;
+                $item->refund_info = $item->refund_info ? json_decode($item->refund_info, true) : null;
+                return $item;
+            }, $allTransactions);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Berhasil memuat detail transaksi platform',
+                'data' => $formattedData
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memuat rincian transaksi: ' . $e->getMessage()
             ], 500);
         }
     }

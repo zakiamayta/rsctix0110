@@ -85,8 +85,27 @@ class TicketController extends Controller
                 }
             }
 
-            // HITUNG TAX & GRAND TOTAL
-            $serviceTax = round($totalAmount * 0.10);
+            // =========================================================================
+            // 🧮 LOGIKA PERHITUNGAN BIAYA LAYANAN (SERVICE TAX) BERJENJANG ANTI-MINUS
+            // =========================================================================
+            if ($totalAmount == 0) {
+                $serviceTax = 0;
+            } elseif ($totalAmount <= 500000) {
+                // Tiket Rp1 - Rp500.000: Biaya layanan 5%, minimal Rp2.500
+                $calculatedTax = ($totalAmount * 5) / 100;
+                $serviceTax = max(2500, $calculatedTax);
+            } elseif ($totalAmount <= 1500000) {
+                // Tiket Rp500.001 - Rp1.500.000: Biaya layanan 3%
+                $serviceTax = ($totalAmount * 3) / 100;
+            } elseif ($totalAmount <= 2500000) {
+                // Tiket Rp1.500.001 - Rp2.500.000: Biaya layanan 2%
+                $serviceTax = ($totalAmount * 2) / 100;
+            } else {
+                // Tiket di atas Rp2.500.000: Flat Rp50.000
+                $serviceTax = 50000;
+            }
+
+            $serviceTax = round($serviceTax);
             $grandTotal = $totalAmount + $serviceTax;
             $kodeUnik = strtoupper(Str::random(10));
 
@@ -106,13 +125,13 @@ class TicketController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // SIMPAN ATTENDEES (Ditambahkan kolom 'jadwal_id' agar relasi ke dashboard Owner sinkron)
+            // SIMPAN ATTENDEES
             foreach ($request->tickets as $item) {
                 for ($i = 0; $i < $item['qty']; $i++) {
                     DB::table('ticket_attendees')->insert([
                         'transaction_id' => $transactionId,
                         'ticket_id' => $item['ticket_id'],
-                        'jadwal_id' => $jadwal->id, // 🔥 FIX: Menyimpan jadwal_id ke tabel peserta
+                        'jadwal_id' => $jadwal->id,
                         'name' => $item['name'],
                         'phone_number' => $item['phone'],
                     ]);
@@ -299,7 +318,6 @@ class TicketController extends Controller
                 'jadwal_info' => $trx->jadwal_info,
                 'tanggal' => $trx->tanggal_event,
                 'jadwal_deskripsi' => $trx->jadwal_deskripsi,
-                // Memastikan data attendees ter-map dengan struktur array murni
                 'attendees' => $attendees->map(fn($a) => [
                     'id' => $a->id,
                     'name' => $a->name,
@@ -311,7 +329,6 @@ class TicketController extends Controller
             ];
         }
 
-        // Return langsung array $result atau pastikan Flutter membaca key 'data'
         return response()->json([
             'success' => true,
             'data' => $result

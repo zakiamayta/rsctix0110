@@ -6,19 +6,18 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class AdminDashboardController extends Controller
 {
     /**
-     * Memuat rincian mendalam data akuntansi dan transaksi platform RSC Ticketing.
-     * Mengambil keseluruhan track record event (termasuk yang sudah selesai, batal, maupun rescheduled).
+     * Memuat rincian mendalam data akuntansi, statistik, merchandise, dan refund platform RSC.
+     * Berdasarkan Skema Database Produksi Utama.
      */
     public function index(Request $request)
     {
         $user = Auth::user();
 
-        // 1. Proteksi Akses Khusus Superadmin
+        // 1. Proteksi Akses Khusus Admin
         if (!$user || $user->role !== 'admin') {
             return response()->json([
                 'success' => false,
@@ -33,263 +32,220 @@ class AdminDashboardController extends Controller
 
         try {
             // =====================================================================
-            // 2. RINGKASAN DATA STATISTIK UTAMA
+            // 2. RINGKASAN DATA STATISTIK UTAMA (Sesuai Struktur Platform)
             // =====================================================================
             $totalUsers = DB::table('users')->where('role', 'user')->count();
-            $totalEo = DB::table('eo')->count(); 
-            $totalEventsPending = DB::table('events')->where('status', 'pending')->count();
+            $totalEo = DB::table('eo')->count();
             
-            // Refund pending dari tabel refunds baru berstatus 'pending'
-            $totalRefundPending = Schema::hasTable('refunds') 
-                ? DB::table('refunds')->where('status', 'pending')->count()
-                : DB::table('events')->whereIn('status', ['cancelled', 'pending_cancel'])->count();
+            // Statistik Status Event Komprehensif dari tabel `events`
+            $eventStats = DB::table('events')
+                ->select(DB::raw("
+                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+                    COUNT(CASE WHEN status = 'pending_reschedule' OR is_rescheduled > 0 THEN 1 END) as rescheduled,
+                    COUNT(CASE WHEN status = 'cancelled' OR status = 'pending_cancel' THEN 1 END) as cancelled,
+                    COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved
+                "))->first();
 
-            // =====================================================================
-            // 3. LAPORAN OMSET PLATFORM GLOBAL & SALDO ESCROW
-            // =====================================================================
-            $totalTicketSales = DB::table('transactions')
+            // Total Permintaan Pengembalian Dana Aktif (Waiting atau Pending) dari tabel `refunds`
+            $totalRefundPending = DB::table('refunds')
+                ->whereIn('status', ['waiting', 'pending'])
+                ->count();
+
+            // Akuntansi Penjualan Finansial Global Tiket (tabel `transactions`)
+            $globalTicketSales = DB::table('transactions')
                 ->where('payment_status', 'paid')
                 ->sum('grand_total');
 
-            $totalMerchSales = DB::table('transaction_merch')
+            // Akuntansi Penjualan Finansial Global Merchandise (tabel `transaction_merch`)
+            $globalMerchSales = DB::table('transaction_merch')
                 ->where('payment_status', 'paid')
                 ->sum('grand_total');
 
-            $platformBalance = 0;
-            if (Schema::hasTable('platform_wallets')) {
-                $platformBalance = DB::table('platform_wallets')->where('id', 1)->value('current_balance') ?? 0;
+            // Saldo Dompet Platform Utama (tabel `platform_wallets`)
+            $platformWallet = DB::table('platform_wallets')->first();
+            $platformBalance = $platformWallet ? (float)$platformWallet->current_balance : 0.00;
+            $totalServiceTax = $platformWallet ? (float)$platformWallet->total_service_tax_earned : 0.00;
+            $totalRefundFees = $platformWallet ? (float)$platformWallet->total_refund_fees_spent : 0.00;
+
+            // =====================================================================
+            // 3. DATA TRANSAKSI TIKET TERBARU & MANIFEST ATTENDEES
+            // =====================================================================
+            $rawTicketTransactions = DB::table('transactions as t')
+                ->leftJoin('events as e', 't.event_id', '=', 'e.id')
+                ->select('t.id', 't.kode_unik as invoice_code', 'e.title as event_title', 't.email as user_email', 't.grand_total as total_amount', 't.payment_status as status', 't.paid_time as date')
+                ->orderBy('t.id', 'desc')
+                ->limit(30)
+                ->get();
+
+            $recentTicketTransactions = [];
+            foreach ($rawTicketTransactions as $tx) {
+                // Ambil data manifest peserta tiket dari table `ticket_attendees` dan hubungkan kategori komponen `tickets`
+                $attendees = DB::table('ticket_attendees as ta')
+                    ->join('tickets as tk', 'ta.ticket_id', '=', 'tk.id')
+                    ->where('ta.transaction_id', $tx->id)
+                    ->select('ta.name as attendee_name', 'ta.phone_number', 'tk.name as ticket_category')
+                    ->get();
+
+                $recentTicketTransactions[] = [
+                    'invoice_code' => $tx->invoice_code ?? '-',
+                    'event_title'  => $tx->event_title ?? 'Event Dihapus',
+                    'user_email'   => $tx->user_email,
+                    'total_amount' => (int)$tx->total_amount,
+                    'status'       => $tx->status,
+                    'date'         => $tx->date ? date('d M Y, H:i', strtotime($tx->date)) : '-',
+                    'attendees'    => $attendees
+                ];
             }
 
             // =====================================================================
-            // 4. MONITORING TRANSAKSI TIKET DENGAN RINCIAN PESERTA & TIKET
+            // 4. DATA TRANSAKSI MERCHANDISE TERBARU & DETAIL BRG (DIAGREGASIKAN)
             // =====================================================================
-            $recentTicketTransactions = DB::table('transactions')
-                ->leftJoin('events', 'transactions.event_id', '=', 'events.id')
-                ->select(
-                    'transactions.id',
-                    'transactions.kode_unik as invoice_code', 
-                    'transactions.email as user_email', 
-                    'transactions.grand_total as total_amount', 
-                    'transactions.payment_status as status', 
-                    'events.title as event_title',
-                    DB::raw('COALESCE(transactions.paid_time, transactions.checkout_time) as date')
-                )
-                ->orderBy('transactions.id', 'desc')
-                ->limit(20)
-                ->get()
-                ->map(function ($tx) {
-                    $tx->total_amount = (int)$tx->total_amount;
-                    
-                    // Ambil daftar peserta (attendees) untuk transaksi ini
-                    $tx->attendees = DB::table('ticket_attendees')
-                        ->leftJoin('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
-                        ->where('ticket_attendees.transaction_id', $tx->id)
-                        ->select(
-                            'ticket_attendees.name as attendee_name',
-                            'ticket_attendees.phone_number',
-                            'tickets.name as ticket_category'
-                        )
-                        ->get();
-
-                    return $tx;
-                });
-
-            // =====================================================================
-            // 5. MONITORING TRANSAKSI MERCHANDISE DENGAN RINCIAN PRODUK & VARIAN
-            // =====================================================================
-            $recentMerchTransactions = DB::table('transaction_merch')
-                ->select(
-                    'id',
-                    'kode_unik as invoice_code', 
-                    'email as user_email', 
-                    'grand_total as total_amount', 
-                    'payment_status as status', 
-                    DB::raw('COALESCE(paid_time, checkout_time) as date')
-                )
+            $rawMerchTransactions = DB::table('transaction_merch')
+                ->select('id', 'kode_unik as invoice_code', 'email as user_email', 'grand_total as total_amount', 'payment_status as status', 'paid_time as date')
                 ->orderBy('id', 'desc')
-                ->limit(20)
-                ->get()
-                ->map(function ($tx) {
-                    $tx->total_amount = (int)$tx->total_amount;
+                ->limit(30)
+                ->get();
 
-                    // Ambil rincian detail barang merchandise yang dipesan
-                    $tx->items = DB::table('transaction_merch_details')
-                        ->leftJoin('products', 'transaction_merch_details.product_id', '=', 'products.id')
-                        ->leftJoin('products_varian', 'transaction_merch_details.varian_id', '=', 'products_varian.id')
-                        ->leftJoin('products_ukuran', 'transaction_merch_details.ukuran_id', '=', 'products_ukuran.id')
-                        ->where('transaction_merch_details.transaction_merch_id', $tx->id)
-                        ->select(
-                            'products.name as product_name',
-                            'products_varian.varian as product_variant',
-                            'products_ukuran.ukuran as product_size',
-                            'transaction_merch_details.quantity',
-                            'transaction_merch_details.price',
-                            'transaction_merch_details.subtotal'
-                        )
-                        ->get()
-                        ->map(function($item) {
-                            $item->price = (int)$item->price;
-                            $item->subtotal = (int)$item->subtotal;
-                            return $item;
-                        });
+            $recentMerchTransactions = [];
+            foreach ($rawMerchTransactions as $tx) {
+                // Tarik rincian item, varian, dan ukuran sesuai skema relasi `transaction_merch_details`
+                $items = DB::table('transaction_merch_details as tmd')
+                    ->join('products as p', 'tmd.product_id', '=', 'p.id')
+                    ->join('products_varian as pv', 'tmd.varian_id', '=', 'pv.id')
+                    ->join('products_ukuran as pu', 'tmd.ukuran_id', '=', 'pu.id')
+                    ->where('tmd.transaction_merch_id', $tx->id)
+                    ->select('p.name as product_name', 'pv.varian as product_variant', 'pu.ukuran as product_size', 'tmd.quantity', 'tmd.price', 'tmd.subtotal')
+                    ->get();
 
-                    return $tx;
-                });
-
-            // =====================================================================
-            // 6. PERFORMA EVENT ORGANIZER (EO) LENGKAP DENGAN PORTFOLIO EVENT (KESELURUHAN STATUS)
-            // =====================================================================
-            $eoPerformance = DB::table('eo')
-                ->join('users', 'eo.user_id', '=', 'users.id')
-                ->select(
-                    'eo.id as eo_id', 
-                    'eo.nama_badan_usaha as eo_name', 
-                    'users.email as email',
-                    'eo.balance as current_balance',
-                    'eo.total_debt as current_debt'
-                )
-                ->get()
-                ->map(function ($eo) {
-                    // Tarik keseluruhan event tanpa memandang status aktif saja (approved, pending, rejected, cancelled, dll)
-                    $events = DB::table('events')
-                        ->where('eo_id', $eo->eo_id)
-                        ->select('id', 'title', 'status', 'date', 'is_rescheduled')
-                        ->get()
-                        ->map(function($ev) {
-                            // Hitung revenue masing-masing event
-                            $revenue = DB::table('transactions')
-                                ->where('event_id', $ev->id)
-                                ->where('payment_status', 'paid')
-                                ->sum('grand_total');
-
-                            $ticketsSold = DB::table('ticket_attendees')
-                                ->leftJoin('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
-                                ->where('tickets.event_id', $ev->id)
-                                ->count();
-
-                            return [
-                                'title' => $ev->title,
-                                'status' => $ev->status,
-                                'date' => $ev->date,
-                                'revenue' => (int)$revenue,
-                                'tickets_sold' => $ticketsSold,
-                                'is_rescheduled' => $ev->is_rescheduled ?? 0,
-                            ];
-                        });
-
-                    $totalEvents = $events->count();
-                    $totalRevenue = $events->sum('revenue');
-
-                    // Hitung rincian status event secara dinamis untuk laporan superadmin
-                    $doneEvents = $events->filter(function($e) {
-                        return $e['status'] === 'approved' && strtotime($e['date']) < time();
-                    })->count();
-
-                    $activeEvents = $events->filter(function($e) {
-                        return $e['status'] === 'approved' && strtotime($e['date']) >= time();
-                    })->count();
-
-                    $cancelledEvents = $events->filter(function($e) {
-                        return in_array($e['status'], ['cancelled', 'pending_cancel']);
-                    })->count();
-
-                    $rescheduledEvents = $events->filter(function($e) {
-                        return in_array($e['status'], ['pending_reschedule']) || (isset($e['is_rescheduled']) && $e['is_rescheduled'] > 0);
-                    })->count();
-
-                    return [
-                        'eo_id' => $eo->eo_id,
-                        'eo_name' => $eo->eo_name,
-                        'eo_email' => $eo->email,
-                        'total_events' => (int)$totalEvents,
-                        'total_revenue' => (int)$totalRevenue,
-                        'balance' => (int)$eo->current_balance,
-                        'debt' => (int)$eo->current_debt,
-                        'events_list' => $events->values(),
-                        'track_record' => [
-                            'done' => $doneEvents,
-                            'active' => $activeEvents,
-                            'cancelled' => $cancelledEvents,
-                            'rescheduled' => $rescheduledEvents
-                        ]
-                    ];
-                })
-                ->sortByDesc('total_revenue')
-                ->values();
-
-            // =====================================================================
-            // 7. MEMANTAU PROSES REFUND & CANCEL (Skema Refunds Terbaru)
-            // =====================================================================
-            $refundEvents = [];
-            if (Schema::hasTable('refunds')) {
-                $refundEvents = DB::table('refunds')
-                    ->join('transactions', 'refunds.transaction_id', '=', 'transactions.id')
-                    ->leftJoin('events', 'transactions.event_id', '=', 'events.id')
-                    ->select(
-                        'refunds.id as refund_id',
-                        'events.title as event_title',
-                        'transactions.kode_unik as invoice_code',
-                        'refunds.grand_total_refunded as estimated_refund',
-                        'refunds.refunds_tax as refund_tax',
-                        'refunds.status',
-                        'refunds.bank_name',
-                        'refunds.account_number',
-                        'refunds.account_name',
-                        'refunds.created_at as updated_at'
-                    )
-                    ->orderBy('refunds.id', 'desc')
-                    ->get()
-                    ->map(function ($item) {
-                        return [
-                            'event_id' => $item->refund_id,
-                            'event_title' => $item->event_title ?? "Refund Pembelian Tiket",
-                            'status' => $item->status,
-                            'eo_name' => "Inv: " . $item->invoice_code,
-                            'updated_at' => strval($item->updated_at),
-                            'estimated_refund' => (int)$item->estimated_refund,
-                            'bank_details' => $item->bank_name . " " . $item->account_number . " a.n " . $item->account_name
-                        ];
-                    });
-            } else {
-                $refundEvents = DB::table('events')
-                    ->join('eo', 'events.eo_id', '=', 'eo.id')
-                    ->whereIn('events.status', ['cancelled', 'pending_cancel'])
-                    ->select('events.id as event_id', 'events.title as event_title', 'events.status', 'eo.nama_badan_usaha as eo_name', 'events.updated_at')
-                    ->get()
-                    ->map(function ($event) {
-                        return [
-                            'event_id' => $event->event_id,
-                            'event_title' => $event->event_title,
-                            'status' => $event->status,
-                            'eo_name' => $event->eo_name,
-                            'updated_at' => strval($event->updated_at),
-                            'estimated_refund' => 0,
-                            'bank_details' => '-'
-                        ];
-                    });
+                $recentMerchTransactions[] = [
+                    'invoice_code' => $tx->invoice_code ?? '-',
+                    'user_email'   => $tx->user_email,
+                    'total_amount' => (int)$tx->total_amount,
+                    'status'       => $tx->status,
+                    'date'         => $tx->date ? date('d M Y, H:i', strtotime($tx->date)) : '-',
+                    'items'        => $items
+                ];
             }
 
             // =====================================================================
-            // 8. RESPON JSON UTUH
+            // 5. PERFORMA EVENT ORGANIZER & HISTORI PORTOFOLIO EVENT
+            // =====================================================================
+            $eoList = DB::table('eo')->get();
+            $eoPerformance = [];
+
+            foreach ($eoList as $eo) {
+                // Hitung data analitik track record performa event internal EO dari tabel `events`
+                $doneEvents = DB::table('events')->where('eo_id', $eo->id)->where('date', '<', now())->where('status', 'approved')->count();
+                $activeEvents = DB::table('events')->where('eo_id', $eo->id)->where('date', '>=', now())->where('status', 'approved')->count();
+                $rescheduledEvents = DB::table('events')->where('eo_id', $eo->id)->where('is_rescheduled', '>', 0)->count();
+                $cancelledEvents = DB::table('events')->where('eo_id', $eo->id)->whereIn('status', ['cancelled', 'pending_cancel'])->count();
+
+                // Tarik total omzet pendapatan kotor sales tiket EO lewat relasi tabel `transactions` -> `events`
+                $totalRevenue = DB::table('transactions as t')
+                    ->join('events as e', 't.event_id', '=', 'e.id')
+                    ->where('e.eo_id', $eo->id)
+                    ->where('t.payment_status', 'paid')
+                    ->sum('t.grand_total');
+
+                // Portofolio semua event yang dikelola mitra EO ini
+                $eventsPortfolio = DB::table('events')
+                    ->where('eo_id', $eo->id)
+                    ->select('id', 'title', 'status', 'date')
+                    ->orderBy('id', 'desc')
+                    ->get()
+                    ->map(function($ev) {
+                        $ticketSold = DB::table('transactions')->where('event_id', $ev->id)->where('payment_status', 'paid')->count();
+                        $revenue = DB::table('transactions')->where('event_id', $ev->id)->where('payment_status', 'paid')->sum('grand_total');
+                        return [
+                            'title'        => $ev->title,
+                            'status'       => $ev->status,
+                            'tickets_sold' => $ticketSold,
+                            'revenue'      => (int)$revenue
+                        ];
+                    });
+
+                $eoPerformance[] = [
+                    'id'            => $eo->id,
+                    'eo_name'       => $eo->nama_badan_usaha,
+                    'eo_email'      => DB::table('users')->where('id', $eo->user_id)->value('email') ?? '-',
+                    'total_events'  => DB::table('events')->where('eo_id', $eo->id)->count(),
+                    'total_revenue' => (int)$totalRevenue,
+                    'balance'       => (float)$eo->balance,
+                    'debt'          => (float)$eo->total_debt,
+                    'status'        => $eo->status,
+                    'track_record'  => [
+                        'done'        => $doneEvents,
+                        'active'      => $activeEvents,
+                        'rescheduled' => $rescheduledEvents,
+                        'cancelled'   => $cancelledEvents
+                    ],
+                    'events_list'   => $eventsPortfolio
+                ];
+            }
+
+            // =====================================================================
+            // 6. ANTRIAN REFUND YANG MEMBUTUHKAN VERIFIKASI / TRANSFER ADMIN
+            // =====================================================================
+            $refundEvents = DB::table('refunds as r')
+                ->leftJoin('transactions as t', 'r.transaction_id', '=', 't.id')
+                ->leftJoin('transaction_merch as tm', 'r.transaction_merch_id', '=', 'tm.id')
+                ->select(
+                    'r.id',
+                    'r.bank_name',
+                    'r.account_number',
+                    'r.account_name',
+                    'r.status',
+                    'r.grand_total_refunded as estimated_refund',
+                    'r.refunds_tax',
+                    'r.updated_at',
+                    't.kode_unik as ticket_invoice',
+                    'tm.kode_unik as merch_invoice',
+                    DB::raw("CASE 
+                        WHEN r.transaction_id IS NOT NULL THEN 'Refund Tiket' 
+                        ELSE 'Refund Merchandise' 
+                     END as type_label")
+                )
+                ->orderBy('r.id', 'desc')
+                ->get()
+                ->map(function($ref) {
+                    return [
+                        'id'               => $ref->id,
+                        'event_title'      => $ref->type_label,
+                        'invoice_code'     => $ref->ticket_invoice ?? $ref->merch_invoice ?? '-',
+                        'eo_name'          => 'Customer Account',
+                        'bank_details'     => "{$ref->bank_name} - {$ref->account_number} a/n {$ref->account_name}",
+                        'status'           => $ref->status,
+                        'estimated_refund' => (int)$ref->estimated_refund,
+                        'refund_tax'       => (int)$ref->refunds_tax,
+                        'updated_at'       => date('d M Y', strtotime($ref->updated_at))
+                    ];
+                });
+
+            // =====================================================================
+            // 7. RETURN PAKET JSON RESPONS KE APP FLUTTER
             // =====================================================================
             return response()->json([
                 'success' => true,
-                'message' => 'Data dashboard admin berhasil dimuat dengan rincian lengkap.',
+                'message' => 'Data workspace admin berhasil dikompilasi.',
                 'user' => [
                     'id'    => $user->id,
                     'name'  => $user->name,
                     'email' => $user->email,
                     'avatar'=> $avatarUrl,
-                    'role'  => $user->role,
                 ],
                 'statistics' => [
                     'total_users'            => (int)$totalUsers,
                     'total_eo'               => (int)$totalEo,
-                    'pending_events_count'   => (int)$totalEventsPending,
+                    'pending_events_count'   => (int)($eventStats->pending ?? 0),
+                    'reschedule_events_count'=> (int)($eventStats->rescheduled ?? 0),
+                    'cancelled_events_count' => (int)($eventStats->cancelled ?? 0),
                     'pending_refund_count'   => (int)$totalRefundPending,
-                    'global_ticket_sales'    => (int)$totalTicketSales,
-                    'global_merch_sales'     => (int)$totalMerchSales,
+                    'global_ticket_sales'    => (int)$globalTicketSales,
+                    'global_merch_sales'     => (int)$globalMerchSales,
+                    // Penambahan Detail Data Finansial Komprehensif Dompet Platform (`platform_wallets`)
                     'platform_balance'       => (int)$platformBalance,
+                    'total_service_tax'      => (int)$totalServiceTax,
+                    'total_refund_fees'      => (int)$totalRefundFees,
                 ],
                 'recent_ticket_transactions' => $recentTicketTransactions,
                 'recent_merch_transactions'  => $recentMerchTransactions,
@@ -300,7 +256,7 @@ class AdminDashboardController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat data statistik admin akibat kendala database.',
+                'message' => 'Gagal memuat data statistik admin.',
                 'error'   => $e->getMessage()
             ], 500);
         }
