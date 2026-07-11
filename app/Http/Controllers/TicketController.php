@@ -69,28 +69,34 @@ class TicketController extends Controller
     }
 
     // Ambil detail peserta + ringkasan tiket untuk satu transaksi
-    private function getTransactionDetails($id, $withPrice = true)
-    {
-        $select = ['ticket_attendees.*', 'tickets.name as ticket_name', 'jadwal.info as jadwal_info', 'jadwal.tanggal as jadwal_tanggal'];
-        if ($withPrice) $select[] = 'tickets.price';
+private function getTransactionDetails($id, $withPrice = true)
+{
+    $select = [
+        'ticket_attendees.*',
+        'ticket_attendees.email as attendee_email', // ✅ email milik masing-masing peserta
+        'tickets.name as ticket_name',
+        'jadwal.info as jadwal_info',
+        'jadwal.tanggal as jadwal_tanggal',
+    ];
+    if ($withPrice) $select[] = 'tickets.price';
 
-        $details = DB::table('ticket_attendees')
-            ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
-            ->join('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
-            ->where('ticket_attendees.transaction_id', $id)
-            ->select($select)
-            ->get();
+    $details = DB::table('ticket_attendees')
+        ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
+        ->join('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
+        ->where('ticket_attendees.transaction_id', $id)
+        ->select($select)
+        ->get();
 
-        $summary = $withPrice
-            ? $details->groupBy('ticket_name')->map(fn($items) => [
-                'qty' => $items->count(),
-                'price' => $items->first()->price,
-                'total' => $items->count() * $items->first()->price,
-            ])
-            : collect();
+    $summary = $withPrice
+        ? $details->groupBy('ticket_name')->map(fn($items) => [
+            'qty' => $items->count(),
+            'price' => $items->first()->price,
+            'total' => $items->count() * $items->first()->price,
+        ])
+        : collect();
 
-        return [$details, $summary];
-    }
+    return [$details, $summary];
+}
 
     public function store(Request $request)
     {
@@ -116,31 +122,35 @@ class TicketController extends Controller
 
         Log::info('[Ticket Store] Mulai validasi', ['event_id' => $event->id]);
 
-        $request->validate([
-            'email' => ['required', 'email', function ($attribute, $value, $fail) use ($event) {
-                if ($event->max_tickets_per_email == 1) {
-                    $exists = DB::table('transactions')
-                        ->join('ticket_attendees', 'transactions.id', '=', 'ticket_attendees.transaction_id')
-                        ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
-                        ->join('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
-                        ->where('jadwal.event_id', $event->id)
-                        ->where('transactions.email', $value)
-                        ->exists();
-                    if ($exists) {
-                        Log::warning('[Ticket Store] Email sudah dipakai untuk event ini', ['email' => $value]);
-                        $fail('Email ini sudah digunakan untuk event ini.');
-                    }
-                }
-            }],
-            'name'        => 'required|array|min:1|max:' . $event->max_tickets_per_email,
-            'name.*'      => 'required|string',
-            'phone'       => 'array',
-            'phone.*'     => 'nullable|string',
-            'ticket_id'   => 'required|array',
-            'ticket_id.*' => 'integer|exists:tickets,id',
-            'qty'         => 'required|array',
-            'qty.*'       => 'integer|min:1',
-        ]);
+$request->validate([
+    'email' => ['required', 'email', function ($attribute, $value, $fail) use ($event) {
+        if ($event->max_tickets_per_email == 1) {
+            $exists = DB::table('transactions')
+                ->join('ticket_attendees', 'transactions.id', '=', 'ticket_attendees.transaction_id')
+                ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
+                ->join('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
+                ->where('jadwal.event_id', $event->id)
+                ->where('transactions.email', $value)
+                ->exists();
+            if ($exists) {
+                $fail('Email ini sudah digunakan untuk event ini.');
+            }
+        }
+    }],
+    'name'            => 'required|array|min:1|max:' . $event->max_tickets_per_email,
+    'name.*'          => 'required|string',
+    'attendee_email'  => 'required|array|min:1|max:' . $event->max_tickets_per_email,
+    'attendee_email.*'=> 'required|email',
+    'phone'           => 'required|array|min:1|max:' . $event->max_tickets_per_email,
+    'phone.*'         => ['required', 'string', 'distinct', 'unique:ticket_attendees,phone_number'],
+    'ticket_id'       => 'required|array',
+    'ticket_id.*'     => 'integer|exists:tickets,id',
+    'qty'             => 'required|array',
+    'qty.*'           => 'integer|min:1',
+], [
+    'phone.*.unique'   => 'Nomor telepon sudah pernah digunakan sebelumnya.',
+    'phone.*.distinct' => 'Nomor telepon tidak boleh sama antar peserta dalam satu pemesanan.',
+]);
 
         Log::info('[Ticket Store] Validasi sukses, mulai DB transaction');
         DB::beginTransaction();
@@ -207,6 +217,8 @@ class TicketController extends Controller
                         'ticket_id'      => $ticketId,
                         'name'           => $request->name[$attendeeIndex] ?? null,
                         'phone_number'   => $request->phone[$attendeeIndex] ?? null,
+                        'email'          => $request->attendee_email[$attendeeIndex] ?? null,
+                        'kode_unik'      => $this->generateUniqueAttendeeCode(),
                     ]);
                     $attendeeIndex++;
                 }
@@ -223,7 +235,7 @@ class TicketController extends Controller
                 $transaction->save();
 
                 try {
-                    app(WebhookController::class)->generateTicketQRCode($transaction);
+                    app(WebhookController::class)->generateAttendeeQRCodes($transaction);
                     Log::info('[Ticket Store] QR Code digenerate', ['transaction_id' => $transactionId]);
                 } catch (\Exception $e) {
                     Log::error('[Ticket Store] Gagal generate QR Code', ['transaction_id' => $transactionId, 'error' => $e->getMessage()]);
@@ -231,7 +243,7 @@ class TicketController extends Controller
                 }
 
                 try {
-                    app(WebhookController::class)->sendTicketEmail($transaction);
+                    app(WebhookController::class)->sendAttendeeEmails($transaction);
                     Log::info('[Ticket Store] Email tiket dikirim', ['transaction_id' => $transactionId]);
                 } catch (\Exception $e) {
                     Log::error('[Ticket Store] Gagal kirim email tiket', ['transaction_id' => $transactionId, 'error' => $e->getMessage()]);
@@ -421,4 +433,13 @@ class TicketController extends Controller
 
         return view('ticket.failed', compact('transaction', 'details'));
     }
+
+    private function generateUniqueAttendeeCode(): string
+{
+    do {
+        $code = strtoupper(\Illuminate\Support\Str::random(12));
+    } while (DB::table('ticket_attendees')->where('kode_unik', $code)->exists());
+
+    return $code;
+}
 }

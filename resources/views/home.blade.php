@@ -70,45 +70,62 @@
     <div class="h-1 w-24 bg-orange-500 mt-2 rounded"></div>
   </div>
 
-  <!-- 🔹 GRID EVENT -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
 
-    @forelse($events as $event)
-    <div class="bg-white rounded-xl shadow-sm hover:shadow-lg w-full max-w-sm flex flex-col overflow-hidden transition transform hover:-translate-y-1"
-         data-aos="fade-up" data-aos-delay="{{ $loop->index * 100 }}">
+  @forelse($events as $event)
+  @php
+    $lastJadwalDate = $event->jadwals->max('tanggal');
+    $referenceDate = $lastJadwalDate ? \Carbon\Carbon::parse($lastJadwalDate) : \Carbon\Carbon::parse($event->date);
+    $isExpired = $referenceDate->isPast();
+  @endphp
 
-      <img src="{{ asset($event->poster) }}"
-        alt="Poster Event"
-        class="w-full aspect-video object-cover bg-gray-200">
+  <div class="event-card bg-white rounded-xl shadow-sm hover:shadow-lg w-full max-w-sm flex flex-col overflow-hidden transition transform hover:-translate-y-1
+              {{ $isExpired ? 'grayscale opacity-60' : '' }}"
+       data-aos="fade-up" data-aos-delay="{{ $loop->index * 100 }}">
 
-      <div class="flex flex-col flex-1 p-4 sm:p-6">
-        <h2 class="text-base sm:text-lg font-bold text-gray-900 mb-1">
-          {{ $event->title }}
-        </h2>
+    <div class="relative">
+      <img src="{{ asset($event->poster) }}" alt="Poster Event" class="w-full aspect-video object-cover bg-gray-200">
+      @if($isExpired)
+        <div class="absolute top-2 right-2 bg-gray-700/80 text-white text-xs font-bold px-3 py-1 rounded-full">
+          Selesai
+        </div>
+      @endif
+    </div>
 
-        <p class="text-sm text-gray-500 mb-1">
-          <i class="fa-solid fa-location-dot text-orange-500 me-1"></i>
-          {{ $event->location }}
-        </p>
+    <div class="flex flex-col flex-1 p-4 sm:p-6">
+      <h2 class="event-title text-base sm:text-lg font-bold text-gray-900 mb-1">
+        {{ $event->title }}
+      </h2>
 
-        <p class="text-sm text-gray-500 mb-4">
-          <i class="fa-solid fa-calendar text-orange-500 me-1"></i>
-          {{ \Carbon\Carbon::parse($event->date)->translatedFormat('d F Y') }}
-        </p>
+      <p class="text-sm text-gray-500 mb-1">
+        <i class="fa-solid fa-location-dot text-orange-500 me-1"></i>
+        {{ $event->location }}
+      </p>
 
-        <div class="mt-auto">
-          <a href="{{ route('info.show', $event->id) }}"
-             class="inline-block px-4 py-2 rounded-full bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition shadow">
+      <p class="text-sm text-gray-500 mb-4">
+        <i class="fa-solid fa-calendar text-orange-500 me-1"></i>
+        {{ \Carbon\Carbon::parse($event->date)->translatedFormat('d F Y') }}
+      </p>
+
+      <div class="mt-auto">
+        @if($isExpired)
+          <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-400 text-white text-sm font-semibold cursor-not-allowed shadow select-none">
+            <i class="fa-solid fa-ban"></i>
+            Event Berakhir
+          </span>
+        @else
+          <a href="{{ route('info.show', $event->id) }}" class="inline-block px-4 py-2 rounded-full bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition shadow">
             More Info
           </a>
-        </div>
+        @endif
       </div>
     </div>
-    @empty
-      <p class="text-gray-500 col-span-full">Belum ada event yang tersedia.</p>
-    @endforelse
-
   </div>
+  @empty
+    <p class="text-gray-500 col-span-full">Belum ada event yang tersedia.</p>
+  @endforelse
+
+</div>
 </div>
 
 <!-- Swiper Init Script -->

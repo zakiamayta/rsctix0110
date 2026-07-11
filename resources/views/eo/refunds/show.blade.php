@@ -44,7 +44,7 @@
 <div class="rsc-wrap">
     {{-- BACK TO LIST NAVIGATION --}}
     <div class="mb-4">
-        <a href="{{ route('eo.refunds.index') }}" class="inline-flex items-center text-xs font-bold text-[#7A6E66] hover:text-[#E8470A] transition-colors gap-1.5">
+        <a href="{{ route('eo.refunds.index') }}" class="inline-flex items-center text-xs font-bold text-[#7A6E66] hover:text-[#f97316] transition-colors gap-1.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             Kembali ke Daftar Manajemen Finansial
         </a>
@@ -53,7 +53,7 @@
     {{-- CLUSTER INFO CARD --}}
     <div class="rsc-card p-5 mb-5 bg-[#FFF0EB] border-[#E2DBD4] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-[#E8470A] text-white tracking-widest uppercase mb-1.5 inline-block">Kloter Detail Summary</span>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-[#f97316] text-white tracking-widest uppercase mb-1.5 inline-block">Kloter Detail Summary</span>
             <h2 class="text-xl font-bold rsc-title leading-tight">{{ $batch->name }}</h2>
             <p class="text-xs text-[#7A6E66] mt-0.5 font-medium">Event: {{ $batch->event->title ?? '-' }}</p>
         </div>

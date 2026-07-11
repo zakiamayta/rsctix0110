@@ -11,6 +11,7 @@ class Eo extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'rejected_reason',
         'nama_badan_usaha',
         'alamat_badan_usaha',
         'dokumen_badan_usaha',

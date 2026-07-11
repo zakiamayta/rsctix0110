@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\DB;
 use App\Models\Event;
+use App\Services\BuyerNotificationService;
 use Xendit\Xendit;
 
 class AppServiceProvider extends ServiceProvider
@@ -54,6 +55,16 @@ class AppServiceProvider extends ServiceProvider
                     }
                 }
             }
+        });
+
+        // 3. NOTIFIKASI PEMBELI: Suntik daftar notifikasi aktivitas ke navbar
+        //    (hanya dihitung untuk user yang login, dan hanya saat navbar dirender)
+        view()->composer('layouts.navbar', function ($view) {
+            $notifications = auth()->check()
+                ? BuyerNotificationService::for(auth()->user())
+                : [];
+
+            $view->with('buyerNotifications', $notifications);
         });
     }
 }

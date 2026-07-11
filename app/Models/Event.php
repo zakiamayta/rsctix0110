@@ -28,6 +28,8 @@ class Event extends Model
         'proposed_date',
         'is_rescheduled',
         'reschedule_reason',
+        'reschedule_rejected_reason',
+        'rejected_reason',
         'can_adjust_schedule',
         'owner_note',
         'merch_cancel_decision'

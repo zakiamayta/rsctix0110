@@ -31,6 +31,35 @@
         </div>
 
         @if(auth()->check())
+          {{-- 🔔 Notifikasi Pembeli --}}
+          <div class="relative flex-shrink-0">
+            <button id="notif-button" class="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 focus:outline-none transition">
+              <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" stroke-width="2"
+                   viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              <span id="notif-badge"
+                    class="hidden absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1
+                           bg-red-500 text-white text-[10px] font-bold leading-[18px]
+                           text-center rounded-full"></span>
+            </button>
+
+            <div id="notif-dropdown"
+                 class="hidden absolute right-0 mt-3 w-80 max-w-[90vw]
+                        bg-white rounded-xl shadow-lg border z-50 overflow-hidden">
+              <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+                <p class="text-sm font-bold text-gray-800">Notifikasi</p>
+                <button id="notif-mark-read" class="text-xs text-orange-500 hover:underline">
+                  Tandai dibaca
+                </button>
+              </div>
+              <div class="max-h-96 overflow-y-auto">
+                @include('layouts.partials.notif-list')
+              </div>
+            </div>
+          </div>
+
           <div class="relative flex-shrink-0">
             <button id="user-menu-button" class="flex items-center focus:outline-none">
               <img
@@ -92,6 +121,22 @@
         </a>
     @endif
 
+    @if(auth()->user()->role === 'admin')
+    <a
+        href="{{ route('admin.dashboard') }}"
+        class="block px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 font-semibold">
+        🛠️ Dashboard Admin
+    </a>
+    @endif
+
+    @if(auth()->user()->role === 'owner')
+        <a
+            href="{{ route('owner.dashboard') }}"
+            class="block px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 font-semibold">
+            👑 Dashboard Owner
+        </a>
+    @endif
+
     <form method="POST" action="{{ route('logout') }}">
         @csrf
         <button
@@ -113,8 +158,37 @@
       </nav>
 
       <!-- Mobile: avatar (jika login) + tombol menu -->
-      <div class="flex md:hidden items-center gap-3">
+      <div class="flex md:hidden items-center gap-2">
         @if(auth()->check())
+          {{-- 🔔 Notifikasi Pembeli (mobile) --}}
+          <div class="relative">
+            <button id="notif-button-mobile" class="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 focus:outline-none transition">
+              <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" stroke-width="2"
+                   viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              <span id="notif-badge-mobile"
+                    class="hidden absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1
+                           bg-red-500 text-white text-[10px] font-bold leading-[18px]
+                           text-center rounded-full"></span>
+            </button>
+
+            <div id="notif-dropdown-mobile"
+                 class="hidden absolute right-0 mt-3 w-80 max-w-[85vw]
+                        bg-white rounded-xl shadow-lg border z-50 overflow-hidden">
+              <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+                <p class="text-sm font-bold text-gray-800">Notifikasi</p>
+                <button id="notif-mark-read-mobile" class="text-xs text-orange-500 hover:underline">
+                  Tandai dibaca
+                </button>
+              </div>
+              <div class="max-h-80 overflow-y-auto">
+                @include('layouts.partials.notif-list')
+              </div>
+            </div>
+          </div>
+
           <button id="user-menu-button-mobile" class="flex items-center focus:outline-none">
             <img
               src="{{ auth()->user()->avatar }}"
@@ -184,6 +258,20 @@
           </a>
         @endif
 
+        @if(auth()->user()->role === 'admin')
+  <a href="{{ route('admin.dashboard') }}"
+     class="block px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 font-semibold">
+    🛠️ Dashboard Admin
+  </a>
+@endif
+
+@if(auth()->user()->role === 'owner')
+  <a href="{{ route('owner.dashboard') }}"
+     class="block px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 font-semibold">
+    👑 Dashboard Owner
+  </a>
+@endif
+
         <form method="POST" action="{{ route('logout') }}">
           @csrf
           <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-b-xl">
@@ -238,6 +326,85 @@
     });
   </script>
 
+  {{-- 🔔 Notifikasi Pembeli: toggle dropdown + badge unread (localStorage) --}}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const STORAGE_KEY = 'rsc_notif_last_seen';
+      const items  = Array.from(document.querySelectorAll('.notif-item'));
+      const badges = [
+        document.getElementById('notif-badge'),
+        document.getElementById('notif-badge-mobile')
+      ];
+      const dropdowns = () =>
+        document.querySelectorAll('#notif-dropdown, #notif-dropdown-mobile');
+
+      const timeOf = el => new Date(el.dataset.time).getTime() || 0;
+
+      function lastSeen() {
+        const v = localStorage.getItem(STORAGE_KEY);
+        return v ? new Date(v).getTime() : 0;
+      }
+      function newest() {
+        return items.reduce((max, el) => Math.max(max, timeOf(el)), 0);
+      }
+      function renderBadge() {
+        const seen = lastSeen();
+        const count = items.filter(el => timeOf(el) > seen).length;
+        badges.forEach(b => {
+          if (!b) return;
+          if (count > 0) {
+            b.textContent = count > 99 ? '99+' : count;
+            b.classList.remove('hidden');
+          } else {
+            b.classList.add('hidden');
+          }
+        });
+      }
+      function markSeen() {
+        const n = newest();
+        localStorage.setItem(STORAGE_KEY,
+          (n > 0 ? new Date(n) : new Date()).toISOString());
+        renderBadge();
+      }
+
+      renderBadge();
+
+      function setupBell(btnId, dropId, markId) {
+        const btn  = document.getElementById(btnId);
+        const drop = document.getElementById(dropId);
+        if (!btn || !drop) return;
+
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const willOpen = drop.classList.contains('hidden');
+          dropdowns().forEach(d => d.classList.add('hidden'));
+          document.getElementById('user-dropdown')?.classList.add('hidden');
+          if (willOpen) {
+            drop.classList.remove('hidden');
+            markSeen(); // membuka = menandai sudah dilihat
+          }
+        });
+
+        drop.addEventListener('click', e => e.stopPropagation());
+
+        const markBtn = markId ? document.getElementById(markId) : null;
+        if (markBtn) {
+          markBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            markSeen();
+          });
+        }
+      }
+
+      setupBell('notif-button', 'notif-dropdown', 'notif-mark-read');
+      setupBell('notif-button-mobile', 'notif-dropdown-mobile', 'notif-mark-read-mobile');
+
+      document.addEventListener('click', function () {
+        dropdowns().forEach(d => d.classList.add('hidden'));
+      });
+    });
+  </script>
+
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const menuToggle = document.getElementById('menu-toggle');
@@ -263,23 +430,29 @@
         });
       }
 
-      searchInputs.forEach(input => {
-        if (!input) return;
+// Ganti bagian script input listener Anda dengan ini:
+searchInputs.forEach(input => {
+  if (!input) return;
 
-        input.addEventListener('input', () => {
-          filterEvents(input.value.toLowerCase());
-        });
+  input.addEventListener('input', (e) => {
+    const value = e.target.value.toLowerCase();
+    
+    // Sinkronisasi nilai text antar input desktop & mobile
+    searchInputs.forEach(si => { if(si) si.value = e.target.value; });
 
-        input.addEventListener('keydown', e => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            filterEvents(input.value.toLowerCase());
-            if (sectionUpcoming) {
-              sectionUpcoming.scrollIntoView({ behavior: "smooth" });
-            }
-          }
-        });
-      });
+    filterEvents(value);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      filterEvents(input.value.toLowerCase());
+      if (sectionUpcoming) {
+        sectionUpcoming.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  });
+});
     });
   </script>
 </header>

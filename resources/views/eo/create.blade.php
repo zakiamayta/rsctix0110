@@ -12,7 +12,7 @@
   --rsc-card: #FFFFFF;
   --rsc-soft: #FFF0EB;
   --rsc-border: #EDE8E3;
-  --rsc-accent: #E8470A;
+  --rsc-accent: #f97316;
   --rsc-accent-soft: rgba(232,71,10,0.08);
   --rsc-text: #1A1208;
   --rsc-muted: #7A6E66;

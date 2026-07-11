@@ -24,6 +24,8 @@ class TransactionMerch extends Model
         'xendit_invoice_id',
         'xendit_invoice_url',
         'qr_code',
+        'is_absen',   // ← tambahkan
+        'absen_at',
     ];
 
     // ✅ Ditambahkan relasi ke Event

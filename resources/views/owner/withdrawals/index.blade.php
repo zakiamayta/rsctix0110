@@ -12,7 +12,7 @@
     --rsc-surface: #FFFFFF;
     --rsc-surface2: #F2EEE9;
     --rsc-border: #E2DBD4;
-    --rsc-accent: #E8470A;
+    --rsc-accent: #f97316;
     --rsc-accent-dim: rgba(232,71,10,0.08);
     --rsc-text: #1A1208;
     --rsc-muted: #8A7E76;
@@ -84,6 +84,27 @@
     cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
   }
   .btn-filter:hover, .btn-reset:hover { opacity: .85; }
+
+  /* ── Filter tabs status (baru) ── */
+  .filter-tabs {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .tab-btn {
+    font-family: 'Sora', sans-serif;
+    font-size: .72rem; font-weight: 700;
+    padding: 7px 16px; border-radius: 99px;
+    border: 1px solid var(--rsc-border);
+    background: var(--rsc-surface);
+    color: var(--rsc-muted);
+    cursor: pointer; transition: all .15s;
+    letter-spacing: .2px;
+  }
+  .tab-btn:hover { border-color: #B5AEA8; color: var(--rsc-text); }
+  .tab-btn.active {
+    background: var(--rsc-accent);
+    border-color: var(--rsc-accent);
+    color: #fff;
+  }
 
   /* ── Stats row ── */
   .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
@@ -364,6 +385,22 @@
 
   </div>
 
+  {{-- ── Filter Tabs Status (baru, seperti halaman Approval Event) ── --}}
+  <div class="filter-tabs" id="filter-bar">
+    <button class="tab-btn active" onclick="filterWithdrawalTable('all', this)">
+      Semua ({{ $allItems->count() }})
+    </button>
+    <button class="tab-btn" onclick="filterWithdrawalTable('pending', this)">
+      Pending ({{ $countPending }})
+    </button>
+    <button class="tab-btn" onclick="filterWithdrawalTable('approved', this)">
+      Approved ({{ $countApproved }})
+    </button>
+    <button class="tab-btn" onclick="filterWithdrawalTable('rejected', this)">
+      Rejected ({{ $countRejected }})
+    </button>
+  </div>
+
   {{-- ── Table ── --}}
   <div class="table-wrap">
 
@@ -381,7 +418,7 @@
     </div>
 
     <div style="overflow-x:auto;">
-      <table class="rsc-table">
+      <table class="rsc-table" id="withdrawal-table">
 
         <thead>
           <tr>
@@ -397,7 +434,7 @@
 
         <tbody>
           @forelse($withdrawals as $withdrawal)
-          <tr>
+          <tr data-status="{{ $withdrawal->status }}">
 
             {{-- Event --}}
             <td>
@@ -416,7 +453,7 @@
             {{-- Invoice --}}
             <td class="td-center">
               @if($withdrawal->invoice_file)
-                <a href="{{ asset('storage/'.$withdrawal->invoice_file) }}"
+                <a href="{{ asset($withdrawal->invoice_file) }}"
                    target="_blank"
                    class="invoice-pill has-file">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
@@ -487,7 +524,7 @@
           <tr>
             <td colspan="7" class="empty-cell">
               <svg width="44" height="44" viewBox="0 0 24 24" fill="none"
-                   stroke="#E8470A" stroke-width="1">
+                   stroke="#f97316" stroke-width="1">
                 <path d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"/>
               </svg>
               <p>Belum ada pengajuan withdrawal</p>
@@ -508,5 +545,15 @@
   </div>
 
 </div>
+
+<script>
+function filterWithdrawalTable(status, btn) {
+  document.querySelectorAll('#filter-bar .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#withdrawal-table tbody tr[data-status]').forEach(row => {
+    row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none';
+  });
+}
+</script>
 
 @endsection

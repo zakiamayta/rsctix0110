@@ -12,7 +12,7 @@
     --rsc-surface: #FFFFFF;
     --rsc-surface2: #F2EEE9;
     --rsc-border: #E2DBD4;
-    --rsc-accent: #E8470A;
+    --rsc-accent: #f97316;
     --rsc-accent-dim: rgba(232,71,10,0.08);
     --rsc-text: #1A1208;
     --rsc-muted: #8A7E76;
@@ -479,18 +479,15 @@
                     </button>
                   </form>
 
-                  <form method="POST" action="{{ route('owner.eo.reject', $eo->id) }}" style="display:inline;">
-                    @csrf
-                    <button type="submit" class="btn-sm btn-reject">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                           stroke="currentColor" stroke-width="2.5">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="15" y1="9" x2="9" y2="15"/>
-                        <line x1="9" y1="9" x2="15" y2="15"/>
-                      </svg>
-                      Reject
-                    </button>
-                  </form>
+                  <button type="button" onclick="openRejectModal({{ $eo->id }})" class="btn-sm btn-reject">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2.5">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="15" y1="9" x2="9" y2="15"/>
+                      <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    Reject
+                  </button>
 
                 @endif
 
@@ -502,7 +499,7 @@
           <tr>
             <td colspan="5" class="empty-cell">
               <svg width="44" height="44" viewBox="0 0 24 24" fill="none"
-                   stroke="#E8470A" stroke-width="1">
+                   stroke="#f97316" stroke-width="1">
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
               </svg>
@@ -563,6 +560,15 @@
       </div>
     </div>
 
+        @if($eo->status === 'rejected' && $eo->rejected_reason)
+    <div class="modal-section">
+      <p class="modal-section-title">Alasan Penolakan</p>
+      <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:var(--radius); padding:14px 16px; font-size:.84rem; color:#B91C1C;">
+        {{ $eo->rejected_reason }}
+      </div>
+    </div>
+    @endif
+
     {{-- Rekening --}}
     <div class="modal-section">
       <p class="modal-section-title">Informasi Rekening</p>
@@ -619,8 +625,59 @@
   </div>
 </div>
 @endforeach
+{{-- ══════════════════════════════════════ --}}
+{{-- REJECT MODALS --}}
+{{-- ══════════════════════════════════════ --}}
+
+@foreach($eoList as $eo)
+  @if($eo->status === 'pending')
+  <div id="rejectModal-{{ $eo->id }}" class="rsc-modal-backdrop">
+    <div class="rsc-modal" style="max-width:460px;" onclick="event.stopPropagation()">
+
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Tolak Pendaftaran</h3>
+          <p class="modal-sub">{{ $eo->nama_badan_usaha }}</p>
+        </div>
+        <button onclick="closeRejectModal({{ $eo->id }})" class="btn-close-modal">✕</button>
+      </div>
+
+      <form method="POST" action="{{ route('owner.eo.reject', $eo->id) }}">
+        @csrf
+        <div class="modal-section" style="margin-bottom:16px;">
+          <label style="font-size:.72rem; font-weight:700; color:var(--rsc-muted); text-transform:uppercase; letter-spacing:.6px; display:block; margin-bottom:8px;">
+            Alasan Penolakan
+          </label>
+          <textarea name="rejected_reason" rows="4" required
+                    placeholder="Jelaskan alasan penolakan agar EO bisa memperbaiki data..."
+                    style="width:100%; padding:12px; border:1px solid var(--rsc-border); border-radius:10px; font-size:.84rem; font-family:'DM Sans',sans-serif; resize:vertical;"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button type="button" onclick="closeRejectModal({{ $eo->id }})" class="btn-sm btn-detail">
+            Batal
+          </button>
+          <button type="submit" class="btn-sm btn-reject">
+            Kirim Penolakan
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+  @endif
+@endforeach
+
 
 <script>
+  function openRejectModal(id) {
+    document.getElementById('rejectModal-' + id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeRejectModal(id) {
+    document.getElementById('rejectModal-' + id).classList.remove('open');
+    document.body.style.overflow = '';
+  }
   /* ── Modal ── */
   function openModal(id) {
     document.getElementById('modal-' + id).classList.add('open');

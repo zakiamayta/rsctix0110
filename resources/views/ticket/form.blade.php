@@ -3,6 +3,59 @@
 @section('title', 'Pembelian Tiket')
 
 @section('content')
+
+{{-- ================================================================= --}}
+{{-- MODAL SYARAT & KETENTUAN (Wajib disetujui sebelum mengisi form) --}}
+{{-- ================================================================= --}}
+<div id="tnc-overlay"
+     class="d-flex align-items-center justify-content-center"
+     style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1055; padding: 1rem;">
+
+  <div class="card shadow-lg border-0 rounded-4 overflow-hidden" style="max-width: 560px; width: 100%;">
+
+    <div class="card-header bg-orange text-white py-3 border-0">
+      <h5 class="fw-bold mb-0">
+        <i class="bi bi-file-earmark-text me-2"></i>
+        Syarat &amp; Ketentuan Pembelian Tiket
+      </h5>
+    </div>
+
+    <div class="card-body bg-white" style="max-height: 60vh; overflow-y: auto;">
+      <p class="mb-3">
+        Harap perhatikan bahwa seluruh transaksi pembelian tiket adalah
+        <strong>final dan tidak dapat diuangkan kembali (non-refundable)</strong>.
+      </p>
+
+      <p class="mb-2">
+        Pengembalian dana (refund) hanya berlaku jika terjadi perubahan pada pihak penyelenggara:
+      </p>
+
+      <ul class="mb-3 ps-3">
+        <li class="mb-2">
+          <strong>Jika Event Dijadwalkan Ulang (Reschedule):</strong>
+          Anda dapat memilih untuk tetap menyimpan tiket atau mengajukan refund.
+        </li>
+        <li>
+          <strong>Jika Event Dibatalkan (Cancel):</strong>
+          Seluruh tiket otomatis masuk proses refund. Pembeli diharapkan segera mengisi
+          form pengajuan refund yang tersedia.
+        </li>
+      </ul>
+
+      <p class="mb-0 text-muted small">
+        Dengan mengklik <strong>"Lanjutkan"</strong>, Anda menyetujui ketentuan ini.
+      </p>
+    </div>
+
+    <div class="card-footer bg-light border-0 text-end py-3">
+      <button type="button" id="tnc-agree-btn" class="btn btn-orange-pill px-4 py-2">
+        Lanjutkan
+      </button>
+    </div>
+
+  </div>
+</div>
+
 <div class="px-6 lg:px-16 xl:px-24 2xl:px-32 py-8 bg-light">
   <div class="container py-5">
 
@@ -313,12 +366,13 @@ function updateFormFields(qty) {
   const wrapper = document.getElementById('pengunjung-list');
 
   // ambil data lama
-  const old = [];
-  wrapper.querySelectorAll('.pengunjung-entry').forEach((entry, i) => {
-    const nm = entry.querySelector('input[name="name[]"]')?.value || '';
-    const ph = entry.querySelector('input[name="phone[]"]')?.value || '';
-    old[i] = { name: nm, phone: ph };
-  });
+const old = [];
+wrapper.querySelectorAll('.pengunjung-entry').forEach((entry, i) => {
+  const nm = entry.querySelector('input[name="name[]"]')?.value || '';
+  const ph = entry.querySelector('input[name="phone[]"]')?.value || '';
+  const em = entry.querySelector('input[name="attendee_email[]"]')?.value || '';
+  old[i] = { name: nm, phone: ph, email: em };
+});
 
   wrapper.innerHTML = '';
   savedValues = savedValues.slice(0, qty);
@@ -352,50 +406,55 @@ function updateFormFields(qty) {
     div.className = 'border rounded-4 p-3 mb-3 position-relative pengunjung-entry shadow-sm fade-in';
     div.dataset.index = i;
 
-    div.innerHTML = `
-      <button type="button" class="btn btn-sm position-absolute top-0 end-0 m-2 rounded-circle bg-danger text-white shadow-sm trash-btn">
-        <i class="bi bi-trash"></i>
-      </button>
+div.innerHTML = `
+  <button type="button" class="btn btn-sm position-absolute top-0 end-0 m-2 rounded-circle bg-danger text-white shadow-sm trash-btn">
+    <i class="bi bi-trash"></i>
+  </button>
 
-      <p class="fw-semibold mb-3 text-black">
-        ${ticketName} - Pengunjung ${i + 1}
-      </p>
+  <p class="fw-semibold mb-3 text-black">
+    ${ticketName} - Pengunjung ${i + 1}
+  </p>
 
-      <div class="mb-3">
-        <label class="form-label">Nama Lengkap:</label>
-        <input type="text" name="name[]" required class="form-control rounded-pill" placeholder="Nama sesuai KTP" />
-      </div>
+  <div class="mb-3">
+    <label class="form-label">Nama Lengkap:</label>
+    <input type="text" name="name[]" required class="form-control rounded-pill" placeholder="Nama sesuai KTP" />
+  </div>
 
-      <div>
-        <label class="form-label">No. Telepon:</label>
-        <input type="text" name="phone[]" class="form-control rounded-pill" placeholder="08xxxxxxxxxx" />
-      </div>
-    `;
+  <div class="mb-3">
+    <label class="form-label">Email Peserta:</label>
+    <input type="email" name="attendee_email[]" required class="form-control rounded-pill" placeholder="email@contoh.com" />
+    <small class="text-muted">Tiket & QR untuk peserta ini akan dikirim ke email ini.</small>
+  </div>
+
+  <div>
+    <label class="form-label">No. Telepon:</label>
+    <input type="text" name="phone[]" required class="form-control rounded-pill" placeholder="08xxxxxxxxxx" />
+  </div>
+`;
 
     wrapper.appendChild(div);
 
-    const nameInput = div.querySelector('input[name="name[]"]');
-    const phoneInput = div.querySelector('input[name="phone[]"]');
-    const trashBtn = div.querySelector('.trash-btn');
+const nameInput = div.querySelector('input[name="name[]"]');
+const phoneInput = div.querySelector('input[name="phone[]"]');
+const emailInput = div.querySelector('input[name="attendee_email[]"]');
+const trashBtn = div.querySelector('.trash-btn');
 
-    // restore data lama
-    if (old[i]) {
-      nameInput.value = old[i].name;
-      phoneInput.value = old[i].phone;
-      savedValues[i] = old[i];
-    } else {
-      savedValues[i] = { name: '', phone: '' };
-    }
+if (old[i]) {
+  nameInput.value = old[i].name;
+  phoneInput.value = old[i].phone;
+  emailInput.value = old[i].email;
+  savedValues[i] = old[i];
+} else {
+  savedValues[i] = { name: '', phone: '', email: '' };
+}
 
-    const syncSaved = () => {
-      savedValues[i] = {
-        name: nameInput.value,
-        phone: phoneInput.value
-      };
-    };
+const syncSaved = () => {
+  savedValues[i] = { name: nameInput.value, phone: phoneInput.value, email: emailInput.value };
+};
 
-    nameInput.addEventListener('input', syncSaved);
-    phoneInput.addEventListener('input', syncSaved);
+nameInput.addEventListener('input', syncSaved);
+phoneInput.addEventListener('input', syncSaved);
+emailInput.addEventListener('input', syncSaved);
 
     trashBtn.addEventListener('click', () => {
       removePengunjung(i);
@@ -460,4 +519,22 @@ function updateFormFields(qty) {
   </script>
 
 @endif
+
+{{-- Script modal S&K — di luar @if($activeTicket) supaya tetap jalan walau tiket belum tersedia --}}
+<script>
+  document.getElementById('tnc-agree-btn')?.addEventListener('click', function () {
+    const overlay = document.getElementById('tnc-overlay');
+    if (overlay) overlay.remove();
+    document.body.style.overflow = ''; // pastikan scroll balik normal
+  });
+
+  // Kunci scroll body selama modal tampil
+  document.body.style.overflow = 'hidden';
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('tnc-overlay')) {
+      document.body.style.overflow = '';
+    }
+  });
+</script>
+
 @endsection

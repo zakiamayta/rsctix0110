@@ -70,8 +70,12 @@ class WebhookController extends Controller
                 }
 
                 $transaction->refresh();
-                $this->generateTicketQRCode($transaction);
-                $this->sendTicketEmail($transaction);
+                DB::table('platform_wallets')->where('id', 1)->update([
+                'total_service_tax_earned' => DB::raw("total_service_tax_earned + {$transaction->service_tax}"),
+                'current_balance'          => DB::raw("current_balance + {$transaction->service_tax}"),
+            ]);
+                $this->generateAttendeeQRCodes($transaction);
+                $this->sendAttendeeEmails($transaction);
                 return response()->json(['message' => 'Ticket transaction updated'], 200);
             }
 
@@ -138,24 +142,75 @@ class WebhookController extends Controller
     /// ===================================================
     /// HELPER: GENERATE QR CODE TIKET
     /// ===================================================
-    public function generateTicketQRCode($transaction)
-    {
-        try {
-            $qrPath = public_path('images/qrcodes');
-            if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
+    // public function generateTicketQRCode($transaction)
+    // {
+    //     try {
+    //         $qrPath = public_path('images/qrcodes');
+    //         if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
 
-            $qrData = route('absen.form', ['kode' => $transaction->kode_unik]);
-            $qrFileName = 'ticket_' . $transaction->kode_unik . '.png';
+    //         $qrData = route('absen.form', ['kode' => $transaction->kode_unik]);
+    //         $qrFileName = 'ticket_' . $transaction->kode_unik . '.png';
+    //         $qrFullPath = $qrPath . '/' . $qrFileName;
+
+    //         QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
+
+    //         $transaction->qr_code = 'images/qrcodes/' . $qrFileName;
+    //         $transaction->save();
+    //     } catch (\Exception $e) {
+    //         Log::error('Failed to generate QR Code Tiket: ' . $e->getMessage());
+    //     }
+    // }
+
+    public function generateAttendeeQRCodes($transaction)
+{
+    try {
+        $qrPath = public_path('images/qrcodes');
+        if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
+
+        $attendees = DB::table('ticket_attendees')->where('transaction_id', $transaction->id)->get();
+
+        foreach ($attendees as $attendee) {
+            $kode = $attendee->kode_unik;
+            if (!$kode) {
+                $kode = strtoupper(\Illuminate\Support\Str::random(12));
+                DB::table('ticket_attendees')->where('id', $attendee->id)->update(['kode_unik' => $kode]);
+            }
+
+            $qrData = route('absen.form', ['kode' => $kode]);
+            $qrFileName = 'ticket_' . $kode . '.png';
             $qrFullPath = $qrPath . '/' . $qrFileName;
 
             QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
 
-            $transaction->qr_code = 'images/qrcodes/' . $qrFileName;
-            $transaction->save();
+            DB::table('ticket_attendees')->where('id', $attendee->id)->update([
+                'qr_code' => 'images/qrcodes/' . $qrFileName,
+            ]);
+        }
+    } catch (\Exception $e) {
+        Log::error('Gagal generate QR per peserta: ' . $e->getMessage());
+    }
+}
+
+public function sendAttendeeEmails($transaction)
+{
+    ini_set('memory_limit', '-1');
+
+    $transaction = \App\Models\Transaction::with(['event', 'attendees.ticket.jadwal'])->find($transaction->id);
+
+    foreach ($transaction->attendees as $attendee) {
+        if (!$attendee->email) {
+            Log::warning('Peserta tanpa email, lewati pengiriman', ['attendee_id' => $attendee->id]);
+            continue;
+        }
+
+        try {
+            Mail::to($attendee->email)->send(new \App\Mail\TicketWithPDF($transaction, $attendee));
+            Log::info('Email tiket terkirim ke peserta', ['attendee_id' => $attendee->id, 'email' => $attendee->email]);
         } catch (\Exception $e) {
-            Log::error('Failed to generate QR Code Tiket: ' . $e->getMessage());
+            Log::error('Gagal kirim email peserta: ' . $e->getMessage(), ['attendee_id' => $attendee->id]);
         }
     }
+}
 
     /// ===================================================
     /// HELPER: GENERATE QR CODE MERCHANDISE
@@ -183,37 +238,37 @@ class WebhookController extends Controller
     /// ===================================================
     /// HELPER: KIRIM EMAIL TIKET & MERCHANDISE
     /// ===================================================
-    public function sendTicketEmail($transaction)
-    {
-        ini_set('memory_limit', '-1');
+    // public function sendTicketEmail($transaction)
+    // {
+    //     ini_set('memory_limit', '-1');
 
-        try {
+    //     try {
 
-            Log::info('START SEND EMAIL');
+    //         Log::info('START SEND EMAIL');
 
-            $transaction =
-            \App\Models\Transaction::with([
-                'event',
-                'attendees.ticket.jadwal'
-            ])->find($transaction->id);
+    //         $transaction =
+    //         \App\Models\Transaction::with([
+    //             'event',
+    //             'attendees.ticket.jadwal'
+    //         ])->find($transaction->id);
 
-            Log::info('EMAIL TARGET: '.$transaction->email);
+    //         Log::info('EMAIL TARGET: '.$transaction->email);
 
-            Mail::to($transaction->email)
-                ->send(
-                    new \App\Mail\TicketWithPDF($transaction)
-                );
+    //         Mail::to($transaction->email)
+    //             ->send(
+    //                 new \App\Mail\TicketWithPDF($transaction)
+    //             );
 
-            Log::info('EMAIL SUCCESS');
+    //         Log::info('EMAIL SUCCESS');
 
-        } catch (\Exception $e) {
+    //     } catch (\Exception $e) {
 
-            Log::error(
-                'Failed to send ticket email: '
-                .$e->getMessage()
-            );
-        }
-    }
+    //         Log::error(
+    //             'Failed to send ticket email: '
+    //             .$e->getMessage()
+    //         );
+    //     }
+    // }
 
     public function sendMerchEmail($merch)
     {

@@ -162,7 +162,7 @@
                     @if($withdrawal->invoice_file)
 
                         <a
-                            href="{{ asset('storage/'.$withdrawal->invoice_file) }}"
+                            href="{{ asset($withdrawal->invoice_file) }}"
                             target="_blank"
                             class="inline-flex items-center px-5 py-3 bg-orange-500 text-white rounded-xl font-semibold"
                         >

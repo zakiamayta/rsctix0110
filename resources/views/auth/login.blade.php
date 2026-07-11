@@ -82,8 +82,7 @@
 
                             <a
                                 href="{{ route('google.login') }}"
-                                class="btn btn-light border w-100 py-3 d-flex align-items-center justify-content-center gap-3 rounded-4"
-                            >
+                                class="btn btn-light border w-100 py-3 d-flex align-items-center justify-content-center gap-3 rounded-4">
 
                                 <img
                                     src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"

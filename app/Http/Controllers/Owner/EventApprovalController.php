@@ -52,9 +52,15 @@ class EventApprovalController extends Controller
      */
     public function reject(Request $request, Event $event)
     {
+        $request->validate([
+            'rejected_reason' => 'required|string|max:1000',
+        ], [
+            'rejected_reason.required' => 'Alasan penolakan wajib diisi',
+        ]);
+
         $event->update([
-            'status'     => 'rejected',
-            'owner_note' => $request->note // menyimpan alasan penolakan jika ada input note
+            'status'          => 'rejected',
+            'rejected_reason' => $request->rejected_reason,
         ]);
 
         return redirect()
@@ -148,10 +154,16 @@ public function approveReschedule(Event $event)
             abort(400, 'Bukan pengajuan reschedule yang sah.');
         }
 
+        $request->validate([
+            'reschedule_rejected_reason' => 'required|string|max:1000',
+        ], [
+            'reschedule_rejected_reason.required' => 'Alasan penolakan reschedule wajib diisi',
+        ]);
+
         $event->update([
-            'status'        => 'approved', // Balik ke aktif semula tanpa merubah tanggal lama
-            'proposed_date' => null,       // Buang usulan tanggal baru
-            'owner_note'    => $request->note
+            'status'                     => 'approved', // Balik ke aktif semula tanpa merubah tanggal lama
+            'proposed_date'              => null,       // Buang usulan tanggal baru
+            'reschedule_rejected_reason' => $request->reschedule_rejected_reason,
         ]);
 
         return redirect()

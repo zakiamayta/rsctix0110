@@ -31,6 +31,8 @@ use App\Http\Controllers\DashboardMerchController;
 use App\Http\Controllers\Admin\AdminRefundController;
 use App\Http\Controllers\Admin\AdminFinanceController;
 use App\Http\Controllers\Admin\PlatformWalletController;
+use App\Http\Controllers\Admin\AdminEventMonitoringController;
+use App\Http\Controllers\Admin\UserManagementController;
 
 // Controllers - Event Organizer (EO) Area
 use App\Http\Controllers\Eo\EoController;
@@ -51,7 +53,7 @@ use App\Http\Controllers\Owner\EventApprovalController;
 use App\Http\Controllers\Owner\WithdrawalApprovalController;
 use App\Http\Controllers\Owner\MerchWithdrawalApprovalController;
 use App\Http\Controllers\Owner\OwnerRefundMonitoringController;
-
+use App\Http\Controllers\Owner\OwnerEventMonitoringController;
 /*
 |--------------------------------------------------------------------------
 | 1. PUBLIC / FRONTEND ROUTES
@@ -76,12 +78,7 @@ Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('google.login');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 
-Route::post('/logout', function () {
-    Auth::logout();
-    request()->session()->invalidate();
-    request()->session()->regenerateToken();
-    return redirect('/');
-})->name('logout');
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------
@@ -125,7 +122,7 @@ Route::middleware('auth')->group(function () {
     })->name('eo.register');
 
     Route::post('/eo/register', [EoController::class, 'store'])->name('eo.store');
-    Route::get('/eo/waiting', fn() => view('eo.waiting'))->name('eo.waiting');
+    Route::get('/eo/waiting', [EoController::class, 'waiting'])->name('eo.waiting');
 
     // Shared Route Antara Admin dan Owner
     Route::get('/global-platform-wallet', [PlatformWalletController::class, 'index'])->name('platform.wallet.index');
@@ -217,6 +214,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/transactions/{id}/regenerate-qr', 'regenerateQR')->name('transactions.regenerateQR');
             Route::post('/transactions/regenerate-qr', 'regenerateAllQR')->name('transactions.regenerate-qr');
         });
+        Route::controller(UserManagementController::class)->group(function () {
+        Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::patch('/users/{id}/update-role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
+        });
+        
 
         // Admin Merchandise Dashboard & Laporan
         Route::controller(DashboardMerchController::class)->group(function () {
@@ -234,11 +236,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/absensi/batal/{id}', 'batalAbsen')->name('absensi.batal');
         });
 
-        Route::controller(AdminController::class)->group(function () {
-            Route::post('/absensi/{transaction}/mark', 'markPresence')->name('absensi.mark');
-            Route::post('/absensi/{transaction}/cancel', 'cancelPresence')->name('absensi.cancel');
-            Route::get('/attendee/{email}', 'showAttendeeDetail')->name('attendee.detail');
-        });
+        // Route::controller(AdminController::class)->group(function () {
+        //     Route::post('/absensi/{transaction}/mark', 'markPresence')->name('absensi.mark');
+        //     Route::post('/absensi/{transaction}/cancel', 'cancelPresence')->name('absensi.cancel');
+        //     Route::get('/attendee/{email}', 'showAttendeeDetail')->name('attendee.detail');
+        // });
 
         // Kelola Data Event & Data Merchandise Platform
         Route::controller(AdminEventController::class)->group(function () {
@@ -274,6 +276,12 @@ Route::middleware('auth')->group(function () {
             Route::post('finance/event/{event}/request-topup', 'requestTopup')->name('finance.requestTopup');
             Route::post('finance/topup/{id}/{status}', 'verifyTopup')->name('finance.verifyTopup');
         });
+
+    });
+    Route::prefix('admin/monitoring')->name('admin.monitoring.')->middleware('auth')->group(function () {
+        Route::get('/', [AdminEventMonitoringController::class, 'index'])->name('index');
+        Route::get('/eo/{eo}', [AdminEventMonitoringController::class, 'showEo'])->name('eo.show');
+        Route::get('/event/{event}/summary', [AdminEventMonitoringController::class, 'eventSummary'])->name('event.summary');
     });
 
     /*
@@ -316,6 +324,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/withdrawals/{withdrawal}', [WithdrawalApprovalController::class, 'show'])->name('withdrawals.show');
         Route::post('/withdrawals/{withdrawal}/approve', [WithdrawalApprovalController::class, 'approve'])->name('withdrawals.approve');
         Route::post('/withdrawals/{withdrawal}/reject', [WithdrawalApprovalController::class, 'reject'])->name('withdrawals.reject');
+
+        Route::get('/monitoring', [OwnerEventMonitoringController::class, 'index'])->name('monitoring.index');
+        Route::get('/monitoring/eo/{eoId}', [OwnerEventMonitoringController::class, 'showEo'])->name('monitoring.eo.show');
+        Route::get('/monitoring/event/{eventId}/summary', [OwnerEventMonitoringController::class, 'eventSummary'])->name('monitoring.event.summary');
     });
 });
 

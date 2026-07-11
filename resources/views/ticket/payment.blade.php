@@ -63,44 +63,44 @@
             {{-- Daftar Tiket --}}
             <h5 class="fw-bold mb-3">Daftar Tiket</h5>
 
-            @forelse($details as $d)
+@forelse($details as $d)
 
-                <div class="d-flex align-items-center p-3 mb-3 rounded border bg-white shadow-sm">
+    <div class="d-flex align-items-center p-3 mb-3 rounded border bg-white shadow-sm">
 
-                    <div class="btn-orange-circle me-3">
-                        <i class="bi bi-ticket-perforated"></i>
-                    </div>
+        <div class="btn-orange-circle me-3">
+            <i class="bi bi-ticket-perforated"></i>
+        </div>
 
-                    <div>
-                        <p class="fw-semibold mb-0">
-                            {{ $d->ticket_name ?? 'Tiket' }}
-                            -
-                            {{ $d->name ?? 'Tanpa Nama' }}
-                        </p>
+        <div>
+            <p class="fw-semibold mb-0">
+                {{ $d->ticket_name ?? 'Tiket' }}
+                -
+                {{ $d->name ?? 'Tanpa Nama' }}
+            </p>
 
-                        <small class="text-muted d-block">
-                            <i class="bi bi-calendar-event me-1"></i>
+            <small class="text-muted d-block">
+                <i class="bi bi-calendar-event me-1"></i>
+                {{ $d->jadwal_info ?? '-' }}
+                —
+                {{ \Carbon\Carbon::parse($d->jadwal_tanggal)->translatedFormat('d F Y H:i') }}
+            </small>
 
-                            {{ $d->jadwal_info ?? '-' }}
-                            —
-                            {{ \Carbon\Carbon::parse($d->jadwal_tanggal)->translatedFormat('d F Y H:i') }}
-                        </small>
+            <small class="text-muted d-block">
+                <i class="bi bi-telephone me-1"></i>
+                {{ $d->phone_number ?? '-' }}
+            </small>
 
-                        <small class="text-muted">
-                            <i class="bi bi-telephone me-1"></i>
-                            {{ $d->phone_number ?? '-' }}
-                        </small>
-                    </div>
+            <small class="text-muted d-block">
+                <i class="bi bi-envelope me-1"></i>
+                E-Tiket akan dikirim ke: <strong>{{ $d->attendee_email ?? '-' }}</strong>
+            </small>
+        </div>
 
-                </div>
+    </div>
 
-            @empty
-
-                <p class="text-muted fst-italic">
-                    Tidak ada data tiket ditemukan.
-                </p>
-
-            @endforelse
+@empty
+    <p class="text-muted fst-italic">Tidak ada data tiket ditemukan.</p>
+@endforelse
 
 
             {{-- Ringkasan Pembayaran --}}

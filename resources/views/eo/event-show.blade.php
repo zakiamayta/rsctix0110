@@ -87,7 +87,7 @@
                 <svg width="36"
                      height="36"
                      fill="none"
-                     stroke="#E8470A"
+                     stroke="#f97316"
                      stroke-width="1.5"
                      viewBox="0 0 24 24">
                     <path d="M21 10V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3m18 0H3m18 0l-2 11H5L3 10"/>

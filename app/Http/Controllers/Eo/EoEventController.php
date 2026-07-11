@@ -543,6 +543,7 @@ class EoEventController extends Controller
             'status' => 'pending_reschedule',
             'proposed_date' => $request->proposed_date,
             'reschedule_reason' => $request->reschedule_reason,
+            'reschedule_rejected_reason' => null, // bersihkan alasan penolakan pengajuan sebelumnya
         ]);
 
         return back()->with('success', 'Request reschedule berhasil dikirim.');

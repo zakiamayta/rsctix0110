@@ -107,7 +107,7 @@
                             <td class="p-3 text-center">
                                 @if(in_array($t->status, ['requested', 'rejected']))
                                     <button type="button" onclick="openUploadModal('{{ $t->id }}', '{{ $t->amount_requested }}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded text-[11px] transition shadow-sm">
-                                        📤 Unggah Bukti Bayar
+                                        📤 Lakukan Pembayaran
                                     </button>
                                 @elseif($t->status === 'pending_verification')
                                     <span class="text-amber-600 font-medium italic text-[11px]">Menunggu Review Finansial</span>
@@ -177,6 +177,7 @@
 </div>
 
 {{-- 📜 MODAL POP-UP: UPLOAD BUKTI TRANSFER --}}
+{{-- 📜 MODAL POP-UP: UPLOAD BUKTI TRANSFER --}}
 <div id="uploadModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded overflow-hidden max-w-md w-full shadow-2xl relative">
         <div class="bg-gray-900 text-white p-3 font-bold text-xs flex justify-between items-center">
@@ -191,6 +192,11 @@
                 <div class="mb-3 bg-amber-50 border border-amber-200 p-2.5 rounded text-xs text-amber-900">
                     <div>Nilai Tagihan Yang Harus Ditransfer:</div>
                     <div class="font-mono font-bold text-sm text-amber-700 mt-0.5" id="modalAmountLabel">Rp 0</div>
+                </div>
+
+                {{-- KUSTOMISASI TEKS INSTRUKSI REKENING --}}
+                <div class="mb-4 text-xs text-gray-700 leading-relaxed font-medium bg-blue-50 border border-blue-200 p-2.5 rounded">
+                    ℹ️ Silakan transfer pada Nomor Rekening <span class="font-mono font-bold text-blue-900 bg-blue-100 px-1 rounded">079798707984</span> lalu upload bukti transfer pada form dibawah ini.
                 </div>
 
                 <div class="mb-2">

@@ -38,7 +38,7 @@
     </div>
 
     {{-- TOTAL REVENUE --}}
-    <div class="bg-[#E8470A] text-white rounded-xl p-3.5 row-span-2 flex flex-col justify-between">
+    <div class="bg-[#f97316] text-white rounded-xl p-3.5 row-span-2 flex flex-col justify-between">
         <div>
             <p class="text-[10px] uppercase font-bold tracking-wider opacity-80 mb-1">
                 Total Pendapatan
@@ -105,7 +105,7 @@
         <p class="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-1">
             Penjualan Hari Ini
         </p>
-        <h2 class="text-xl font-bold text-[#E8470A] leading-none">
+        <h2 class="text-xl font-bold text-[#f97316] leading-none">
             {{ $todaySales }}
         </h2>
     </div>
@@ -138,7 +138,7 @@
                         <span class="text-[#1A1208]">Rp {{ number_format($chart['total']) }}</span>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="h-full rounded-full bg-[#E8470A]" style="width: {{ $width }}%"></div>
+                        <div class="h-full rounded-full bg-[#f97316]" style="width: {{ $width }}%"></div>
                     </div>
                 </div>
             @endforeach

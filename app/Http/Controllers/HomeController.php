@@ -29,16 +29,17 @@ public function __construct()
         });
     }
 
-    public function index()
-    {
-        // ✅ HANYA tampilkan event yang sudah di-approve
-        $events = Event::where('status', 'approved')
-            ->orderBy('date')
-            ->get();
+public function index()
+{
+    // ✅ HANYA tampilkan event yang sudah di-approve, sekaligus load relasi jadwals
+    $events = Event::where('status', 'approved')
+        ->with('jadwals') // <- tambahkan ini
+        ->orderBy('date')
+        ->get();
 
-        $tickets = Product::where('type', 'ticket')->get();
-        $merchandise = Product::where('type', 'merch')->get();
+    $tickets = Product::where('type', 'ticket')->get();
+    $merchandise = Product::where('type', 'merch')->get();
 
-        return view('home', compact('events', 'tickets', 'merchandise'));
-    }
+    return view('home', compact('events', 'tickets', 'merchandise'));
+}
 }

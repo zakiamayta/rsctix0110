@@ -40,19 +40,19 @@
                     <input type="text"
                            name="nama_badan_usaha"
                            placeholder="Nama Badan Usaha"
-                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#E8470A]"
+                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#f97316]"
                            required>
 
                     <textarea name="alamat_badan_usaha"
                               placeholder="Alamat Badan Usaha"
-                              class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#E8470A]"
+                              class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#f97316]"
                               rows="3"
                               required></textarea>
 
                     <input type="text"
                            name="penanggung_jawab"
                            placeholder="Nama Penanggung Jawab"
-                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#E8470A]"
+                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#f97316]"
                            required>
 
                     <div>
@@ -98,7 +98,7 @@
                            name="bank_name"
                            list="bankList"
                            placeholder="Cari bank (contoh: BCA, Mandiri...)"
-                           class="w-full p-3 pl-10 rounded-xl border focus:ring-2 focus:ring-[#E8470A]"
+                           class="w-full p-3 pl-10 rounded-xl border focus:ring-2 focus:ring-[#f97316]"
                            required>
 
                     <span class="absolute left-3 top-3.5 text-gray-400">
@@ -118,13 +118,13 @@
                     <input type="text"
                            name="account_name"
                            placeholder="Nama Pemilik Rekening"
-                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#E8470A]"
+                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#f97316]"
                            required>
 
                     <input type="text"
                            name="account_number"
                            placeholder="Nomor Rekening"
-                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#E8470A]"
+                           class="w-full p-3 rounded-xl border focus:ring-2 focus:ring-[#f97316]"
                            required>
 
                 </div>
@@ -142,7 +142,7 @@
                 </a>
 
                 <button class="px-6 py-3 rounded-xl text-white font-bold text-sm"
-                        style="background:#E8470A;">
+                        style="background:#f97316;">
 
                     Daftar EO
 

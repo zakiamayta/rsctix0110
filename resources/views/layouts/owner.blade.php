@@ -18,7 +18,7 @@
     <style>
 
         :root {
-            --rsc-orange:       #E8470A;
+            --rsc-orange:       #f97316;
             --rsc-orange-dark:  #C03A08;
             --rsc-orange-light: #FFF0EB;
 
@@ -372,6 +372,45 @@
             border-radius: 999px;
         }
 
+        .topbar-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 220px;
+    background: var(--rsc-surface);
+    border: 1px solid var(--rsc-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(26,18,8,0.1);
+    overflow: hidden;
+    display: none;
+    z-index: 100;
+}
+.topbar-dropdown.open { display: block; animation: dropIn 0.15s ease; }
+@keyframes dropIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.dropdown-header { padding: 14px 16px; border-bottom: 1px solid var(--rsc-border); }
+.dropdown-name { font-size: 13px; font-weight: 700; color: var(--rsc-dark); font-family: var(--font-display); }
+.dropdown-email { font-size: 11px; color: var(--rsc-muted); margin-top: 2px; }
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--rsc-dark);
+    font-weight: 500;
+    transition: background 0.1s;
+    cursor: pointer;
+}
+.dropdown-item:hover { background: var(--rsc-bg); }
+.dropdown-item svg { width: 14px; height: 14px; color: var(--rsc-muted); flex-shrink: 0; }
+.dropdown-divider { height: 1px; background: var(--rsc-border); margin: 4px 0; }
+.dropdown-item-danger { color: #B92929; }
+.dropdown-item-danger svg { color: #B92929; }
+.dropdown-item-danger:hover { background: #FFF0F0; }
+
     </style>
 
     @stack('styles')
@@ -482,27 +521,38 @@
             </div>
 
             {{-- MANAGEMENT --}}
-            <div class="nav-group">
+<div class="nav-group">
 
-                <div class="nav-group-label">
-                    Management
-                </div>
+    <div class="nav-group-label">
+        Management
+    </div>
 
-                <a href="#"
-                   class="nav-link">
+    {{-- MENU TERBARU: MONITORING & LIVE LOGS --}}
+    <a href="{{ route('owner.monitoring.index') }}"
+       class="nav-link {{ request()->routeIs('owner.monitoring.*') ? 'active' : '' }}">
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="20" x2="18" y2="10"/>
-                        <line x1="12" y1="20" x2="12" y2="4"/>
-                        <line x1="6" y1="20" x2="6" y2="14"/>
-                        <polyline points="3 20 21 20"/>
-                    </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+            <polyline points="3 20 21 20"/>
+        </svg>
 
-                    Statistik Platform
+        Monitoring Platform
 
-                </a>
+    </a>
 
-            </div>
+    <!-- <a href="#" class="nav-link">
+
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z"></path>
+        </svg>
+
+        Statistik Platform
+
+    </a> -->
+
+</div>
 
         </nav>
 
@@ -563,23 +613,51 @@
 
                 </div>
 
-                {{-- USER --}}
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
+{{-- USER --}}
+<div class="topbar-avatar-wrap" style="position:relative;">
+    <button id="topbar-avatar-btn" type="button" class="topbar-avatar-btn">
+        <img src="{{ $user->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($user->name) }}"
+             class="topbar-avatar"
+             alt="{{ $user->name }}">
+        <span class="topbar-avatar-name">
+            {{ explode(' ', $user->name)[0] }}
+        </span>
+        <svg style="width:12px;height:12px;color:var(--rsc-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="6 9 12 15 18 9"/>
+        </svg>
+    </button>
 
-                    <button type="submit"
-                            class="topbar-avatar-btn">
+    <div id="topbar-dropdown" class="topbar-dropdown">
+        <div class="dropdown-header">
+            <div class="dropdown-name">{{ $user->name }}</div>
+            <div class="dropdown-email">{{ $user->email }}</div>
+        </div>
 
-                        <img src="{{ $user->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($user->name) }}"
-                             class="topbar-avatar"
-                             alt="{{ $user->name }}">
+        <a href="{{ route('home') }}" class="dropdown-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            Kembali ke Home
+        </a>
 
-                        <span class="topbar-avatar-name">
-                            {{ explode(' ', $user->name)[0] }}
-                        </span>
+        <div class="dropdown-divider"></div>
 
-                    </button>
-                </form>
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button type="submit" class="dropdown-item dropdown-item-danger" style="width:100%; background:none; border:none; text-align:left; cursor:pointer; font-family:var(--font-body);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Logout
+            </button>
+        </form>
+    </div>
+</div>
 
             </div>
 
@@ -618,3 +696,26 @@
 
 </body>
 </html>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const avatarBtn = document.getElementById('topbar-avatar-btn');
+    const dropdown  = document.getElementById('topbar-dropdown');
+
+    if (avatarBtn && dropdown) {
+        avatarBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!dropdown.contains(e.target) && e.target !== avatarBtn) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') dropdown.classList.remove('open');
+        });
+    }
+});
+</script>

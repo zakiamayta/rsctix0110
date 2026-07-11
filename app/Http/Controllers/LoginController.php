@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cookie;
 
 class LoginController extends Controller
 {
@@ -58,7 +59,7 @@ public function login(Request $request)
     // 5. Cek kelengkapan profil terlebih dahulu sebelum masuk ke dashboard/home
     return redirect()->route('profile.complete');
 
-    // 6. Alur redirect berdasarkan role jika profil sudah lengkap
+    // 6. Alur redirect berdasarkan r   ole jika profil sudah lengkap
     switch ($user->role) {
         case 'admin':
             return redirect()->route('admin.dashboard');
@@ -88,9 +89,8 @@ public function logout(Request $request)
     // 3. Buat ulang token CSRF agar session lama mati total
     $request->session()->regenerateToken();
 
-    // 4. Hapus cookie session secara paksa dari browser
-    return redirect()->route('login')
-        ->with('success', 'Anda berhasil logout.')
-        ->withCookie(\Cookie::forget('laravel_session')); // Sesuaikan dengan nama cookie session Anda jika diubah
+return redirect()->route('login')
+    ->with('success', 'Anda berhasil logout.')
+    ->withCookie(Cookie::forget('laravel_session'));
 }
 }

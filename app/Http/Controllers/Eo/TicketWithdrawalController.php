@@ -380,10 +380,12 @@ class TicketWithdrawalController extends Controller
                 ->first();
 
             if (!$event) {
+                DB::rollBack();
                 return redirect()->back()->with('error', 'Data Wallet Event tidak ditemukan.');
             }
 
             if ($event->event_status === 'cancelled') {
+                DB::rollBack();
                 return redirect()->back()->with('error', 'Gagal memproses. Seluruh sisa dana event telah dibatalkan dikunci di sistem.');
             }
 
@@ -395,14 +397,17 @@ class TicketWithdrawalController extends Controller
                 ->exists();
 
             if ($hasPendingWithdrawal) {
+                DB::rollBack();
                 return redirect()->back()->with('error', 'Gagal. Anda masih memiliki pengajuan dana berstatus PENDING.');
             }
 
             if (is_null($event->bank_name) || is_null($event->account_number)) {
+                DB::rollBack();
                 return redirect()->back()->with('error', 'Gagal. Lengkapi data rekening bank di profil EO Anda terlebih dahulu.');
             }
 
             if ($event->withdraw_locked == 1) {
+                DB::rollBack();
                 return redirect()->back()->with('error', 'Penarikan untuk event ini sedang dikunci oleh admin.');
             }
 
@@ -465,11 +470,11 @@ class TicketWithdrawalController extends Controller
             if ($request->hasFile('invoice')) {
                 $file = $request->file('invoice');
                 $filename = 'invoice_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/invoices', $filename);
-                $invoicePath = 'invoices/' . $filename;
+                $file->move(public_path('images/invoices_withdrawal'), $filename);// Path yang disimpan ke database (disesuaikan agar mudah dipanggil di view)
+                $invoicePath = 'images/invoices_withdrawal/' . $filename;
             }
 
-            $adminReviewNote = "[Web Log] Skala Omset: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%" . ($isHMinus10 ? " | Darurat H-10 Terbuka" : "");
+            $adminReviewNote = "Skala Omset: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%" . ($isHMinus10 ? " | Darurat H-10 Terbuka" : "");
 
             DB::table('withdrawals')->insert([
                 'eo_id'          => $eoId,

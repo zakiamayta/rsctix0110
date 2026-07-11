@@ -300,11 +300,28 @@ class OwnerController extends Controller
         return back()->with('success', 'EO berhasil di-approve');
     }
 
-    public function reject($id)
-    {
-        DB::table('eo')->where('id', $id)->update(['status' => 'rejected']);
-        return back()->with('success', 'EO berhasil ditolak');
+public function reject(Request $request, $id)
+{
+    $eo = DB::table('eo')->where('id', $id)->first();
+
+    if (!$eo) {
+        abort(404);
     }
+
+    $request->validate([
+        'rejected_reason' => 'required|string|max:1000',
+    ], [
+        'rejected_reason.required' => 'Alasan penolakan wajib diisi',
+    ]);
+
+    DB::table('eo')->where('id', $id)->update([
+        'status'          => 'rejected',
+        'rejected_reason' => $request->rejected_reason,
+        'updated_at'      => now(),
+    ]);
+
+    return back()->with('success', 'EO berhasil ditolak');
+}
 
     /*
     |--------------------------------------------------------------------------

@@ -14,7 +14,7 @@
     --rsc-surface: #FFFFFF;
     --rsc-surface2: #F2EEE9;
     --rsc-border: #E2DBD4;
-    --rsc-accent: #E8470A;
+    --rsc-accent: #f97316;
     --rsc-accent-dim: rgba(232,71,10,0.08);
     --rsc-text: #1A1208;
     --rsc-muted: #8A7E76;
@@ -540,7 +540,7 @@
           <tr>
             <td colspan="10" class="empty-cell">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
-                   stroke="#E8470A" stroke-width="1">
+                   stroke="#f97316" stroke-width="1">
                 <rect x="3" y="4" width="18" height="18" rx="2"/>
                 <line x1="16" y1="2" x2="16" y2="6"/>
                 <line x1="8" y1="2" x2="8" y2="6"/>

@@ -24,8 +24,8 @@ class Transaction extends Model
         'total_amount',
         'service_tax',
         'grand_total',
-        'is_registered',     // ✅ Ditambahkan sesuai database
-        'registered_at',     // ✅ Ditambahkan sesuai database
+        // 'is_registered',     // ✅ Ditambahkan sesuai database
+        // 'registered_at',     // ✅ Ditambahkan sesuai database
     ];
 
     public $timestamps = true;

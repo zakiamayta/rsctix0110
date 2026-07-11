@@ -26,30 +26,31 @@ class GoogleAuthController extends Controller
                 ->with('error', 'Login Google gagal, silakan coba lagi.');
         }
 
-        // 🎯 PERBAIKAN 1: Pastikan kolom 'role' diberi nilai default jika user baru dibuat
-        $user = User::updateOrCreate(
-            [
-                'email' => $googleUser->getEmail()
-            ],
-            [
+        // ─── PERBAIKAN LOGIKA: Pisahkan Create dan Update secara eksplisit ───
+        // 1. Cari user berdasarkan email terlebih dahulu
+        $user = User::where('email', $googleUser->getEmail())->first();
+
+        if (!$user) {
+            // 2. Jika user BELUM ADA, buat baru dengan role default 'user'
+            $user = User::create([
+                'email'            => $googleUser->getEmail(),
+                'google_id'        => $googleUser->getId(),
+                'name'             => $googleUser->getName(),
+                'avatar'           => str_replace('=s96-c', '=s200-c', $googleUser->getAvatar()),
+                'role'             => 'user', // Aman tersimpan sebagai string murni
+                'profile_complete' => 0,
+            ]);
+        } else {
+            // 3. Jika user SUDAH ADA (bisa saja Admin/Owner), UPDATE data Google-nya saja
+            // TANPA MENYENTUH ATAU MENIMPA KOLOM 'role' MEREKA!
+            $user->update([
                 'google_id' => $googleUser->getId(),
                 'name'      => $googleUser->getName(),
                 'avatar'    => str_replace('=s96-c', '=s200-c', $googleUser->getAvatar()),
-                // Jika user baru (belum punya role di DB), otomatis jadikan 'user'
-                'role'      => DB::raw('IFNULL(role, "user")') 
-            ]
-        );
-
-        // Jika DB::raw tidak bersahabat dengan properti fillable Anda, pakai fallback manual ini:
-        if (!$user->role) {
-            $user->role = 'user';
-            $user->save();
+            ]);
         }
 
-        // Autentikasi ke DUA guard yang dipakai aplikasi:
-        // - 'web' (default) → dibaca RoleMiddleware (admin/owner/eo) & ProfileController.
-        // - 'user' → dibaca view complete-profile dan fitur user-facing (TicketController,
-        //   HomeController, CheckEoApproved, dll). Tanpa ini auth('user')->user() bernilai null.
+        // Autentikasi ke DUA guard yang dipakai aplikasi
         Auth::login($user);
         Auth::guard('user')->login($user);
 
@@ -58,11 +59,10 @@ class GoogleAuthController extends Controller
 
         /*
         =========================================
-        1. VALIDASI: USER BIASA (Harus Melengkapi Profil)
+        1. VALIDASI: USER BIASA
         =========================================
         */
         if ($user->role === 'user') {
-            // Jika profil belum lengkap (0), kunci jalan ke halaman /complete-profile
             if ($user->profile_complete == 0) {
                 session()->forget('url.intended'); 
                 return redirect()->to('/complete-profile');
@@ -114,7 +114,7 @@ class GoogleAuthController extends Controller
             return redirect()->to('/');
         }
 
-        // Fallback terakhir jika terjadi sesuatu yang aneh dengan role
+        // Fallback terakhir
         return redirect()->to('/');
     }
 }

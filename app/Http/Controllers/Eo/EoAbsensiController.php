@@ -19,9 +19,6 @@ class EoAbsensiController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Pantauan Absensi Tiket Masuk Event (Gate) bagi EO
-     */
     public function indexTiket(Request $request)
     {
         $eo = DB::table('eo')->where('user_id', Auth::id())->first();
@@ -33,7 +30,6 @@ class EoAbsensiController extends Controller
         $events = Event::where('eo_id', $eo->id)->get();
         $eventIds = $events->pluck('id');
 
-        // Query mengambil data TicketAttendee yang memiliki transaksi sukses milik EO ini
         $query = TicketAttendee::whereHas('transaction', function ($q) use ($eventIds) {
             $q->whereIn('event_id', $eventIds);
         })->with(['transaction.event', 'ticket']);
@@ -45,25 +41,24 @@ class EoAbsensiController extends Controller
             });
         }
 
-        // Filter Pencarian (Nama, Email, No HP, atau Kode Unik)
+        // Filter Pencarian (Nama, No HP, Email peserta, atau Kode Unik peserta)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('phone_number', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('kode_unik', 'like', "%{$search}%")
                   ->orWhereHas('transaction', function ($subQ) use ($search) {
-                      $subQ->where('email', 'like', "%{$search}%")
-                           ->orWhere('kode_unik', 'like', "%{$search}%");
+                      $subQ->where('email', 'like', "%{$search}%");
                   });
             });
         }
 
-        // Filter Status Absen
+        // Filter Status Absen — sekarang dari ticket_attendees langsung
         if ($request->filled('status')) {
             $status = $request->status;
-            $query->whereHas('transaction', function ($q) use ($status) {
-                $q->where('is_registered', $status === 'sudah' ? 1 : 0);
-            });
+            $query->where('is_registered', $status === 'sudah' ? 1 : 0);
         }
 
         $attendees = $query->latest('id')->paginate(10)->withQueryString();
@@ -72,18 +67,13 @@ class EoAbsensiController extends Controller
     }
 
     /**
-     * Tombol Aksi Manual Langsung dari Tabel Pantauan EO (Jika ada kendala QR)
+     * Tombol Aksi Manual — update langsung ke attendee.
      */
     public function absenManual($id)
     {
         $attendee = TicketAttendee::findOrFail($id);
-        $transaction = Transaction::find($attendee->transaction_id);
 
-        if (!$transaction) {
-            return redirect()->back()->with('error', 'Data transaksi tidak ditemukan.');
-        }
-
-        $transaction->update([
+        $attendee->update([
             'is_registered' => true,
             'registered_at' => now(),
         ]);
@@ -94,13 +84,8 @@ class EoAbsensiController extends Controller
     public function batalAbsen($id)
     {
         $attendee = TicketAttendee::findOrFail($id);
-        $transaction = Transaction::find($attendee->transaction_id);
 
-        if (!$transaction) {
-            return redirect()->back()->with('error', 'Data transaksi tidak ditemukan.');
-        }
-
-        $transaction->update([
+        $attendee->update([
             'is_registered' => false,
             'registered_at' => null,
         ]);
@@ -115,33 +100,30 @@ class EoAbsensiController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Tampilkan form input password gate saat QR Tiket di-scan lewat HP
-     */
     public function showAbsenForm($kode)
     {
-        $transaction = Transaction::where('kode_unik', $kode)->with('event')->firstOrFail();
-        return view('absen.form', compact('transaction'));
+        $attendee = TicketAttendee::where('kode_unik', $kode)
+            ->with(['transaction.event', 'ticket.jadwal'])
+            ->firstOrFail();
+
+        $transaction = $attendee->transaction;
+
+        return view('absen.form', compact('transaction', 'attendee'));
     }
 
-    /**
-     * Handle pengiriman password dari HP dan mengubah status transaksi menjadi 'Sudah Absen'
-     */
     public function handleScan(Request $request, $kode)
     {
         $request->validate([
             'password' => 'required',
         ]);
 
-        // Cek password gate (bisa disesuaikan passwordnya)
         if ($request->password !== config('app.gate_password', 'gate123')) {
             return redirect()->route('absen.form', $kode)->with('error', 'Password petugas salah.');
         }
 
-        $transaction = Transaction::where('kode_unik', $kode)->firstOrFail();
+        $attendee = TicketAttendee::where('kode_unik', $kode)->firstOrFail();
 
-        // Jika sudah pernah absen sebelumnya, tampilkan info
-        if ($transaction->is_registered) {
+        if ($attendee->is_registered) {
             return redirect()->route('absen.form', $kode)
                 ->with('status', 'warning')
                 ->with('message', 'Kode tiket ini sudah pernah digunakan untuk absensi sebelumnya.');
@@ -149,23 +131,18 @@ class EoAbsensiController extends Controller
 
         DB::beginTransaction();
         try {
-            // Update status absensi utama pada transaksi
-            $transaction->is_registered = true;
-            $transaction->registered_at = now();
-            $transaction->save();
-
-            // Ambil data peserta di dalam transaksi untuk ditampilkan di view sukses HP
-            $attendees = TicketAttendee::where('transaction_id', $transaction->id)->get();
-            $attendeeUtama = $attendees->first();
+            $attendee->is_registered = true;
+            $attendee->registered_at = now();
+            $attendee->save();
 
             DB::commit();
 
             return redirect()->route('absen.form', $kode)
                 ->with('status', 'success')
-                ->with('attendee_name', $attendeeUtama->name ?? 'Pengunjung')
-                ->with('attendee_phone', $attendeeUtama->phone_number ?? '-')
-                ->with('ticket_count', $attendees->count())
-                ->with('transaction_kode_unik', $transaction->kode_unik);
+                ->with('attendee_name', $attendee->name ?? 'Pengunjung')
+                ->with('attendee_phone', $attendee->phone_number ?? '-')
+                ->with('ticket_count', 1) // ✅ 1 QR = 1 orang
+                ->with('transaction_kode_unik', $attendee->kode_unik);
 
         } catch (\Exception $e) {
             DB::rollBack();

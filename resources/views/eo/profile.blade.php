@@ -21,18 +21,30 @@
     {{-- BUTTON --}}
     <button onclick="openEditModal()"
             class="px-5 py-3 rounded-xl text-sm font-bold text-white"
-            style="background:#E8470A;">
+            style="background:#f97316;">
         Edit Profil
     </button>
 
 </div>
 
-<!-- {{-- ALERT --}}
+{{-- ALERT SUKSES --}}
 @if(session('success'))
 <div class="mb-5 px-4 py-3 rounded-xl bg-green-100 text-green-700">
     {{ session('success') }}
 </div>
-@endif -->
+@endif
+
+{{-- ALERT ERROR VALIDASI (sebelumnya tidak ada, ini penyebab kegagalan "silent") --}}
+@if($errors->any())
+<div class="mb-5 px-4 py-3 rounded-xl bg-red-100 text-red-700">
+    <p class="font-bold mb-1">Gagal menyimpan perubahan:</p>
+    <ul class="list-disc list-inside text-sm">
+        @foreach ($errors->all() as $error)
+            <li>{{ $error }}</li>
+        @endforeach
+    </ul>
+</div>
+@endif
 
 {{-- PROFILE CARD --}}
 <div class="grid grid-cols-3 gap-6">
@@ -246,8 +258,18 @@
 
                 <input type="file"
                        name="logo"
+                       accept="image/*"
                        class="w-full border border-[#EDE8E3]
                               rounded-xl p-3">
+
+                {{-- INI YANG SEBELUMNYA TIDAK ADA: pesan error khusus field logo --}}
+                @error('logo')
+                    <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
+                @enderror
+
+                <p class="text-xs text-gray-400 mt-1">
+                    Format JPG/PNG/WEBP, maksimal 2MB.
+                </p>
 
             </div>
 
@@ -262,9 +284,13 @@
 
                     <input type="text"
                         name="nama_badan_usaha"
-                        value="{{ $eo->nama_badan_usaha }}"
+                        value="{{ old('nama_badan_usaha', $eo->nama_badan_usaha) }}"
                         class="w-full border border-[#EDE8E3]
                                 rounded-xl p-3">
+
+                    @error('nama_badan_usaha')
+                        <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
+                    @enderror
 
                 </div>
 
@@ -277,9 +303,14 @@
 
                     <input type="text"
                         name="phone"
-                        value="{{ $eo->user->phone ?? '' }}"
+                        value="{{ old('phone', $eo->user->phone ?? '') }}"
                         class="w-full border border-[#EDE8E3]
                                 rounded-xl p-3">
+
+                    @error('phone')
+                        <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
+                    @enderror
+
                 </div>
 
 
@@ -302,7 +333,7 @@
 
                         <input type="text"
                                name="bank_name"
-                               value="{{ $eo->bank_name }}"
+                               value="{{ old('bank_name', $eo->bank_name) }}"
                                class="w-full border border-[#EDE8E3]
                                       rounded-xl p-3">
 
@@ -316,7 +347,7 @@
 
                         <input type="text"
                                name="account_name"
-                               value="{{ $eo->account_name }}"
+                               value="{{ old('account_name', $eo->account_name) }}"
                                class="w-full border border-[#EDE8E3]
                                       rounded-xl p-3">
 
@@ -330,7 +361,7 @@
 
                         <input type="text"
                                name="account_number"
-                               value="{{ $eo->account_number }}"
+                               value="{{ old('account_number', $eo->account_number) }}"
                                class="w-full border border-[#EDE8E3]
                                       rounded-xl p-3">
 
@@ -352,7 +383,7 @@
                 </button>
 
                 <button class="px-5 py-2 rounded-xl text-white font-bold"
-                        style="background:#E8470A;">
+                        style="background:#f97316;">
 
                     Simpan Perubahan
 
@@ -386,6 +417,14 @@ function closeEditModal()
     document.getElementById('editModal')
         .classList.remove('flex');
 }
+
+// Auto-buka modal lagi kalau ada error validasi setelah submit,
+// supaya user langsung lihat pesan error tanpa harus klik "Edit Profil" ulang
+@if ($errors->any())
+    document.addEventListener('DOMContentLoaded', function () {
+        openEditModal();
+    });
+@endif
 
 </script>
 

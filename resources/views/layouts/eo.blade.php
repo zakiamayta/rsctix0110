@@ -18,7 +18,7 @@
     <style>
         /* ─── RSC DESIGN TOKENS ─── */
         :root {
-            --rsc-orange:       #E8470A;
+            --rsc-orange:       #f97316;
             --rsc-orange-dark:  #C03A08;
             --rsc-orange-mid:   #F97040;
             --rsc-orange-light: #FFF0EB;
@@ -695,35 +695,16 @@
                             <div class="dropdown-email">{{ $user->email }}</div>
                         </div>
 
-                        @if($eo && $eo->status === 'approved')
-                        <a href="{{ route('eo.dashboard') }}" class="dropdown-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                                <rect x="14" y="14" width="7" height="7" rx="1"/>
-                            </svg>
-                            Dashboard EO
-                        </a>
-                        @endif
+                    <a href="{{ route('home') }}" class="dropdown-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                        Kembali ke Home
+                    </a>
 
-                        <a href="{{ route('eo.event.index') }}" class="dropdown-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                            Event Saya
-                        </a>
-
-                        <a href="{{ route('eo.status') }}" class="dropdown-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 12l2 2 4-4"/>
-                                <path d="M21 12c0 5-4 9-9 9S3 17 3 12 7 3 12 3s9 4 9 9z"/>
-                            </svg>
-                            Status Persetujuan
-                        </a>
 
                         <div class="dropdown-divider"></div>
 

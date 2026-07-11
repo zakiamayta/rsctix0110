@@ -10,7 +10,7 @@
   /* section title */
   #resubmitForm .rs-section-title {
     font-size:.72rem; font-weight:800; text-transform:uppercase;
-    letter-spacing:1.4px; color:#E8470A;
+    letter-spacing:1.4px; color:#f97316;
     display:flex; align-items:center; gap:8px; margin:0 0 14px;
   }
   #resubmitForm .rs-section-title::after {
@@ -20,7 +20,7 @@
   /* Badge tambahan untuk menegaskan mode edit */
   #resubmitForm .rs-edit-badge {
     font-size: 0.58rem; background: rgba(232,71,10,.1); 
-    color: #E8470A; padding: 2px 6px; border-radius: 4px; margin-left: auto;
+    color: #f97316; padding: 2px 6px; border-radius: 4px; margin-left: auto;
   }
 
   /* grid */
@@ -79,7 +79,7 @@
   
   /* Focus state saat mulai mengetik */
   #resubmitForm .rs-input:focus {
-    border-color:#E8470A !important;
+    border-color:#f97316 !important;
     box-shadow:0 0 0 3px rgba(232,71,10,.15) !important;
     background:#fff !important;
   }
@@ -93,7 +93,7 @@
     display:flex; gap:11px; align-items:flex-start;
     background:#FFF7F3;
     border:1px solid rgba(232,71,10,.25);
-    border-left:4px solid #E8470A;
+    border-left:4px solid #f97316;
     border-radius:10px; padding:12px 14px;
   }
   #resubmitForm .rs-note-icon {
@@ -103,7 +103,7 @@
   }
   #resubmitForm .rs-note-tag {
     font-size:.63rem; font-weight:800; text-transform:uppercase;
-    letter-spacing:1px; color:#E8470A; margin-bottom:3px;
+    letter-spacing:1px; color:#f97316; margin-bottom:3px;
   }
   #resubmitForm .rs-note-text {
     font-size:.81rem; color:#5A3A28; line-height:1.6; margin:0;
@@ -136,14 +136,14 @@
     transition:border-color .2s, background .2s, transform .1s;
   }
   #resubmitForm .rs-file-zone:hover {
-    border-color:#E8470A; background:rgba(232,71,10,.04);
+    border-color:#f97316; background:rgba(232,71,10,.04);
     transform: scale(0.995);
   }
   #resubmitForm .rs-file-zone input[type="file"] {
     position:absolute; inset:0; opacity:0; cursor:pointer; width:100%;
   }
   #resubmitForm .rs-file-zone-txt { font-size:.78rem; color:#6E635C; }
-  #resubmitForm .rs-file-zone-txt span { color:#E8470A; font-weight:700; }
+  #resubmitForm .rs-file-zone-txt span { color:#f97316; font-weight:700; }
   #resubmitForm .rs-file-zone-sub { font-size:.65rem; color:#B5AEA8; margin-top:3px; }
 
   /* jadwal */
@@ -154,7 +154,7 @@
   }
   #resubmitForm .rs-jadwal-num {
     font-size:.65rem; font-weight:800; text-transform:uppercase;
-    letter-spacing:1px; color:#E8470A;
+    letter-spacing:1px; color:#f97316;
     display:flex; align-items:center; gap:8px; margin-bottom:14px;
   }
   #resubmitForm .rs-jadwal-num span {
@@ -191,7 +191,7 @@
   /* submit button */
   #resubmitForm .rs-btn-submit {
     display:inline-flex; align-items:center; gap:8px;
-    background:#E8470A; color:#fff; border:none;
+    background:#f97316; color:#fff; border:none;
     border-radius:9px; padding:12px 26px;
     font-size:.85rem; font-weight:800; cursor:pointer;
     letter-spacing:.5px; transition:opacity .15s, transform .12s, box-shadow .15s;
@@ -234,12 +234,12 @@
 @if(
     $event->status === 'rejected'
     &&
-    ($event->rejection_reason || $event->owner_note)
+    ($event->rejected_reason || $event->rejection_reason || $event->owner_note)
 )
   <div class="rs-note">
     <div class="rs-note-icon">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-           stroke="#E8470A" stroke-width="2.3">
+           stroke="#f97316" stroke-width="2.3">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -248,7 +248,7 @@
     <div>
       <div class="rs-note-tag">Catatan Penolakan Admin</div>
       <p class="rs-note-text">
-        {{ $event->rejection_reason ?? $event->owner_note }}
+        {{ $event->rejected_reason ?? $event->rejection_reason ?? $event->owner_note }}
       </p>
     </div>
   </div>

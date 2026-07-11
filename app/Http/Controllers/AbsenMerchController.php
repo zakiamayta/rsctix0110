@@ -33,14 +33,7 @@ class AbsenMerchController extends Controller
         return back()->with('error', 'Password salah!');
     }
 
-    public function store($kode_unik)
-    {
-        $transaction = TransactionMerch::where('kode_unik', $kode_unik)->firstOrFail();
-        $transaction->update(['is_absen' => true]);
 
-        session()->forget('absen_verified');
-        return back();
-    }
 
     /*
     |--------------------------------------------------------------------------
@@ -83,19 +76,39 @@ class AbsenMerchController extends Controller
         return view('eo.absensi.merch', compact('events', 'merchTransactions'));
     }
 
-    public function merchManual($id)
-    {
-        $transaction = TransactionMerch::findOrFail($id);
-        $transaction->update(['is_absen' => true]);
+public function merchManual($id)
+{
+    $transaction = TransactionMerch::findOrFail($id);
+    $transaction->update([
+        'is_absen' => true,
+        'absen_at' => now(),
+    ]);
 
-        return redirect()->back()->with('success', "Merchandise berhasil ditandai telah diambil.");
-    }
+    return redirect()->back()->with('success', "Merchandise berhasil ditandai telah diambil.");
+}
 
-    public function batalMerch($id)
-    {
-        $transaction = TransactionMerch::findOrFail($id);
-        $transaction->update(['is_absen' => false]);
+public function batalMerch($id)
+{
+    $transaction = TransactionMerch::findOrFail($id);
+    $transaction->update([
+        'is_absen' => false,
+        'absen_at' => null,
+    ]);
 
-        return redirect()->back()->with('success', "Status pengambilan merchandise berhasil dibatalkan.");
-    }
+    return redirect()->back()->with('success', "Status pengambilan merchandise berhasil dibatalkan.");
+}
+
+    public function store($kode_unik)
+{
+    $transaction = TransactionMerch::where('kode_unik', $kode_unik)->firstOrFail();
+    $transaction->update([
+        'is_absen' => true,
+        'absen_at' => now(),
+    ]);
+
+    session()->forget('absen_verified');
+    return back();
+}
+
+
 }

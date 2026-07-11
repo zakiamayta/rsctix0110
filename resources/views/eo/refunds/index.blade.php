@@ -51,7 +51,7 @@
     .btn-rsc-outline:hover {
         background: #FDF5F2;
         border-color: #F97040;
-        color: #E8470A;
+        color: #f97316;
     }
 </style>
 
@@ -80,16 +80,16 @@
         </div>
 
         {{-- CARD 2: UTANG EO (SINKRON DENGAN KOLOM remaining_debt & status DATABASE) --}}
-        <div class="rsc-card p-4 flex items-center justify-between border-l-4" style="border-l-color: #E8470A;">
+        <div class="rsc-card p-4 flex items-center justify-between border-l-4" style="border-l-color: #f97316;">
             <div>
                 <p class="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-1">Minus Saldo Belum Lunas (Utang)</p>
-                <h2 class="text-2xl font-bold text-[#E8470A] leading-none">
+                <h2 class="text-2xl font-bold text-[#f97316] leading-none">
                     Rp {{ number_format($myDebts->filter(function($debt) { 
                         return strtolower($debt->status) === 'unpaid' || strtolower($debt->status) === 'partially_paid'; 
                     })->sum('remaining_debt'), 0, ',', '.') }}
                 </h2>
             </div>
-            <div class="p-3 bg-red-50 rounded-xl text-[#E8470A]">
+            <div class="p-3 bg-red-50 rounded-xl text-[#f97316]">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
         </div>
@@ -121,7 +121,7 @@
                         <td class="text-center font-semibold">{{ $batch->total_pengajuan ?? 0 }} Tiket</td>
                         <td>
                             @if(strtolower($batch->status) === 'active')
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-[#E8470A]">TERBUKA</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-[#f97316]">TERBUKA</span>
                             @else
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500">DITUTUP</span>
                             @endif
