@@ -20,6 +20,9 @@ use App\Http\Controllers\Api\OwnerMerchController;
 use App\Http\Controllers\Api\OwnerTicketController;
 use App\Http\Controllers\Api\OwnerWalletController;
 use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\AdminPlatformWalletController;
+use App\Http\Controllers\Api\OwnerPlatformRevenue;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -221,7 +224,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/owner/wallet-ledgers', [OwnerWalletController::class, 'getWalletLedgers']);
     Route::put('/owner/withdrawals/{id}/status', [OwnerWalletController::class, 'updateWithdrawalStatus']);
     Route::get('/owner/history', [OwnerDashboardController::class, 'getOwnerHistory']);
-
+    Route::get('/owner/platform-revenue/detail', [OwnerDashboardController::class, 'getPlatformRevenueDetail']);
 
     Route::get('/admin/dashboard', [AdminDashboardController::class, 'index']);
+    Route::get('/admin/platform-wallet', [AdminPlatformWalletController::class, 'index']);
 });
