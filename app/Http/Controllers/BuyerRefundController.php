@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use App\Support\XenditBankList;
 
 class BuyerRefundController extends Controller
 {
@@ -51,7 +53,10 @@ class BuyerRefundController extends Controller
             return redirect()->back()->with('error', 'Anda sudah mengajukan refund untuk transaksi ini.');
         }
 
-        return view('user.refund-form', compact('transaction'));
+        // 🏦 Daftar bank resmi Xendit untuk widget pencarian di form
+        $banks = XenditBankList::all();
+
+        return view('user.refund-form', compact('transaction', 'banks'));
     }
 
     /**
@@ -60,10 +65,13 @@ class BuyerRefundController extends Controller
     public function store(Request $request, $id)
     {
         $request->validate([
-            'bank_name'      => 'required|string|max:100',
+            // bank_name sekarang WAJIB berupa channel code resmi Xendit (ex: ID_BCA, ID_MANDIRI)
+            // dan tidak boleh diisi bebas -- dipilih dari widget pencarian di frontend.
+            'bank_name'      => ['required', 'string', Rule::in(XenditBankList::codes())],
             'account_number' => 'required|string|max:50',
             'account_name'   => 'required|string|max:150',
-            'refund_reason'  => 'nullable|string',
+        ], [
+            'bank_name.in' => 'Bank yang dipilih tidak terdaftar di sistem pembayaran. Silakan pilih dari daftar yang tersedia.',
         ]);
 
         $user = auth()->user();
@@ -94,7 +102,7 @@ class BuyerRefundController extends Controller
             ->first();
 
         // Pembeli hanya menerima pengembalian harga tiket murni (total_amount)
-        $pureAmountToBuyer = $transaction->total_amount; 
+        $pureAmountToBuyer = $transaction->total_amount;
         $refundTaxFee = 2500; // Log beban transfer massal PG flat
 
         if ($openBatch) {
@@ -110,12 +118,12 @@ class BuyerRefundController extends Controller
         }
 
         DB::table('refunds')->insert([
-            'refund_batch_id'      => $batchId, 
+            'refund_batch_id'      => $batchId,
             'transaction_id'       => $transaction->id,
+            // Disimpan dalam bentuk channel code resmi (ex: ID_BCA), bukan nama bebas
             'bank_name'            => $request->bank_name,
             'account_number'       => $request->account_number,
             'account_name'         => $request->account_name,
-            'refund_reason'        => $request->refund_reason,
             'grand_total_refunded' => $pureAmountToBuyer,
             'refunds_tax'          => $refundTaxFee,
             'status'               => $statusRefund,

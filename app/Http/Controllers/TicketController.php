@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Xendit\Xendit;
 use Xendit\Invoice;
+use Illuminate\Support\Facades\Validator;
 
 class TicketController extends Controller
 {

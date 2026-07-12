@@ -429,3 +429,30 @@ Route::get('/qrcodes/{filename}', function ($filename) {
 //     // 5. Alihkan ke halaman dashboard tujuan
 //     return redirect('/eo/event'); 
 // });
+
+use Illuminate\Support\Facades\Http;
+
+Route::get('/xendit-bank', function () {
+
+    $response = Http::withBasicAuth(
+        env('XENDIT_API_KEY'),
+        ''
+    )->get('https://api.xendit.co/payouts_channels', [
+        'channel_category' => 'BANK',
+        'currency' => 'IDR',
+    ]);
+
+    $banks = [];
+
+    foreach ($response->json() as $bank) {
+
+        $banks[$bank['channel_name']]
+            = $bank['channel_code'];
+
+    }
+
+    ksort($banks);
+
+    return response()->json($banks);
+
+});

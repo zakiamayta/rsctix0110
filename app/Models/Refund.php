@@ -15,7 +15,6 @@ class Refund extends Model
         'bank_name',
         'account_number',
         'account_name',
-        'refund_reason',
         'grand_total_refunded',
         'refunds_tax', // Diperbarui dari platform_service_tax_share sesuai database baru
         'status',

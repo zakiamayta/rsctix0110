@@ -57,7 +57,7 @@ class RefundXenditExport implements FromCollection, WithHeadings, WithMapping, W
         return [
             (string) $item->refund_code,                // Reference Id pembeli asli
             (int) $item->amount,                        // Amount murni tanpa Rp / titik desimal
-            strtoupper(trim($item->bank_name)),          // Channel Code bank (BCA, MANDIRI, SHOPEEPAY wajib KAPITAL)
+            trim($item->bank_name),                      // Channel Code resmi Xendit (ex: ID_BCA), sudah divalidasi saat input
             (string) $item->account_number,             // Account Number nomor rekening pembeli
             trim($item->account_name),                  // Account Name pemilik rekening
             substr($cleanDescription, 0, 30),           // Description (Alphanumeric maks 30 karakter)
@@ -79,48 +79,40 @@ class RefundXenditExport implements FromCollection, WithHeadings, WithMapping, W
         ];
     }
 
-    /**
-     * Mengatur ukuran lebar kolom (Column Widths) agar proporsional dan rapi
-     */
     public function columnWidths(): array
     {
         return [
-            'A' => 20, // Reference Id
-            'B' => 15, // Amount
-            'C' => 18, // Channel Code
-            'D' => 22, // Account Number
-            'E' => 28, // Account Name
-            'F' => 30, // Description
-            'G' => 25, // Email To
-            'H' => 12, // Email CC
-            'I' => 12, // Email BCC
+            'A' => 20,
+            'B' => 15,
+            'C' => 18,
+            'D' => 22,
+            'E' => 28,
+            'F' => 30,
+            'G' => 25,
+            'H' => 12,
+            'I' => 12,
         ];
     }
 
-    /**
-     * Memberikan Styling Warna Header Hijau Gelap & Font Bold Persis Template Keuangan Bank
-     */
     public function styles(Worksheet $sheet)
     {
         return [
-            // Baris ke-1 (Header) diwarnai Hijau Tua Muted dengan Teks Putih Bold, Font Sora/DM Sans
             1 => [
                 'font' => [
-                    'bold' => true, 
+                    'bold' => true,
                     'color' => ['rgb' => 'FFFFFF'],
                     'size' => 11,
                     'name' => 'Arial'
                 ],
                 'fill' => [
                     'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '1B5E20'] // Hijau gelap standar template disbursement perbankan
+                    'startColor' => ['rgb' => '1B5E20']
                 ],
                 'alignment' => [
                     'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
                     'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
                 ]
             ],
-            // Semua baris di bawah header berformat rata kiri/kanan proporsional
             'A2:I100' => [
                 'font' => [
                     'size' => 10,

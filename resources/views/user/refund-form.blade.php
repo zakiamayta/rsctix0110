@@ -52,21 +52,25 @@
                     </div>
 
                     {{-- ALUR INPUT FORM --}}
-                    <form action="{{ route('buyer.refund.store', $transaction->id) }}" method="POST">
+                    <form action="{{ route('buyer.refund.store', $transaction->id) }}" method="POST" id="refundForm">
                         @csrf
 
-                        {{-- NAMA BANK --}}
+                        {{-- NAMA BANK (KLIK UNTUK BUKA PENCARIAN) --}}
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-secondary">Nama Bank Tujuan</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0 border-0 rounded-start-3"><i class="bi bi-bank text-muted"></i></span>
-                                <input type="text" 
-                                       name="bank_name" 
-                                       class="form-control bg-light border-0 rounded-end-3 py-2 @error('bank_name') is-invalid @enderror" 
-                                       placeholder="Contoh: BCA, Mandiri, BRI, BNI" 
-                                       value="{{ old('bank_name') }}"
+                                <input type="text"
+                                       id="bankPickerTrigger"
+                                       class="form-control bg-light border-0 rounded-end-3 py-2 @error('bank_name') is-invalid @enderror"
+                                       placeholder="Klik untuk pilih bank..."
+                                       style="cursor: pointer;"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#bankPickerModal"
+                                       readonly
                                        required>
                             </div>
+                            <input type="hidden" name="bank_name" id="bank_name" value="{{ old('bank_name') }}">
                             @error('bank_name')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
@@ -91,7 +95,7 @@
                         </div>
 
                         {{-- NAMA PEMILIK REKENING --}}
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label class="form-label small fw-bold text-secondary">Nama Pemilik Rekening (Sesuai Buku Tabungan)</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0 border-0 rounded-start-3"><i class="bi bi-person text-muted"></i></span>
@@ -103,18 +107,6 @@
                                        required>
                             </div>
                             @error('account_name')
-                                <div class="text-danger small mt-1">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- ALASAN REFUND --}}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-secondary">Alasan Refund <span class="text-muted fw-normal">(Opsional)</span></label>
-                            <textarea name="refund_reason" 
-                                      class="form-control bg-light border-0 rounded-3" 
-                                      rows="3" 
-                                      placeholder="Tulis alasan pembatalan tiket jika diperlukan...">{{ old('refund_reason') }}</textarea>
-                            @error('refund_reason')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
                         </div>
@@ -136,4 +128,94 @@
         </div>
     </div>
 </div>
+
+{{-- ==================== MODAL PENCARIAN BANK (RESMI XENDIT) ==================== --}}
+<div class="modal fade" id="bankPickerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-dark">Pilih Bank Tujuan</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <div class="input-group mb-3">
+                    <span class="input-group-text bg-light border-end-0 border-0 rounded-start-3"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="bankSearchInput" autocomplete="off"
+                           class="form-control bg-light border-0 rounded-end-3 py-2"
+                           placeholder="Ketik nama bank... (contoh: BCA, Mandiri, BRI)">
+                </div>
+
+                <ul class="list-group list-group-flush" id="bankResultList" style="max-height: 320px; overflow-y: auto;"></ul>
+
+                <p id="bankNoResult" class="text-center text-muted small py-4 d-none mb-0">
+                    Bank tidak ditemukan di daftar resmi Xendit.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Daftar bank resmi Xendit dikirim dari backend (single source of truth)
+    const XENDIT_BANKS = @json($banks);
+
+    const bankModalEl   = document.getElementById('bankPickerModal');
+    const trigger        = document.getElementById('bankPickerTrigger');
+    const hiddenInput    = document.getElementById('bank_name');
+    const searchInput    = document.getElementById('bankSearchInput');
+    const resultList     = document.getElementById('bankResultList');
+    const noResult       = document.getElementById('bankNoResult');
+
+    function renderBankList(keyword = '') {
+        const q = keyword.trim().toLowerCase();
+        const filtered = XENDIT_BANKS.filter(b =>
+            b.name.toLowerCase().includes(q) || b.code.toLowerCase().includes(q)
+        );
+
+        resultList.innerHTML = '';
+
+        if (filtered.length === 0) {
+            noResult.classList.remove('d-none');
+            return;
+        }
+        noResult.classList.add('d-none');
+
+        filtered.forEach(bank => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0 border-bottom rounded-3 mb-1';
+            li.style.cursor = 'pointer';
+            li.innerHTML = `
+                <span class="text-dark">${bank.name}</span>
+                <span class="badge bg-light text-muted border">${bank.code}</span>
+            `;
+            li.addEventListener('click', () => selectBank(bank));
+            resultList.appendChild(li);
+        });
+    }
+
+    function selectBank(bank) {
+        hiddenInput.value = bank.code;
+        trigger.value = bank.name;
+        trigger.classList.remove('is-invalid');
+
+        const modalInstance = bootstrap.Modal.getInstance(bankModalEl) || new bootstrap.Modal(bankModalEl);
+        modalInstance.hide();
+    }
+
+    bankModalEl.addEventListener('show.bs.modal', () => {
+        searchInput.value = '';
+        renderBankList('');
+        setTimeout(() => searchInput.focus(), 150);
+    });
+
+    searchInput.addEventListener('input', (e) => renderBankList(e.target.value));
+
+    // Kalau ada old('bank_name') dari validasi gagal sebelumnya, tampilkan nama banknya kembali
+    document.addEventListener('DOMContentLoaded', () => {
+        if (hiddenInput.value) {
+            const existing = XENDIT_BANKS.find(b => b.code === hiddenInput.value);
+            if (existing) trigger.value = existing.name;
+        }
+    });
+</script>
 @endsection
