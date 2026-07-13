@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 
 use App\Models\Withdrawal;
 use App\Models\EventWallet;
+use App\Services\TicketWalletService;
 
 class WithdrawalApprovalController extends Controller
 {
@@ -236,6 +237,8 @@ class WithdrawalApprovalController extends Controller
 
             DB::commit();
 
+            TicketWalletService::recalculate($withdrawal->event_id);
+
             return redirect()
                 ->route('owner.withdrawals.index')
                 ->with(
@@ -280,16 +283,18 @@ class WithdrawalApprovalController extends Controller
             );
         }
 
-        $withdrawal->status = 'rejected';
-        $withdrawal->owner_note = $request->owner_note;
-        $withdrawal->approved_at = null;
-        $withdrawal->save();
+$withdrawal->status = 'rejected';
+$withdrawal->owner_note = $request->owner_note;
+$withdrawal->approved_at = null;
+$withdrawal->save();
 
-        return redirect()
-            ->route('owner.withdrawals.index')
-            ->with(
-                'success',
-                'Withdrawal berhasil ditolak'
-            );
+TicketWalletService::recalculate($withdrawal->event_id);
+
+return redirect()
+    ->route('owner.withdrawals.index')
+    ->with(
+        'success',
+        'Withdrawal berhasil ditolak'
+    );
     }
 }

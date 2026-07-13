@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB; // Ditambahkan untuk handle update tabel jadwal otomatis
+use App\Services\TicketWalletService;
+use App\Services\MerchWalletService;
 
 class EventApprovalController extends Controller
 {
@@ -88,6 +90,9 @@ class EventApprovalController extends Controller
             'merch_cancel_decision' => null // Memastikan null agar alert penentu keputusan langsung mengunci dashboard EO
         ]);
 
+        TicketWalletService::recalculate($event->id);
+        MerchWalletService::recalculate($event->id);
+
         return redirect()
             ->route('owner.events.index')
             ->with('success', 'Event resmi DIBATALKAN. Sistem siap memproses refund.');
@@ -106,6 +111,9 @@ class EventApprovalController extends Controller
             'status'     => 'approved', // Dikembalikan ke status aktif semula
             'owner_note' => $request->note
         ]);
+
+        TicketWalletService::recalculate($event->id);
+        MerchWalletService::recalculate($event->id);
 
         return redirect()
             ->route('owner.events.index')
@@ -136,6 +144,9 @@ public function approveReschedule(Event $event)
         // kasih hak edit sekali
         'can_adjust_schedule' => true,
     ]);
+
+    TicketWalletService::recalculate($event->id);
+    MerchWalletService::recalculate($event->id);
 
     return redirect()
         ->route('owner.events.index')

@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Exports\RefundXenditExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\TicketWalletService;
+use App\Services\MerchWalletService;
 
 class AdminRefundController extends Controller
 {
@@ -324,6 +326,14 @@ class AdminRefundController extends Controller
 
         $biayaOperasionalXendit = $pendingRefunds->sum('refunds_tax');
         $walletTable = $batch->type === 'ticket' ? 'event_wallets' : 'merch_wallets';
+
+        // Pastikan angka fresh sebelum uang benar-benar dipotong
+        if ($batch->type === 'ticket') {
+            TicketWalletService::recalculate($batch->event_id);
+        } else {
+            MerchWalletService::recalculate($batch->event_id);
+        }
+
         $wallet = DB::table($walletTable)->where('event_id', $batch->event_id)->first();
         
         $isCancelled = ($batch->event->status === 'cancelled');
@@ -392,6 +402,12 @@ class AdminRefundController extends Controller
             $batch->update(['status' => 'completed']);
 
             DB::commit();
+
+            if ($batch->type === 'ticket') {
+                TicketWalletService::recalculate($batch->event_id);
+            } else {
+                MerchWalletService::recalculate($batch->event_id);
+            }
             return redirect()->route('admin.refunds.index', ['tab' => $batch->type])
                 ->with('success', 'Batch berhasil ditutup sepenuhnya dan finansial disinkronkan.');
         } catch (\Exception $e) {

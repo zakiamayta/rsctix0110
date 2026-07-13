@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 // Memanggil Model Utama Finansial Merchandise
 use App\Models\MerchWithdrawal; 
 use App\Models\MerchWallet; 
+use App\Services\MerchWalletService;
 
 class MerchWithdrawalApprovalController extends Controller
 {
@@ -182,6 +183,8 @@ class MerchWithdrawalApprovalController extends Controller
 
             DB::commit();
 
+            TicketWalletService::recalculate($withdrawal->event_id);
+
             return redirect()
                 ->route('owner.withdrawals.merch.index')
                 ->with('success', 'Pencairan dana merchandise berhasil disetujui.');
@@ -216,6 +219,8 @@ class MerchWithdrawalApprovalController extends Controller
         $withdrawal->owner_note = $request->owner_note;
         $withdrawal->approved_at = null;
         $withdrawal->save();
+
+        TicketWalletService::recalculate($withdrawal->event_id);
 
         return redirect()
             ->route('owner.withdrawals.merch.index')

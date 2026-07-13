@@ -17,6 +17,40 @@
 .btn-white {
     background: #fff;
 }
+
+/* 🎨 TINT KARTU BERDASARKAN STATUS EVENT (FULL CARD, bukan cuma strip atas) */
+.card-status-cancelled,
+.card-status-cancelled .card-body {
+    background-color: #fdecea !important;
+    border: 1px solid rgba(220,53,69,.35) !important;
+}
+
+.card-status-rescheduled,
+.card-status-rescheduled .card-body {
+    background-color: #fff6da !important;
+    border: 1px solid rgba(255,193,7,.45) !important;
+}
+
+.card-status-refunded,
+.card-status-refunded .card-body {
+    background-color: #eaf2fe !important;
+    border: 1px solid rgba(13,110,253,.35) !important;
+}
+
+/* Warna alert notifikasi — DIPAKAI SAMA PERSIS baik di card maupun di dalam modal detail,
+   supaya konsisten (bukan scoped ke parent card lagi). */
+.status-tint-cancelled {
+    background-color: rgba(220,53,69,.14);
+    color: #b02a37;
+}
+.status-tint-rescheduled {
+    background-color: rgba(255,193,7,.22);
+    color: #7a5c00;
+}
+.status-tint-refunded {
+    background-color: rgba(13,110,253,.14);
+    color: #0d47a1;
+}
 </style>
 
 <div class="px-6 lg:px-16 xl:px-24 2xl:px-32 py-8 bg-light">
@@ -64,9 +98,19 @@
     
     $currentKlaimStatus = $trx->klaim_status ?? 'belum_diambil';
     $currentRefundStatus = $trx->refund_status ?? null; 
+
+    // Penentu tint kartu berdasarkan status event/refund (refunded = prioritas tertinggi)
+    $cardStatusClass = '';
+    if ($currentRefundStatus === 'refunded') {
+        $cardStatusClass = 'card-status-refunded';
+    } elseif ($relatedEvent && $relatedEvent->status === 'cancelled') {
+        $cardStatusClass = 'card-status-cancelled';
+    } elseif ($relatedEvent && ($relatedEvent->is_rescheduled ?? 0) > 0) {
+        $cardStatusClass = 'card-status-rescheduled';
+    }
 @endphp
 
-<div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+<div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden {{ $cardStatusClass }}">
 
     {{-- TOP BAR --}}
     <div style="
@@ -78,6 +122,24 @@
     "></div>
 
     <div class="card-body p-4">
+
+        {{-- 🔔 NOTIFIKASI STATUS EVENT/REFUND DI AWAL CARD (BUKAN DI DETAIL) --}}
+        @if($currentRefundStatus === 'refunded')
+            <div class="alert status-tint-refunded border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Anda sudah melakukan <strong>refund</strong> untuk merchandise ini. Dana telah dikembalikan ke rekening Anda.</span>
+            </div>
+        @elseif($relatedEvent && $relatedEvent->status === 'cancelled')
+            <div class="alert status-tint-cancelled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>Event ini telah <strong>dibatalkan</strong> oleh penyelenggara.</span>
+            </div>
+        @elseif($relatedEvent && ($relatedEvent->is_rescheduled ?? 0) > 0)
+            <div class="alert status-tint-rescheduled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                <i class="bi bi-calendar-event-fill"></i>
+                <span>Jadwal event ini telah <strong>diubah (reschedule)</strong> oleh penyelenggara.</span>
+            </div>
+        @endif
 
         {{-- HEADER KARTU --}}
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
@@ -96,13 +158,6 @@
                             : 'bg-warning bg-opacity-10 text-warning' }}">
                         {{ strtoupper($trx->payment_status) }}
                     </span>
-
-                    {{-- BADGE EVENT CANCEL --}}
-                    @if($relatedEvent && $relatedEvent->status === 'cancelled')
-                        <span class="badge rounded-pill px-3 py-2 bg-danger bg-opacity-10 text-danger small">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i> EVENT CANCEL
-                        </span>
-                    @endif
                 </div>
             </div>
 
@@ -205,18 +260,34 @@
 
             <div class="modal-body p-4">
 
-                {{-- ALERT EVENT BATAL DI DALAM MODAL --}}
-                @if($relatedEvent && $relatedEvent->status === 'cancelled')
-                    <div class="alert alert-danger rounded-4 border-0 mb-4 p-3 small text-dark d-flex gap-2">
-                        <i class="bi bi-info-circle-fill text-danger h5 mb-0 mt-0.5"></i>
+                {{-- ALERT STATUS EVENT/REFUND DI DALAM MODAL (SINKRON DENGAN ALERT DI CARD) --}}
+                @if($currentRefundStatus === 'refunded')
+                    <div class="status-tint-refunded rounded-4 border-0 mb-4 p-3 small d-flex gap-2">
+                        <i class="bi bi-check-circle-fill h5 mb-0 mt-0.5"></i>
+                        <div>
+                            <strong>Refund Selesai:</strong>
+                            <p class="mb-0 mt-1">Anda sudah melakukan refund untuk merchandise ini. Dana telah dikembalikan ke rekening Anda.</p>
+                        </div>
+                    </div>
+                @elseif($relatedEvent && $relatedEvent->status === 'cancelled')
+                    <div class="status-tint-cancelled rounded-4 border-0 mb-4 p-3 small d-flex gap-2">
+                        <i class="bi bi-info-circle-fill h5 mb-0 mt-0.5"></i>
                         <div>
                             <strong>Pemberitahuan Pembatalan:</strong>
                             <p class="mb-0 mt-1">Event ini resmi dibatalkan.</p>
                             @if($relatedEvent->merch_cancel_decision === 'refund')
-                                <p class="mb-0 text-muted small">Kebijakan: Pengembalian dana penuh telah dibuka pada halaman riwayat.</p>
+                                <p class="mb-0 small opacity-75">Kebijakan: Pengembalian dana penuh telah dibuka pada halaman riwayat.</p>
                             @elseif($relatedEvent->merch_cancel_decision === 'ship' || $relatedEvent->merch_cancel_decision === 'ship_independently')
-                                <p class="mb-0 text-muted small">Kebijakan: Merchandise ini akan tetap diproduksi oleh EO dan dikirim ke alamat terdaftar Anda.</p>
+                                <p class="mb-0 small opacity-75">Kebijakan: Merchandise ini akan tetap diproduksi oleh EO dan dikirim ke alamat terdaftar Anda.</p>
                             @endif
+                        </div>
+                    </div>
+                @elseif($relatedEvent && ($relatedEvent->is_rescheduled ?? 0) > 0)
+                    <div class="status-tint-rescheduled rounded-4 border-0 mb-4 p-3 small d-flex gap-2">
+                        <i class="bi bi-calendar-event-fill h5 mb-0 mt-0.5"></i>
+                        <div>
+                            <strong>Pemberitahuan Reschedule:</strong>
+                            <p class="mb-0 mt-1">Jadwal event ini telah diubah oleh penyelenggara.</p>
                         </div>
                     </div>
                 @endif

@@ -7,241 +7,152 @@ use Illuminate\Support\Facades\DB;
 
 class MerchWalletService
 {
-    public function getWallets(int $eoId): array
+    /**
+     * Hitung ulang & sinkronkan saldo wallet MERCH untuk satu event.
+     * Panggil ini di SETIAP titik yang mengubah payment_status transaksi_merch,
+     * status merch_withdrawals, atau saldo minus refund merch.
+     */
+    public static function recalculate(int $eventId): array
     {
-        $eo = DB::table('eo')
-            ->where('id', $eoId)
-            ->first();
+        $event = DB::table('events')->where('id', $eventId)->first();
 
-        if (!$eo) {
-            return [
-                'summary' => [
-                    'total_sales' => 0,
-                    'total_available_balance' => 0,
-                    'total_held_balance' => 0,
-                    'total_withdrawn' => 0,
-                ],
-                'events' => [],
-            ];
+        if (!$event) {
+            return self::emptyResult('Event tidak ditemukan.');
         }
 
-        $events = DB::table('events')
-            ->where('eo_id', $eoId)
-            ->orderByDesc('date')
-            ->get();
+        $wallet = DB::table('merch_wallets')->where('event_id', $eventId)->first();
 
-        $wallets = [];
-
-        $totalSales = 0;
-        $totalAvailable = 0;
-        $totalHeld = 0;
-        $totalWithdrawn = 0;
-
-        foreach ($events as $event) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | TOTAL PAID
-            |--------------------------------------------------------------------------
-            */
-
-            $paidTotal = DB::table('merch_orders')
-                ->where('event_id', $event->id)
-                ->where('payment_status', 'paid')
-                ->sum('total_price');
-
-            /*
-            |--------------------------------------------------------------------------
-            | POTENSI REVENUE
-            |--------------------------------------------------------------------------
-            */
-
-            $potentialRevenue = DB::table('products_ukuran')
-                ->join(
-                    'products_varian',
-                    'products_varian.id',
-                    '=',
-                    'products_ukuran.varian_id'
-                )
-                ->join(
-                    'products',
-                    'products.id',
-                    '=',
-                    'products_varian.product_id'
-                )
-                ->where('products.event_id', $event->id)
-                ->selectRaw('SUM(products_ukuran.stok * products_ukuran.harga) as total')
-                ->value('total') ?? 0;
-
-            /*
-            |--------------------------------------------------------------------------
-            | WITHDRAW APPROVED
-            |--------------------------------------------------------------------------
-            */
-
-            $alreadyWithdrawn = DB::table('merch_withdrawals')
-                ->where('event_id', $event->id)
-                ->where('status', 'approved')
-                ->sum('amount');
-
-            /*
-            |--------------------------------------------------------------------------
-            | EVENT STATUS
-            |--------------------------------------------------------------------------
-            */
-
-            $startDate = Carbon::parse($event->date);
-
-            $endDate = !empty($event->end_date)
-                ? Carbon::parse($event->end_date)
-                : $startDate;
-
-            $isEventFinished = $endDate->isPast();
-
-            $isHMinus10 =
-                now()->diffInDays($startDate, false) <= 10
-                && now()->isBefore($startDate);
-
-            /*
-            |--------------------------------------------------------------------------
-            | MINIMUM HELD BALANCE
-            |--------------------------------------------------------------------------
-            */
-
-            $minHeldBalance =
-                $potentialRevenue * 0.20;
-
-            /*
-            |--------------------------------------------------------------------------
-            | WITHDRAW LIMIT
-            |--------------------------------------------------------------------------
-            */
-
-            if ($isEventFinished) {
-
-                $plafonPercent = 1.0;
-
-            } elseif ($isHMinus10) {
-
-                $plafonPercent = 0.7;
-
-            } else {
-
-                $plafonPercent = 0.5;
-            }
-
-            $maxWithdrawable =
-                max(
-                    0,
-                    ($paidTotal * $plafonPercent)
-                    - $alreadyWithdrawn
-                );
-
-            /*
-            |--------------------------------------------------------------------------
-            | AVAILABLE BALANCE
-            |--------------------------------------------------------------------------
-            */
-
-            $availableBalance =
-                min(
-                    $maxWithdrawable,
-                    max(
-                        0,
-                        ($paidTotal - $alreadyWithdrawn)
-                        - $minHeldBalance
-                    )
-                );
-
-            /*
-            |--------------------------------------------------------------------------
-            | HELD BALANCE
-            |--------------------------------------------------------------------------
-            */
-
-            $heldBalance =
-                ($paidTotal - $alreadyWithdrawn)
-                - $availableBalance;
-
-            $heldBalance =
-                max(0, $heldBalance);
-
-            /*
-            |--------------------------------------------------------------------------
-            | SYSTEM REASON
-            |--------------------------------------------------------------------------
-            */
-
-            $canWithdraw = true;
-            $systemReason = null;
-
-            if ($paidTotal <= 0) {
-
-                $canWithdraw = false;
-                $systemReason =
-                    'Belum ada penjualan merchandise yang dibayar.';
-
-            } elseif (
-                ($paidTotal - $alreadyWithdrawn)
-                < $minHeldBalance
-                && !$isEventFinished
-            ) {
-
-                $canWithdraw = false;
-                $systemReason =
-                    'Saldo masih berada di bawah batas saldo mengendap 20%.';
-
-            } elseif ($availableBalance <= 0) {
-
-                $canWithdraw = false;
-                $systemReason =
-                    'Tidak ada saldo yang dapat ditarik.';
-            }
-
-            $wallets[] = [
-
-                'event_id' => $event->id,
-
-                'event_name' => $event->nama_event,
-
-                'event_date' => $event->date,
-
-                'total_sales' => $paidTotal,
-
-                'potential_revenue' => $potentialRevenue,
-
-                'available_balance' => $availableBalance,
-
-                'held_balance' => $heldBalance,
-
-                'withdrawn_balance' => $alreadyWithdrawn,
-
-                'can_withdraw' => $canWithdraw,
-
-                'system_reason' => $systemReason,
-
-                'bank_name' => $eo->bank_name,
-
-                'account_name' => $eo->account_name,
-
-                'account_number' => $eo->account_number,
-            ];
-
-            $totalSales += $paidTotal;
-            $totalAvailable += $availableBalance;
-            $totalHeld += $heldBalance;
-            $totalWithdrawn += $alreadyWithdrawn;
+        if (!$wallet) {
+            $walletId = DB::table('merch_wallets')->insertGetId([
+                'eo_id'             => $event->eo_id,
+                'event_id'          => $eventId,
+                'available_balance' => 0,
+                'held_balance'      => 0,
+                'negative_balance'  => 0,
+                'withdraw_locked'   => 0,
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+            $wallet = DB::table('merch_wallets')->where('id', $walletId)->first();
         }
+
+        $paidTotal = DB::table('transaction_merch_details as tmd')
+            ->join('transaction_merch as tm', 'tmd.transaction_merch_id', '=', 'tm.id')
+            ->join('products as p', 'tmd.product_id', '=', 'p.id')
+            ->where('p.event_id', $eventId)
+            ->where('tm.payment_status', 'paid')
+            ->sum('tmd.subtotal') ?? 0;
+
+        $alreadyWithdrawn = DB::table('merch_withdrawals')
+            ->where('event_id', $eventId)
+            ->whereIn('status', ['approved', 'pending'])
+            ->sum('amount') ?? 0;
+
+        $potentialRevenue = DB::table('products_ukuran')
+            ->where('event_id', $eventId)
+            ->select(DB::raw('SUM(stok * harga) as total_potential'))
+            ->value('total_potential') ?? 0;
+
+        $isSkalaBesar = $potentialRevenue >= 25000000;
+        $minBalanceRequired = $isSkalaBesar ? 500000 : 100000;
+        $minHeldBalance = $isSkalaBesar ? 250000 : 50000;
+
+        $isHMinus10 = false;
+        if (!is_null($event->date)) {
+            $startDate = Carbon::parse($event->date)->startOfDay();
+            $today = now()->startOfDay();
+            $isHMinus10 = $today->diffInDays($startDate, false) <= 10;
+        }
+
+        $isBypassedByHMinus10 = false;
+        if ($isHMinus10) {
+            $minBalanceRequired = 0;
+            $minHeldBalance = 0;
+            $isBypassedByHMinus10 = true;
+        }
+
+        $plafonPercent = $isHMinus10 ? 0.7 : 0.5;
+
+        $maxEligibleBalance = floor($paidTotal * $plafonPercent);
+        $calculatedAvailable = $maxEligibleBalance - $alreadyWithdrawn;
+        if ($calculatedAvailable < 0) $calculatedAvailable = 0;
+
+        $sisaKasSistem = $paidTotal - $alreadyWithdrawn;
+        $heldBalance = $sisaKasSistem - $calculatedAvailable;
+        if ($heldBalance < 0) $heldBalance = 0;
+
+        $canWithdraw = true;
+        $systemReason = 'Silakan masukkan nominal pengajuan Anda.';
+
+        if ($wallet->withdraw_locked == 1) {
+            $canWithdraw = false;
+            $calculatedAvailable = 0;
+            $heldBalance = $paidTotal - $alreadyWithdrawn;
+            $systemReason = 'Fitur penarikan dana dinonaktifkan sementara oleh admin.';
+        } elseif ($paidTotal < $minBalanceRequired) {
+            $canWithdraw = false;
+            $calculatedAvailable = 0;
+            $heldBalance = $paidTotal - $alreadyWithdrawn;
+            $systemReason = 'Total omset belum mencapai batas minimal Rp '
+                . number_format($minBalanceRequired, 0, ',', '.');
+        } elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance) {
+            $canWithdraw = false;
+            $calculatedAvailable = 0;
+            $heldBalance = $paidTotal - $alreadyWithdrawn;
+            $systemReason = 'Sisa saldo berjalan di bawah target mengendap Rp '
+                . number_format($minHeldBalance, 0, ',', '.');
+        } elseif ($calculatedAvailable <= 0) {
+            $canWithdraw = false;
+            $calculatedAvailable = 0;
+            $systemReason = $isBypassedByHMinus10
+                ? 'Gerbang H-10 terbuka otomatis! Namun saldo hak tarik Anda masih 0 karena limit plafon 70% sudah diambil atau belum ada merch laku baru.'
+                : 'Kuota limit penarikan termin berjalan (Plafon 50%) Anda saat ini sudah diambil.';
+        }
+
+        DB::table('merch_wallets')->where('event_id', $eventId)->update([
+            'available_balance' => (int) $calculatedAvailable,
+            'held_balance'      => (int) $heldBalance,
+            'updated_at'        => now(),
+        ]);
 
         return [
-            'summary' => [
-                'total_sales' => $totalSales,
-                'total_available_balance' => $totalAvailable,
-                'total_held_balance' => $totalHeld,
-                'total_withdrawn' => $totalWithdrawn,
-            ],
+            'available_balance' => (int) $calculatedAvailable,
+            'held_balance'      => (int) $heldBalance,
+            'total_sales'       => (int) $paidTotal,
+            'already_withdrawn' => (int) $alreadyWithdrawn,
+            'can_withdraw'      => $canWithdraw,
+            'system_reason'     => $systemReason . ($isBypassedByHMinus10 ? ' (Bypass H-10 Aktif)' : ''),
+            'is_h_minus_10'     => $isHMinus10,
+            'is_bypassed_h10'   => $isBypassedByHMinus10,
+            'skala_event'       => $isSkalaBesar ? 'Besar' : 'Kecil',
+            'negative_balance'  => $wallet->negative_balance,
+            'withdraw_locked'   => $wallet->withdraw_locked,
+        ];
+    }
 
-            'events' => $wallets,
+    /** Resync semua event milik satu EO sekaligus (dipakai di dashboard index()) */
+    public static function recalculateForEo(int $eoId): void
+    {
+        $eventIds = DB::table('events')->where('eo_id', $eoId)->pluck('id');
+        foreach ($eventIds as $eventId) {
+            self::recalculate($eventId);
+        }
+    }
+
+    private static function emptyResult(string $reason): array
+    {
+        return [
+            'available_balance' => 0,
+            'held_balance'      => 0,
+            'total_sales'       => 0,
+            'already_withdrawn' => 0,
+            'can_withdraw'      => false,
+            'system_reason'     => $reason,
+            'is_h_minus_10'     => false,
+            'is_bypassed_h10'   => false,
+            'skala_event'       => 'Kecil',
+            'negative_balance'  => 0,
+            'withdraw_locked'   => 0,
         ];
     }
 }

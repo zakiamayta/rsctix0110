@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use App\Services\TicketWalletService;
 
 class TicketWithdrawalController extends Controller
 {
@@ -77,152 +78,37 @@ class TicketWithdrawalController extends Controller
         $account_number = count($events) > 0 ? ($events[0]->account_number ?? '-') : '-';
         $account_name = count($events) > 0 ? ($events[0]->account_name ?? '-') : '-';
 
-        foreach ($events as $event) {
-            $actualEndDate = $event->end_date ?? $event->start_date;
+foreach ($events as $event) {
+    $calc = TicketWalletService::recalculate($event->event_id);
 
-            if (is_null($event->wallet_id)) {
-                $insertedId = DB::table('event_wallets')->insertGetId([
-                    'eo_id'             => $eoId,
-                    'event_id'          => $event->event_id,
-                    'available_balance' => 0, 
-                    'held_balance'      => 0,
-                    'negative_balance'  => 0,
-                    'withdraw_locked'   => 0,
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
-                ]);
-                
-                $event->wallet_id = $insertedId;
-                $event->withdraw_locked = 0;
-                $event->negative_balance = 0;
-            }
+    $totalGlobalAvailable += ($calc['negative_balance'] > 0) ? 0 : $calc['available_balance'];
+    $totalGlobalHeld      += $calc['held_balance'];
+    $totalGlobalSales     += $calc['total_sales'];
+    $totalGlobalNegative  += $calc['negative_balance'];
 
-            $paidTotal = DB::table('transactions')
-                ->where('event_id', $event->event_id)
-                ->where('payment_status', 'paid')
-                ->sum('total_amount') ?? 0;
-
-            $alreadyWithdrawn = DB::table('withdrawals')
-                ->where('event_id', $event->event_id)
-                ->whereIn('status', ['approved', 'pending']) 
-                ->sum('amount') ?? 0;
-
-            $potentialRevenue = DB::table('tickets')
-                ->where('event_id', $event->event_id)
-                ->select(DB::raw('SUM(stock * price) as total_potential_revenue'))
-                ->value('total_potential_revenue') ?? 0;
-
-            $isSkalaBesar = $potentialRevenue >= 50000000;
-            $minBalanceRequired = $isSkalaBesar ? 3000000 : 1000000; 
-            $minHeldBalance = $isSkalaBesar ? 500000 : 100000;       
-
-            $isEventFinished = false;
-            $isHMinus10 = false;
-            
-            if (!is_null($event->start_date)) {
-                $today = now()->startOfDay();
-                $startDate = Carbon::parse($event->start_date)->startOfDay();
-                $daysLeft = $today->diffInDays($startDate);
-                $isHMinus10 = ($daysLeft <= 10) && $today->isBefore($startDate);
-            }
-            
-            if (!is_null($actualEndDate)) {
-                $isEventFinished = Carbon::parse($actualEndDate)->isPast();
-            }
-
-            $plafonPercent = $isEventFinished ? 1.0 : 0.5; 
-
-            $isBypassedByHMinus10 = false;
-            if ($isHMinus10 && $paidTotal < $minBalanceRequired) {
-                $minBalanceRequired = 0;
-                $minHeldBalance = 0;
-                $isBypassedByHMinus10 = true;
-            }
-
-            // --- PERHITUNGAN WALLET PER EVENT ---
-            $maxEligibleBalance = floor($paidTotal * $plafonPercent);
-            $calculatedAvailable = $maxEligibleBalance - $alreadyWithdrawn;
-            if ($calculatedAvailable < 0) $calculatedAvailable = 0;
-
-            $sisaKasSistem = $paidTotal - $alreadyWithdrawn;
-            $heldBalance = $sisaKasSistem - $calculatedAvailable;
-            if ($heldBalance < 0) $heldBalance = 0;
-
-            $canWithdraw = true;
-            $systemReason = 'Silakan masukkan nominal pengajuan Anda.';
-
-            if ($event->event_status === 'cancelled') {
-                $canWithdraw = false;
-                $calculatedAvailable = 0;
-                $heldBalance = $sisaKasSistem; 
-                $systemReason = 'Event dibatalkan. Dana dibekukan untuk dialokasikan ke sirkuit refund.';
-            } 
-            else {
-                if ($event->withdraw_locked == 1) {
-                    $canWithdraw = false;
-                    $calculatedAvailable = 0;
-                    $heldBalance = $paidTotal - $alreadyWithdrawn;
-                    $systemReason = 'Fitur penarikan dana dinonaktifkan sementara oleh admin.';
-                } 
-                // FIX LOGIKA DI SINI: Target omset minimum hanya mengunci JIKA event BELUM selesai
-                elseif ($paidTotal < $minBalanceRequired && !$isEventFinished) {
-                    $canWithdraw = false;
-                    $calculatedAvailable = 0;
-                    $heldBalance = $paidTotal - $alreadyWithdrawn;
-                    $systemReason = 'Total omset belum mencapai batas minimal pembuka gerbang ' . $this->formatRupiah($minBalanceRequired);
-                } 
-                elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isEventFinished) {
-                    $canWithdraw = false;
-                    $calculatedAvailable = 0;
-                    $heldBalance = $paidTotal - $alreadyWithdrawn;
-                    $systemReason = 'Sisa saldo berjalan di bawah target mengendap ' . $this->formatRupiah($minHeldBalance);
-                } 
-                elseif ($calculatedAvailable <= 0) {
-                    $canWithdraw = false;
-                    $calculatedAvailable = 0;
-                    $systemReason = $isBypassedByHMinus10 
-                        ? 'Gerbang H-10 terbuka otomatis! Namun saldo hak tarik Anda masih 0 karena limit plafon 50% sudah habis.'
-                        : 'Kuota limit penarikan termin berjalan Anda saat ini sudah diambil.';
-                }
-            }
-
-            // Sync Database Wallet secara real-time per event
-            DB::table('event_wallets')
-                ->where('id', $event->wallet_id)
-                ->update([
-                    'available_balance' => (int) $calculatedAvailable,
-                    'held_balance'      => (int) $heldBalance,
-                    'updated_at'        => now()
-                ]);
-
-            $totalGlobalAvailable += ($event->negative_balance > 0) ? 0 : $calculatedAvailable;
-            $totalGlobalHeld += $heldBalance;
-            $totalGlobalSales += $paidTotal;
-            $totalGlobalNegative += $event->negative_balance;
-
-            $wallets[] = [
-                'event_id'             => $event->event_id,
-                'event_name'           => $event->title,
-                'poster'               => $event->poster,
-                'start_date'           => $event->start_date,
-                'end_date'             => $actualEndDate,
-                'status'               => $event->event_status,
-                'is_event_finished'    => $isEventFinished,
-                'is_h_minus_10'        => $isHMinus10,
-                'withdraw_locked'      => $event->withdraw_locked,
-                'negative_balance'     => $event->negative_balance,
-                'skala_event'          => $isSkalaBesar ? 'Besar' : 'Kecil',
-                'total_sales'          => $paidTotal,
-                'already_withdrawn'    => $alreadyWithdrawn,
-                'available_balance'    => $calculatedAvailable, 
-                'held_balance'         => $heldBalance, 
-                'can_withdraw'         => $canWithdraw,
-                'system_reason'        => $systemReason . ($isBypassedByHMinus10 ? ' (Bypass H-10 Aktif)' : ''),
-                'bank_name'            => $event->bank_name ?? '-',
-                'account_name'         => $event->account_name ?? '-',
-                'account_number'       => $event->account_number ?? '-',
-            ];
-        }
+    $wallets[] = [
+        'event_id'          => $event->event_id,
+        'event_name'        => $event->title,
+        'poster'            => $event->poster,
+        'start_date'        => $event->start_date,
+        'end_date'          => $event->end_date ?? $event->start_date,
+        'status'            => $event->event_status,
+        'is_event_finished' => $calc['is_event_finished'],
+        'is_h_minus_10'     => $calc['is_h_minus_10'],
+        'withdraw_locked'   => $calc['withdraw_locked'],
+        'negative_balance'  => $calc['negative_balance'],
+        'skala_event'       => $calc['skala_event'],
+        'total_sales'       => $calc['total_sales'],
+        'already_withdrawn' => $calc['already_withdrawn'],
+        'available_balance' => $calc['available_balance'],
+        'held_balance'      => $calc['held_balance'],
+        'can_withdraw'      => $calc['can_withdraw'],
+        'system_reason'     => $calc['system_reason'],
+        'bank_name'         => $event->bank_name ?? '-',
+        'account_name'      => $event->account_name ?? '-',
+        'account_number'    => $event->account_number ?? '-',
+    ];
+}
 
         // 2. AMBIL RIWAYAT TRANSAKSI WITHDRAWAL
         $historyQuery = DB::table('withdrawals')
