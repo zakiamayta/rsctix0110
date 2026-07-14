@@ -102,10 +102,12 @@
                         <td class="font-bold text-[#1A1208]">Rp {{ number_format($refund->grand_total_refunded) }}</td>
                         <td class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($refund->created_at)->translatedFormat('d M Y, H:i') }}</td>
                         <td class="text-center">
-                            @if($refund->status === 'transferred')
+                            @if($refund->status === 'refunded')
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">SUCCESS</span>
                             @elseif($refund->status === 'rejected')
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">REJECTED</span>
+                            @elseif(in_array($refund->status, ['failed', 'needs_review']))
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">GAGAL</span>
                             @else
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700">PENDING</span>
                             @endif

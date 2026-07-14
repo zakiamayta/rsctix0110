@@ -45,7 +45,10 @@ class RefundTransactionController extends Controller
                 $q->whereNotNull('transaction_merch_id')
                     ->with([
                         'transactionMerch.event',
-                        'transactionMerch.details.productVarian.product',
+                        // Relasi detail yang benar: varian() -> ProductVarian (punya kolom
+                        // 'varian' + relasi product). 'productVarian' tidak ada di model,
+                        // eager-load itu melempar RelationNotFoundException (tab merch crash).
+                        'transactionMerch.details.varian.product',
                     ]);
             })
             ->when($request->event_id, function ($q) use ($request, $type) {

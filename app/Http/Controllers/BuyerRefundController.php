@@ -48,8 +48,12 @@ class BuyerRefundController extends Controller
         }
 
         // Cek double input pengajuan
-        $existing = DB::table('refunds')->where('transaction_id', $id)->first();
-        if ($existing) {
+        $existing = DB::table('refunds')
+            ->where('transaction_id', $id)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($existing && $existing->status !== 'rejected') {
             return redirect()->back()->with('error', 'Anda sudah mengajukan refund untuk transaksi ini.');
         }
 
@@ -89,8 +93,12 @@ class BuyerRefundController extends Controller
         }
 
         // Cek double input pengajuan saat submit
-        $existing = DB::table('refunds')->where('transaction_id', $id)->first();
-        if ($existing) {
+        $existing = DB::table('refunds')
+            ->where('transaction_id', $id)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($existing && $existing->status !== 'rejected') {
             return redirect()->back()->with('error', 'Anda sudah mengajukan refund untuk transaksi ini.');
         }
 

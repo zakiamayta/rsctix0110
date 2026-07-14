@@ -522,7 +522,7 @@
                             ${details.map(d => `
                                 <tr>
                                     <td style="font-weight:600;">${d.buyer_name ?? '-'}</td>
-                                    <td>${d.product_varian?.product?.name ?? '-'} (${d.product_varian?.varian ?? '-'})</td>
+                                    <td>${d.varian?.product?.name ?? '-'} (${d.varian?.varian ?? '-'})</td>
                                     <td>${d.quantity}</td>
                                     <td style="font-weight:700;">${formatRupiah(d.subtotal)}</td>
                                 </tr>

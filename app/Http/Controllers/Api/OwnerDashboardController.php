@@ -341,7 +341,10 @@ class OwnerDashboardController extends Controller
                     'tiket' as product_type
                 FROM transactions t
                 JOIN events e ON t.event_id = e.id
-                LEFT JOIN refunds r ON t.id = r.transaction_id
+                -- Batasi ke refund yang benar-benar berhasil. Tanpa filter status, transaksi
+                -- yang pernah diajukan ulang (punya baris rejected lama + refunded baru) akan
+                -- terduplikasi dan bisa menampilkan info refund yang salah.
+                LEFT JOIN refunds r ON t.id = r.transaction_id AND r.status = 'refunded'
                 WHERE t.payment_status IN ('paid', 'refunded') AND $txCondition
             ", $bindings);
 

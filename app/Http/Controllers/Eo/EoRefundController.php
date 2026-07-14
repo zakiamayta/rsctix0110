@@ -43,7 +43,7 @@ class EORefundController extends Controller
             ->withCount([
                 'refunds as total_pengajuan',
                 'refunds as total_selesai_transfer' => function($query) {
-                    $query->where('status', 'transferred');
+                    $query->where('status', 'refunded');
                 }
             ])
             ->latest()

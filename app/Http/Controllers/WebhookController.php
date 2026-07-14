@@ -12,6 +12,9 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use App\Models\TransactionMerch; 
 use App\Services\TicketWalletService;
 use App\Services\MerchWalletService;
+use App\Models\Refund;
+use App\Models\EODebt;
+use App\Services\XenditPayoutService;
 
 class WebhookController extends Controller
 {
@@ -145,6 +148,191 @@ class WebhookController extends Controller
         }
 
         return response()->json(['message' => 'Ignored webhook'], 200);
+    }
+
+    /// ===================================================
+    /// 🆕 MENANGKAP WEBHOOK PAYOUTS V2 (REFUND OTOMATIS)
+    /// ===================================================
+    public function handlePayoutCallback(Request $request)
+    {
+        set_time_limit(60);
+
+        // 🔐 Verifikasi token — beda slot dari webhook invoice, JANGAN pakai XENDIT_CALLBACK_TOKEN
+        $expectedToken = config('services.xendit.payout_callback_token');
+        if (!empty($expectedToken)) {
+            $incomingToken = (string) $request->header('x-callback-token');
+            if (!hash_equals((string) $expectedToken, $incomingToken)) {
+                Log::warning('Xendit Payout Webhook DITOLAK: token tidak valid.', ['ip' => $request->ip()]);
+                return response()->json(['message' => 'Invalid callback token'], 403);
+            }
+        } else {
+            Log::warning('XENDIT_PAYOUT_CALLBACK_TOKEN belum diset — verifikasi DINONAKTIFKAN.');
+        }
+
+        $data = $request->all();
+        Log::info('Xendit Payout Webhook Received:', $data);
+
+        // Payouts v2 membungkus detail di dalam objek "data"; "?? $data" tetap
+        // menangani kasus payload datar (mis. saat uji coba manual).
+        $payload = $data['data'] ?? $data;
+
+        $referenceId = $payload['reference_id'] ?? null;
+        $status      = strtoupper($payload['status'] ?? '');
+
+        if (!$referenceId || !$status) {
+            return response()->json(['message' => 'Invalid payload'], 400);
+        }
+
+        $refund = Refund::where('xendit_reference_id', $referenceId)->first();
+        if (!$refund) {
+            Log::warning('Payout webhook: refund tidak ditemukan utk reference_id ' . $referenceId);
+            return response()->json(['message' => 'Refund not found'], 404);
+        }
+
+        if ($status === 'SUCCEEDED') {
+            return $this->processSuccessfulPayout($refund, $data);
+        }
+
+        if ($status === 'FAILED') {
+            // 🔒 Idempoten: hanya proses kalau masih 'processing'
+            $affected = Refund::where('id', $refund->id)->where('status', 'processing')->update([
+                'status'               => 'failed',
+                'xendit_payout_status' => 'FAILED',
+                'failure_code'         => $payload['failure_code'] ?? 'UNKNOWN',
+                'failure_message'      => $payload['failure_code'] ?? 'Payout gagal diproses Xendit.',
+                'updated_at'           => now(),
+            ]);
+
+            if ($affected === 0) {
+                Log::info('Payout FAILED duplikat diabaikan.', ['reference_id' => $referenceId]);
+            }
+
+            return response()->json(['message' => 'Payout failure recorded'], 200);
+        }
+
+        if ($status === 'REVERSED') {
+            // ⚠️ Kasus jarang: sempat SUCCEEDED, lalu ditolak channel setelahnya.
+            // TIDAK auto-reverse saldo/debt di sini — terlalu berisiko dilakukan otomatis.
+            // Cukup tandai untuk ditinjau manual oleh admin.
+            Refund::where('id', $refund->id)->update([
+                'status'               => 'needs_review',
+                'xendit_payout_status' => 'REVERSED',
+                'failure_code'         => 'REVERSED_AFTER_SUCCESS',
+                'failure_message'      => 'Payout sempat sukses tapi ditolak channel (rekening tidak valid/dorman). Perlu peninjauan manual admin.',
+                'updated_at'           => now(),
+            ]);
+
+            Log::warning('⚠️ Payout REVERSED — butuh peninjauan manual.', ['refund_id' => $refund->id]);
+
+            return response()->json(['message' => 'Reversal flagged for review'], 200);
+        }
+
+        // ACCEPTED / REQUESTED — status transisi, cukup dicatat, tidak ada aksi
+        Refund::where('id', $refund->id)->update(['xendit_payout_status' => $status]);
+        return response()->json(['message' => 'Status noted'], 200);
+    }
+
+    /**
+     * 💰 Eksekusi finansial saat payout SUKSES — dipindah dari completeBatch() lama,
+     * sekarang berjalan PER-ITEM, dipicu webhook.
+     */
+    protected function processSuccessfulPayout(Refund $refund, array $data)
+    {
+        DB::beginTransaction();
+        try {
+            // 🔒 Idempoten: lock row & pastikan masih 'processing' sebelum potong saldo
+            $refund = Refund::where('id', $refund->id)->lockForUpdate()->first();
+            if ($refund->status !== 'processing') {
+                DB::commit();
+                Log::info('Payout SUCCEEDED duplikat/telat diabaikan.', ['refund_id' => $refund->id]);
+                return response()->json(['message' => 'Already processed'], 200);
+            }
+
+            $batch = $refund->refundBatch; // pastikan relasi refundBatch() ada di Model Refund
+            $isTicket = is_null($refund->transaction_merch_id);
+
+            $relation = $isTicket
+                ? DB::table('transactions')->where('id', $refund->transaction_id)->first()
+                : DB::table('transaction_merch')->where('id', $refund->transaction_merch_id)->first();
+
+            $pureAmountToBuyer = $relation ? $relation->total_amount : $refund->grand_total_refunded;
+            $eventId = $relation->event_id;
+            $eoId = $batch->eo_id;
+
+            $walletTable = $isTicket ? 'event_wallets' : 'merch_wallets';
+
+            // Pastikan angka fresh sebelum dipotong
+            if ($isTicket) {
+                TicketWalletService::recalculate($eventId);
+            } else {
+                MerchWalletService::recalculate($eventId);
+            }
+
+            // 🔒 Kunci baris wallet: cegah dua webhook payout untuk event yang sama
+            // membaca saldo yang sama secara paralel (bisa membuat utang EO tercatat
+            // lebih kecil dari seharusnya).
+            $wallet = DB::table($walletTable)->where('event_id', $eventId)->lockForUpdate()->first();
+            $sumberSaldoUang = $wallet ? ($wallet->available_balance + $wallet->held_balance) : 0;
+
+            if ($sumberSaldoUang < $pureAmountToBuyer) {
+                $kekuranganDana = $pureAmountToBuyer - $sumberSaldoUang;
+
+                DB::table($walletTable)->where('event_id', $eventId)->update([
+                    'available_balance' => 0,
+                    'held_balance'      => 0,
+                ]);
+                DB::table($walletTable)->where('event_id', $eventId)->increment('negative_balance', $kekuranganDana);
+                DB::table($walletTable)->where('event_id', $eventId)->update(['withdraw_locked' => 1]);
+
+                EODebt::create([
+                    'eo_id'          => $eoId,
+                    'event_id'       => $eventId,
+                    'type'           => $isTicket ? 'ticket' : 'merch',
+                    'total_debt'     => $kekuranganDana,
+                    'remaining_debt' => $kekuranganDana,
+                    'status'         => 'unpaid',
+                ]);
+
+                DB::table('eo')->where('id', $eoId)->increment('total_debt', $kekuranganDana);
+            }
+
+            // Potong wallet platform utk biaya transfer per-item
+            DB::table('platform_wallets')->updateOrInsert(['id' => 1], []);
+            DB::table('platform_wallets')->where('id', 1)->update([
+                'total_refund_fees_spent' => DB::raw("total_refund_fees_spent + {$refund->refunds_tax}"),
+                'current_balance'         => DB::raw("current_balance - {$refund->refunds_tax}"),
+                'updated_at'              => now(),
+            ]);
+
+            $refund->update([
+                'grand_total_refunded'  => $pureAmountToBuyer,
+                'status'                => 'refunded',
+                'xendit_payout_status'  => 'SUCCEEDED',
+                'processed_at'          => now(),
+            ]);
+
+            $targetTable = $isTicket ? 'transactions' : 'transaction_merch';
+            DB::table($targetTable)->where('id', $relation->id)->update([
+                'payment_status' => 'refunded',
+                'updated_at'     => now(),
+            ]);
+
+            DB::commit();
+
+            if ($isTicket) {
+                TicketWalletService::recalculate($eventId);
+            } else {
+                MerchWalletService::recalculate($eventId);
+            }
+
+            Log::info('✅ Payout sukses diproses & saldo dipotong.', ['refund_id' => $refund->id]);
+
+            return response()->json(['message' => 'Payout processed successfully'], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal memproses payout sukses: ' . $e->getMessage(), ['refund_id' => $refund->id]);
+            return response()->json(['message' => 'Processing error'], 500);
+        }
     }
 
     /// ===================================================

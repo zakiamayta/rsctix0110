@@ -45,6 +45,7 @@ return [
     'xendit' => [
         'api_key' => env('XENDIT_API_KEY'),
         'callback_token' => env('XENDIT_CALLBACK_TOKEN'),
+        'payout_callback_token' => env('XENDIT_PAYOUT_CALLBACK_TOKEN'),
     ],
 
     'google' => [

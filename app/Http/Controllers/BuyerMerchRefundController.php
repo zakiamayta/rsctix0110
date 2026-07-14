@@ -47,8 +47,8 @@ class BuyerMerchRefundController extends Controller
             return redirect()->route('user.merch')->with('error', 'Komoditas merchandise tidak memenuhi syarat refund atau diselesaikan mandiri oleh EO.');
         }
 
-        $existing = DB::table('refunds')->where('transaction_merch_id', $id)->first();
-        if ($existing) {
+        $existing = DB::table('refunds')->where('transaction_merch_id', $id)->orderByDesc('created_at')->first();
+        if ($existing && $existing->status !== 'rejected') {
             return redirect()->route('user.merch')->with('error', 'Anda sudah mengajukan refund untuk merchandise ini.');
         }
 
@@ -66,7 +66,6 @@ class BuyerMerchRefundController extends Controller
             'bank_name'      => 'required|string|max:100',
             'account_number' => 'required|string|max:50',
             'account_name'   => 'required|string|max:150',
-            'refund_reason'  => 'nullable|string',
         ]);
 
         $user = auth()->user();
@@ -88,8 +87,8 @@ class BuyerMerchRefundController extends Controller
             return redirect()->route('user.merch')->with('error', 'Gagal memproses. Aturan penyelesaian komoditas tidak valid.');
         }
 
-        $existing = DB::table('refunds')->where('transaction_merch_id', $id)->first();
-        if ($existing) {
+        $existing = DB::table('refunds')->where('transaction_merch_id', $id)->orderByDesc('created_at')->first();
+        if ($existing && $existing->status !== 'rejected') {
             return redirect()->route('user.merch')->with('error', 'Anda sudah mengajukan refund untuk merchandise ini.');
         }
 
@@ -121,7 +120,6 @@ class BuyerMerchRefundController extends Controller
             'bank_name'            => $request->bank_name,
             'account_number'       => $request->account_number,
             'account_name'         => $request->account_name,
-            'refund_reason'        => $request->refund_reason,
             'grand_total_refunded' => $pureAmountToBuyer,
             'refunds_tax'          => $refundTaxFee,
             'status'               => $statusRefund,
