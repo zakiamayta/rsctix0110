@@ -12,6 +12,9 @@ class EOMerchController extends Controller
     /**
      * 1. GET HISTORI PENARIKAN MERCHANDISE
      */
+    /**
+     * 1. GET HISTORI PENARIKAN MERCHANDISE (DENGAN FIX OWNER NOTE)
+     */
     public function index(Request $request)
     {
         try {
@@ -28,8 +31,10 @@ class EOMerchController extends Controller
                 ->where('merch_withdrawals.eo_id', $request->eo_id)
                 ->select(
                     'merch_withdrawals.id as withdrawal_id',
+                    'merch_withdrawals.event_id',
                     'merch_withdrawals.amount',
                     'merch_withdrawals.note',
+                    'merch_withdrawals.owner_note', // 🔥 FIX BUG #2: Select owner_note dari database asli
                     'merch_withdrawals.status',
                     'merch_withdrawals.transfer_proof',
                     'merch_withdrawals.created_at',
@@ -59,8 +64,10 @@ class EOMerchController extends Controller
             $formattedHistory = $history->map(function ($item) {
                 return [
                     'id' => $item->withdrawal_id,
+                    'event_id' => (int) $item->event_id,
                     'amount' => (int) $item->amount,
                     'note' => $item->note ?? '',
+                    'owner_note' => $item->owner_note ?? 'Belum ada catatan dari admin.', // 🔥 FIX BUG #2: Teruskan field owner_note ke Flutter
                     'status' => $item->status ?? 'pending',
                     'transfer_proof' => $item->transfer_proof,
                     'event_name' => $item->event_name ?? 'Event Tidak Diketahui',
@@ -142,11 +149,47 @@ class EOMerchController extends Controller
                     ->where('tm.payment_status', 'paid')
                     ->sum('tmd.subtotal') ?? 0;
 
-                // 2. Total penarikan yang SUKSES (approved)
+                // 1b. 🛠️ FIX SALDO RIL: potong refund yang SUDAH selesai (status 'refunded')
+                // dari omset merch, disamakan dengan EOTicketController & dengan
+                // EODashboardController::getRealRevenue() yang memperlakukan wallet
+                // sebagai sumber kebenaran saldo (sudah dipotong refund & WD).
+                $refundedTotal = DB::table('refunds')
+                    ->where('status', 'refunded')
+                    ->whereIn('transaction_merch_id', function ($q) use ($event) {
+                        $q->select('transaction_merch_details.transaction_merch_id')
+                            ->from('transaction_merch_details')
+                            ->join('products', 'products.id', '=', 'transaction_merch_details.product_id')
+                            ->where('products.event_id', $event->event_id);
+                    })
+                    ->sum('grand_total_refunded') ?? 0;
+
+                // 🛠️ FIX BUG: SALDO MINUS TIDAK PERNAH MUNCUL (disamakan dengan
+                // EOTicketController::eventWallets()). Selisih minus dari
+                // (paidTotal - refundedTotal) ditangkap ke $negativeBalance & disimpan
+                // ke DB, bukan dibuang lewat max(0, ...) seperti sebelumnya.
+                $negativeBalance = 0;
+
+                $netAfterRefund = $paidTotal - $refundedTotal;
+                if ($netAfterRefund < 0) {
+                    $negativeBalance += abs($netAfterRefund);
+                }
+                $paidTotal = max(0, $netAfterRefund);
+
+                // 2. Total penarikan yang SUDAH APPROVED SAJA.
+                //    (Penarikan berstatus 'pending' TIDAK memotong saldo yang
+                //    ditampilkan — saldo baru berkurang setelah owner approve.
+                //    Proteksi dobel-pengajuan tetap ada lewat pengecekan
+                //    $hasPendingWithdrawal di requestMerchWithdraw().)
                 $alreadyWithdrawn = DB::table('merch_withdrawals')
                     ->where('event_id', $event->event_id)
-                    ->where('status', 'approved') 
+                    ->where('status', 'approved')
                     ->sum('amount') ?? 0;
+
+                // Deficit tambahan: dana yang sudah/sedang ditarik ternyata melebihi sisa
+                // omset merch bersih event ini (WD disetujui duluan, refund besar belakangan).
+                if (($paidTotal - $alreadyWithdrawn) < 0) {
+                    $negativeBalance += abs($paidTotal - $alreadyWithdrawn);
+                }
 
                 // 3. Deteksi potensi nilai omset berdasarkan stok awal & harga merch
                 $potentialRevenue = DB::table('products_ukuran')
@@ -167,8 +210,22 @@ class EOMerchController extends Controller
                     $isHMinus10 = now()->diffInDays($startDate, false) <= 10;
                 }
 
-                // Jika sudah H-10, plafon naik ke 70%
-                if ($isHMinus10) {
+                // 4b. 🛠️ FIX BUG #1: Deteksi status "Event Selesai" agar plafon otomatis
+                // terbuka penuh 100% dan gerbang syarat omset minimum/saldo mengendap
+                // (yang tadinya hanya dibypass saat H-10) ikut di-bypass juga saat event
+                // sudah benar-benar berakhir. Tanggal akhir riil diambil dari jadwal
+                // terakhir (jika ada), jika tidak ada jadwal maka pakai events.date.
+                $maxJadwalDate = DB::table('jadwal')->where('event_id', $event->event_id)->max('tanggal');
+                $realEndDate = $maxJadwalDate
+                    ? Carbon::parse($maxJadwalDate)
+                    : (!is_null($event->start_date) ? Carbon::parse($event->start_date) : null);
+                $isEventFinished = $realEndDate ? now()->greaterThan($realEndDate) : false;
+
+                // Jika event sudah SELESAI -> plafon 100%. Jika belum tapi sudah H-10 -> 70%.
+                // Selain itu default 50%.
+                if ($isEventFinished) {
+                    $plafonPercent = 1.0;
+                } elseif ($isHMinus10) {
                     $plafonPercent = 0.7; 
                 } else {
                     $plafonPercent = 0.5; 
@@ -194,15 +251,15 @@ class EOMerchController extends Controller
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
                     $systemReason = 'Fitur penarikan dana dinonaktifkan sementara oleh admin.';
                 } 
-                // Auto terbuka jika sudah H-10 walau nominal omset belum tercapai
-                elseif ($paidTotal < $minBalanceRequired && !$isHMinus10) {
+                // Auto terbuka jika sudah H-10 ATAU event sudah selesai, walau nominal omset belum tercapai
+                elseif ($paidTotal < $minBalanceRequired && !$isHMinus10 && !$isEventFinished) {
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
                     $systemReason = 'Total omset belum mencapai batas minimal ' . $this->formatRupiah($minBalanceRequired);
                 } 
-                // Auto terbuka jika sudah H-10 walau sisa saldo berjalan di bawah target mengendap
-                elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isHMinus10) {
+                // Auto terbuka jika sudah H-10 ATAU event sudah selesai, walau sisa saldo berjalan di bawah target mengendap
+                elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isHMinus10 && !$isEventFinished) {
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
                     $heldBalance = $paidTotal - $alreadyWithdrawn;
@@ -211,7 +268,9 @@ class EOMerchController extends Controller
                 elseif ($calculatedAvailable <= 0) {
                     $canWithdraw = false;
                     $calculatedAvailable = 0;
-                    $systemReason = 'Kuota limit penarikan termin berjalan Anda saat ini sudah habis.';
+                    $systemReason = $isEventFinished
+                        ? 'Seluruh saldo kas event ini sudah habis dicairkan.'
+                        : 'Kuota limit penarikan termin berjalan Anda saat ini sudah habis.';
                 }
 
                 // Update data dompet merch agar sinkron di database
@@ -220,6 +279,7 @@ class EOMerchController extends Controller
                     ->update([
                         'available_balance' => (int) $calculatedAvailable,
                         'held_balance'      => (int) $heldBalance,
+                        'negative_balance'  => (int) $negativeBalance,
                         'updated_at'        => now()
                     ]);
 
@@ -230,13 +290,15 @@ class EOMerchController extends Controller
                     'start_date'        => $event->start_date,
                     'status'            => $event->event_status,
                     'is_h_minus_10'     => $isHMinus10,
+                    'is_event_finished' => $isEventFinished,
                     'skala_event'       => $isSkalaBesar ? 'Besar (Potensi Capai ' . $this->formatRupiah($potentialRevenue) . ')' : 'Kecil (Potensi ' . $this->formatRupiah($potentialRevenue) . ')',
                     'total_sales'       => (int) $paidTotal,
+                    'total_refunded'    => (int) $refundedTotal,
                     'already_withdrawn' => (int) $alreadyWithdrawn,
                     'available_balance' => (int) $calculatedAvailable, 
                     'held_balance_ui'   => (int) $heldBalance, 
                     'held_balance'      => (int) $heldBalance, 
-                    'negative_balance'  => (int) $event->negative_balance,
+                    'negative_balance'  => (int) $negativeBalance,
                     'withdraw_locked'   => (int) $event->withdraw_locked,
                     'can_withdraw'      => $canWithdraw,
                     'system_reason'     => $systemReason,
@@ -331,10 +393,28 @@ class EOMerchController extends Controller
                 ->where('tm.payment_status', 'paid')
                 ->sum('tmd.subtotal') ?? 0;
 
-            // Menghitung penarikan sebelumnya (Approved & Pending yang sudah ada sebelum request ini)
+            // 🛠️ FIX SALDO RIL: disamakan dengan merchWallets() — potong refund yang
+            // sudah selesai (status 'refunded') dari omset sebelum dipakai untuk
+            // validasi & perhitungan plafon penarikan.
+            $refundedTotal = DB::table('refunds')
+                ->where('status', 'refunded')
+                ->whereIn('transaction_merch_id', function ($q) use ($request) {
+                    $q->select('transaction_merch_details.transaction_merch_id')
+                        ->from('transaction_merch_details')
+                        ->join('products', 'products.id', '=', 'transaction_merch_details.product_id')
+                        ->where('products.event_id', $request->event_id);
+                })
+                ->sum('grand_total_refunded') ?? 0;
+
+            $paidTotal = max(0, $paidTotal - $refundedTotal);
+
+            // Menghitung penarikan sebelumnya — hanya yang SUDAH APPROVED.
+            // Withdrawal 'pending' tidak ikut memotong plafon di sini karena
+            // EO tidak mungkin sampai ke titik ini jika masih ada pengajuan
+            // pending untuk event yang sama (lihat $hasPendingWithdrawal di atas).
             $alreadyWithdrawn = DB::table('merch_withdrawals')
                 ->where('event_id', $request->event_id)
-                ->whereIn('status', ['approved', 'pending']) 
+                ->where('status', 'approved')
                 ->sum('amount') ?? 0;
 
             $potentialRevenue = DB::table('products_ukuran')
@@ -352,23 +432,34 @@ class EOMerchController extends Controller
                 $isHMinus10 = now()->diffInDays($startDate, false) <= 10;
             }
 
-            // Validasi omset minimum jika belum H-10
-            if ($paidTotal < $minBalanceRequired && !$isHMinus10) {
+            // 🛠️ FIX BUG #1: sinkronkan deteksi "Event Selesai" dengan merchWallets(),
+            // supaya gerbang validasi saat submit tidak lagi menolak pengajuan yang
+            // sebenarnya sudah ditampilkan aktif (100%) di layar dashboard.
+            $maxJadwalDate = DB::table('jadwal')->where('event_id', $request->event_id)->max('tanggal');
+            $realEndDate = $maxJadwalDate
+                ? Carbon::parse($maxJadwalDate)
+                : (!is_null($wallet->start_date) ? Carbon::parse($wallet->start_date) : null);
+            $isEventFinished = $realEndDate ? now()->greaterThan($realEndDate) : false;
+
+            // Validasi omset minimum jika belum H-10 dan event belum selesai
+            if ($paidTotal < $minBalanceRequired && !$isHMinus10 && !$isEventFinished) {
                 return response()->json([
                     'success' => false, 
                     'message' => 'Gagal. Omset belum mencapai batas syarat minimum ' . $this->formatRupiah($minBalanceRequired)
                 ], 400);
             }
 
-            // Validasi saldo mengendap jika belum H-10
-            if (($paidTotal - ($alreadyWithdrawn + $request->amount)) < $minHeldBalance && !$isHMinus10) {
+            // Validasi saldo mengendap jika belum H-10 dan event belum selesai
+            if (($paidTotal - ($alreadyWithdrawn + $request->amount)) < $minHeldBalance && !$isHMinus10 && !$isEventFinished) {
                 return response()->json([
                     'success' => false, 
                     'message' => 'Gagal. Penarikan ini melanggar batas saldo mengendap wajib sistem senilai ' . $this->formatRupiah($minHeldBalance)
                 ], 400);
             }
 
-            if ($isHMinus10) {
+            if ($isEventFinished) {
+                $plafonPercent = 1.0;
+            } elseif ($isHMinus10) {
                 $plafonPercent = 0.7;
             } else {
                 $plafonPercent = 0.5;
@@ -569,9 +660,12 @@ class EOMerchController extends Controller
                 'payment_method' => $transaction->payment_method ?? ($transaction->grand_total == 0 ? 'Free' : 'Xendit Gateway'),
                 'payment_status' => $transaction->payment_status ?? 'paid',
                 'created_at'     => $transaction->created_at ? Carbon::parse($transaction->created_at)->toIso8601String() : now()->toIso8601String(),
-                'total_amount'   => (int) $transaction->total_amount,
-                'service_fee'    => (int) ($transaction->service_tax ?? 0),
-                'total_price'    => (int) $transaction->grand_total,
+                // Semua nilai finansial di bawah diambil LANGSUNG dari kolom tabel `transaction_merch`
+                // (sudah final saat checkout), TANPA dihitung ulang / tanpa logika persentase apa pun.
+                'total_amount'    => (int) $transaction->total_amount,   // Harga total produk (porsi EO)
+                'service_fee'     => (int) ($transaction->service_tax ?? 0), // Biaya layanan (porsi platform)
+                'total_price'     => (int) $transaction->grand_total,    // Total yang dibayar customer
+                'net_revenue_eo'  => (int) $transaction->total_amount,   // Pendapatan bersih EO = total_amount, apa adanya dari DB
             ];
 
             return response()->json([

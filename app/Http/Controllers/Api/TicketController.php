@@ -25,7 +25,41 @@ class TicketController extends Controller
             'tickets.*.qty' => 'required|integer|min:1',
             'tickets.*.name' => 'required|string',
             'tickets.*.phone' => 'nullable|string',
+            // 📧 EMAIL PER PEMEGANG TIKET: wajib diisi agar QR tiket bisa dikirim
+            // ke masing-masing pemilik tiket, bukan hanya ke email pembeli.
+            'tickets.*.email' => 'required|email',
         ]);
+
+        // 🚫 CEK DUPLIKAT NAMA / NO HP ANTAR PEMEGANG TIKET DALAM SATU TRANSAKSI
+        // Setiap pemegang tiket wajib punya identitas berbeda karena tiap tiket akan
+        // punya QR unik sendiri. Jika ada nama atau no HP yang sama antar attendee,
+        // tolak checkout sebelum masuk ke proses DB/stok/pembayaran.
+        $seenNames = [];
+        $seenPhones = [];
+        foreach ($request->tickets as $idx => $item) {
+            $normalizedName = strtolower(trim($item['name'] ?? ''));
+            $normalizedPhone = preg_replace('/\D/', '', $item['phone'] ?? '');
+
+            if ($normalizedName !== '') {
+                if (isset($seenNames[$normalizedName])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Nama pemegang tiket \"{$item['name']}\" digunakan lebih dari satu kali. Setiap pemegang tiket harus punya nama berbeda.",
+                    ], 422);
+                }
+                $seenNames[$normalizedName] = true;
+            }
+
+            if ($normalizedPhone !== '') {
+                if (isset($seenPhones[$normalizedPhone])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Nomor HP \"{$item['phone']}\" digunakan lebih dari satu kali. Setiap pemegang tiket harus punya nomor HP berbeda.",
+                    ], 422);
+                }
+                $seenPhones[$normalizedPhone] = true;
+            }
+        }
 
         DB::beginTransaction();
 
@@ -126,6 +160,9 @@ class TicketController extends Controller
             ]);
 
             // SIMPAN ATTENDEES
+            // 📧 Setiap attendee disimpan dengan emailnya masing-masing. Email inilah yang
+            // dipakai WebhookController::sendAttendeeEmails() untuk mengirim e-tiket dengan
+            // QR unik ke tiap pemegang tiket (bukan hanya ke email pembeli/emailController).
             foreach ($request->tickets as $item) {
                 for ($i = 0; $i < $item['qty']; $i++) {
                     DB::table('ticket_attendees')->insert([
@@ -134,6 +171,7 @@ class TicketController extends Controller
                         'jadwal_id' => $jadwal->id,
                         'name' => $item['name'],
                         'phone_number' => $item['phone'],
+                        'email' => $item['email'],
                     ]);
                 }
             }
@@ -253,12 +291,13 @@ class TicketController extends Controller
             ->leftJoin('events as e', 't.event_id', '=', 'e.id')
             ->leftJoin('jadwal as j', 't.jadwal_id', '=', 'j.id')
             ->whereRaw('LOWER(t.email) = ?', [strtolower($email)])
-            ->whereIn('t.payment_status', ['paid', 'unpaid'])
+            ->where('t.payment_status', 'paid')
             ->orderBy('t.created_at', 'desc')
             ->select(
                 't.id', 't.kode_unik', 't.qr_code', 't.total_amount', 't.service_tax', 't.grand_total',
                 't.checkout_time', 't.payment_status', 't.paid_time', 't.payment_method',
-                'e.title as event_title',
+                'e.id as event_id', 'e.title as event_title', 'e.status as event_status',
+                'e.reschedule_reason', 'e.date as event_date', 'e.is_rescheduled',
                 'j.id as jadwal_id', 'j.info as jadwal_info', 'j.tanggal as tanggal_event', 'j.deskripsi as jadwal_deskripsi'
             )->get();
 
@@ -268,8 +307,42 @@ class TicketController extends Controller
             $attendees = DB::table('ticket_attendees as ta')
                 ->leftJoin('tickets as tk', 'ta.ticket_id', '=', 'tk.id')
                 ->where('ta.transaction_id', $trx->id)
-                ->select('ta.id', 'ta.name', 'ta.phone_number', 'tk.id as ticket_id', 'tk.name as ticket_name', 'tk.price')
+                ->select(
+                    'ta.id', 'ta.name', 'ta.phone_number', 'ta.email',
+                    'ta.qr_code', 'ta.kode_unik', 'ta.is_registered',
+                    'tk.id as ticket_id', 'tk.name as ticket_name', 'tk.price'
+                )
                 ->get();
+
+            // AMBIL DATA REFUND TERBARU UNTUK TRANSAKSI INI (JIKA ADA)
+            $refund = DB::table('refunds')
+                ->where('transaction_id', $trx->id)
+                ->orderBy('id', 'desc')
+                ->first();
+            $refundStatus = $refund->status ?? null; // waiting | pending | refunded | rejected | null
+
+            // JIKA REFUND SUDAH SELESAI (REFUNDED), TIKET TIDAK PERLU DITAMPILKAN LAGI
+            if ($refundStatus === 'refunded') {
+                continue;
+            }
+
+            // STATUS EVENT & PENENTUAN APAKAH TIKET PERLU TINDAKAN (CANCEL/RESCHEDULE)
+            $eventStatus = $trx->event_status ?? 'approved';
+            $isCancelled = $eventStatus === 'cancelled';
+            $isRescheduled = ((int) ($trx->is_rescheduled ?? 0)) >= 1 && $eventStatus === 'approved';
+            $isTicketInvalid = $isCancelled || $isRescheduled;
+
+            // "PERLU TINDAKAN" HANYA JIKA BELUM ADA PENGAJUAN REFUND, ATAU PENGAJUAN SEBELUMNYA DITOLAK
+            $needsAction = $isTicketInvalid && ($refundStatus === null || $refundStatus === 'rejected');
+
+            // CEK APAKAH EVENT SUDAH SELESAI (BERDASARKAN TANGGAL JADWAL, FALLBACK KE TANGGAL EVENT)
+            $refDate = $trx->tanggal_event ?? $trx->event_date;
+            $isFinished = $refDate ? now()->gt(\Carbon\Carbon::parse($refDate)->endOfDay()) : false;
+
+            // JIKA EVENT SUDAH SELESAI SECARA NORMAL (BUKAN CANCEL/RESCHEDULE), TIKET SUDAH TIDAK BERLAKU -> SEMBUNYIKAN
+            if ($isFinished && !$isTicketInvalid) {
+                continue;
+            }
 
             // GROUP DETAIL TIKET
             $details = $attendees->groupBy('ticket_name')->map(function ($items, $ticketName) {
@@ -282,15 +355,22 @@ class TicketController extends Controller
                 ];
             })->values()->toArray();
 
-            // LOGIKA URL QR CODE
-            $fullQrUrl = '';
-            if (!empty($trx->qr_code)) {
-                if (str_starts_with($trx->qr_code, 'http')) {
-                    $fullQrUrl = $trx->qr_code;
-                } else {
-                    $fullQrUrl = url($trx->qr_code); 
-                }
-            } else {
+            // HELPER: UBAH PATH QR RELATIF MENJADI FULL URL
+            $toFullQrUrl = function ($qrPath) {
+                if (empty($qrPath)) return '';
+                return str_starts_with($qrPath, 'http') ? $qrPath : url($qrPath);
+            };
+
+            // LOGIKA URL QR CODE (LEVEL TRANSAKSI)
+            // 🔁 KONSEP BARU: QR tidak lagi dibuat per-transaksi, melainkan per-attendee
+            // (lihat WebhookController::generateAttendeeQRCodes). Kolom transactions.qr_code
+            // dipertahankan untuk kompatibilitas lama, tapi jika kosong kita fallback ke QR
+            // milik pemegang tiket pertama supaya tampilan kartu utama tetap ada QR-nya.
+            $fullQrUrl = $toFullQrUrl($trx->qr_code);
+            if (empty($fullQrUrl) && $attendees->isNotEmpty()) {
+                $fullQrUrl = $toFullQrUrl($attendees->first()->qr_code);
+            }
+            if (empty($fullQrUrl)) {
                 $fullQrUrl = $trx->kode_unik;
             }
 
@@ -314,6 +394,12 @@ class TicketController extends Controller
                 'checkout_time' => $trx->checkout_time,
                 'payment_status' => $trx->payment_status,
                 'event_title' => $trx->event_title,
+                'event_status' => $eventStatus,
+                'is_rescheduled' => (int) ($trx->is_rescheduled ?? 0),
+                'reschedule_reason' => $trx->reschedule_reason,
+                'refund_status' => $refundStatus,
+                'needs_action' => $needsAction,
+                'is_finished' => $isFinished,
                 'jadwal_id' => $trx->jadwal_id,
                 'jadwal_info' => $trx->jadwal_info,
                 'tanggal' => $trx->tanggal_event,
@@ -322,6 +408,12 @@ class TicketController extends Controller
                     'id' => $a->id,
                     'name' => $a->name,
                     'phone_number' => $a->phone_number,
+                    // 📧 Email masing-masing pemegang tiket (tujuan pengiriman e-tiket individual)
+                    'email' => $a->email,
+                    // 🔳 QR code unik milik pemegang tiket ini (bukan QR bersama satu transaksi lagi)
+                    'qr_code' => $toFullQrUrl($a->qr_code),
+                    'kode_unik' => $a->kode_unik,
+                    'is_registered' => (bool) $a->is_registered,
                     'ticket_id' => $a->ticket_id,
                     'ticket_name' => $a->ticket_name,
                     'price' => (int) $a->price,

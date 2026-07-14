@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\Product;
+use App\Support\XenditBankList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class HomeApiController extends Controller
 {
@@ -299,9 +302,6 @@ class HomeApiController extends Controller
             'merchandise' => $merchandise,
         ]);
     }
-    /**
-     * Ambil Notifikasi Kedaruratan Event untuk Pembeli
-     */
     public function notifications(Request $request)
     {
         $email = $request->user() ? $request->user()->email : $request->query('email');
@@ -314,8 +314,8 @@ class HomeApiController extends Controller
             ], 400);
         }
 
-        // Ambil riwayat pembelian tiket yang mengalami pembatalan atau penjadwalan ulang sah
-        $notifications = DB::table('transactions')
+        // 🎟️ A. AMBIL DATA DARI TRANSAKSI TIKET
+        $ticketNotifications = DB::table('transactions')
             ->join('events', 'transactions.event_id', '=', 'events.id')
             ->select(
                 'events.id as event_id',
@@ -324,57 +324,295 @@ class HomeApiController extends Controller
                 'events.status as event_status',
                 'events.date as event_old_date',
                 'events.proposed_date as event_new_date',
-                'events.reschedule_reason',
                 'transactions.kode_unik',
                 'transactions.paid_time'
             )
             ->where('transactions.email', $email)
             ->where('transactions.payment_status', 'paid')
             ->where(function ($query) {
-                // Kondisi 1: Event dibatalkan
                 $query->whereIn('events.status', ['cancelled', 'pending_cancel'])
-                // Kondisi 2: Reschedule yang sudah disetujui (status approved tapi ada alasan reschedule)
                       ->orWhere(function ($q) {
                           $q->where('events.status', 'approved')
                             ->whereNotNull('events.reschedule_reason')
                             ->where('events.reschedule_reason', '!=', '');
                       });
             })
-            ->orderByDesc('transactions.id')
             ->get()
             ->map(function ($item) {
                 $isCancel = in_array($item->event_status, ['cancelled', 'pending_cancel']);
-                
                 $type = $isCancel ? "CANCELLED" : "RESCHEDULE";
                 $title = $isCancel ? "Pembatalan: " . $item->event_title : "Jadwal Baru: " . $item->event_title;
                 
-                // Pesan lengkap yang akan muncul di dialog detail saat diklik
                 if ($isCancel) {
-                    $message = "Dengan hormat kami informasikan bahwa event '" . $item->event_title . "' telah dibatalkan oleh pihak penyelenggara.\n\nSesuai dengan kebijakan proteksi pembeli, Anda memiliki HAK REFUND PENUH (100%) untuk transaksi dengan nomor invoice " . $item->kode_unik . ".";
+                    $message = "Dengan hormat kami informasikan bahwa event '" . $item->event_title . "' telah dibatalkan.\n\nSesuai kebijakan proteksi pembeli, Anda berhak mendapatkan REFUND TIKET PENUH (100%) untuk kode invoice " . $item->kode_unik . ".";
                 } else {
                     $newDateStr = $item->event_new_date ? Carbon::parse($item->event_new_date)->translatedFormat('l, d F Y') : '-';
-                    $message = "Event '" . $item->event_title . "' mengalami perubahan jadwal pelaksanaan.\n\n" .
-                               "🗓️ Jadwal Baru: " . $newDateStr . "\n" .
-                               "💬 Alasan: " . $item->reschedule_reason . "\n\n" .
-                               "Apabila Anda berhalangan hadir pada tanggal baru tersebut, Anda BERHAK mengajukan pengembalian dana penuh (100% Refund) atas nomor invoice " . $item->kode_unik . ".";
+                    $message = "Event '" . $item->event_title . "' mengalami perubahan jadwal.\n\n🗓️ Jadwal Baru: " . $newDateStr . "\n\nJika berhalangan hadir, Anda berhak mengklaim 100% Refund untuk nomor invoice " . $item->kode_unik . ".";
                 }
 
                 return [
                     'event_id' => $item->event_id,
                     'invoice_code' => $item->kode_unik,
                     'type' => $type,
+                    'transaction_type' => 'ticket',
                     'title' => $title,
-                    'short_info' => $isCancel ? "Event ini dibatalkan. Klik untuk info refund." : "Tanggal pelaksanaan berubah. Klik untuk lihat detail.",
+                    'short_info' => $isCancel ? "Event dibatalkan. Ambil refund tiket di sini." : "Jadwal event berubah. Klik detail refund.",
                     'message' => $message,
                     'poster' => $item->event_poster ? asset($item->event_poster) : null,
                     'created_at' => Carbon::parse($item->paid_time)->toDateTimeString(),
                 ];
-            });
+    });
+
+        // 📦 B. AMBIL DATA DARI TRANSAKSI MERCHANDISE
+        // Menyesuaikan jika event yang berhubungan dengan produk merchandise tersebut dibatalkan
+        $merchNotifications = DB::table('transaction_merch')
+            ->join('transaction_merch_details', 'transaction_merch.id', '=', 'transaction_merch_details.transaction_merch_id')
+            ->join('products', 'transaction_merch_details.product_id', '=', 'products.id')
+            ->join('events', 'products.event_id', '=', 'events.id')
+            ->select(
+                'events.id as event_id',
+                'events.title as event_title',
+                'events.poster as event_poster',
+                'events.status as event_status',
+                'transaction_merch.kode_unik',
+                'transaction_merch.paid_time'
+            )
+            ->where('transaction_merch.email', $email)
+            ->where('transaction_merch.payment_status', 'paid')
+            ->whereIn('events.status', ['cancelled', 'pending_cancel'])
+            ->get()
+            ->unique('kode_unik') // Mencegah duplikasi data jika memesan item merch yang berbeda dalam 1 invoice
+            ->map(function ($item) {
+                $title = "Pembatalan Merch: " . $item->event_title;
+                $message = "Sehubungan dengan dibatalkannya event '" . $item->event_title . "', pesanan Merchandise resmi Anda dengan nomor invoice " . $item->kode_unik . " dibatalkan secara otomatis.\n\nAnda berhak mendapatkan pengembalian dana 100% tanpa potongan.";
+
+                return [
+                    'event_id' => $item->event_id,
+                    'invoice_code' => $item->kode_unik,
+                    'type' => 'CANCELLED',
+                    'transaction_type' => 'merch',
+                    'title' => $title,
+                    'short_info' => "Pemesanan Merchandise dibatalkan. Klaim refund di sini.",
+                    'message' => $message,
+                    'poster' => $item->event_poster ? asset($item->event_poster) : null,
+                    'created_at' => Carbon::parse($item->paid_time)->toDateTimeString(),
+                ];
+    });
+
+        // 🏢 C. STATUS PENGAJUAN EO & EVENT
+        // Agar EO tetap bisa memantau status pengajuannya (disetujui/ditolak/masih ditinjau)
+        // meskipun sedang tidak bisa melakukan pengajuan baru.
+        $eoNotifications = collect();
+
+        $user = DB::table('users')->where('email', $email)->first();
+
+        if ($user) {
+            $eo = DB::table('eo')->where('user_id', $user->id)->first();
+
+            if ($eo) {
+                // --- Status pengajuan akun EO (badan usaha) ---
+                $eoType = $eo->status === 'approved'
+                    ? 'EO_APPROVED'
+                    : ($eo->status === 'rejected' ? 'EO_REJECTED' : 'EO_PENDING');
+
+                $eoTitle = $eo->status === 'approved'
+                    ? "Pengajuan EO Disetujui"
+                    : ($eo->status === 'rejected' ? "Pengajuan EO Ditolak" : "Pengajuan EO Sedang Ditinjau");
+
+                if ($eo->status === 'approved') {
+                    $eoMessage = "Selamat! Pengajuan Event Organizer atas nama '" . $eo->nama_badan_usaha . "' telah disetujui.\n\nKamu sudah bisa membuat event melalui halaman Web.";
+                    $eoShortInfo = "Akun EO kamu sudah aktif.";
+                } elseif ($eo->status === 'rejected') {
+                    $eoMessage = "Mohon maaf, pengajuan Event Organizer atas nama '" . $eo->nama_badan_usaha . "' ditolak.\n\nAlasan: " . ($eo->rejected_reason ?? '-');
+                    $eoShortInfo = "Pengajuan ditolak. Lihat alasannya di sini.";
+                } else {
+                    $eoMessage = "Pengajuan Event Organizer atas nama '" . $eo->nama_badan_usaha . "' sedang ditinjau oleh Admin.\n\nMohon tunggu beberapa saat, kamu akan diberi tahu setelah statusnya diperbarui.";
+                    $eoShortInfo = "Sedang ditinjau oleh Admin.";
+                }
+
+                $eoNotifications->push([
+                    'event_id' => null,
+                    'invoice_code' => null,
+                    'type' => $eoType,
+                    'transaction_type' => 'eo',
+                    'title' => $eoTitle,
+                    'short_info' => $eoShortInfo,
+                    'message' => $eoMessage,
+                    'poster' => $eo->logo ? asset($eo->logo) : null,
+                    'created_at' => Carbon::parse($eo->updated_at ?? $eo->created_at)->toDateTimeString(),
+                ]);
+
+                // --- Status pengajuan tiap Event milik EO ini ---
+                $eventSubmissions = DB::table('events')
+                    ->where('eo_id', $eo->id)
+                    ->whereIn('status', ['pending', 'approved', 'rejected'])
+                    ->orderByDesc('updated_at')
+                    ->get();
+
+                foreach ($eventSubmissions as $ev) {
+                    $evType = $ev->status === 'approved'
+                        ? 'EVENT_APPROVED'
+                        : ($ev->status === 'rejected' ? 'EVENT_REJECTED' : 'EVENT_PENDING');
+
+                    $evTitle = $ev->status === 'approved'
+                        ? "Event Disetujui: " . $ev->title
+                        : ($ev->status === 'rejected' ? "Event Ditolak: " . $ev->title : "Event Sedang Ditinjau: " . $ev->title);
+
+                    if ($ev->status === 'approved') {
+                        $evMessage = "Event '" . $ev->title . "' telah disetujui dan sudah tayang di aplikasi.\n\nTiket/merchandise sudah bisa dijual sesuai jadwal yang kamu atur.";
+                        $evShortInfo = "Event sudah tayang & bisa dijual.";
+                    } elseif ($ev->status === 'rejected') {
+                        $evMessage = "Mohon maaf, pengajuan event '" . $ev->title . "' ditolak.\n\nAlasan: " . ($ev->rejected_reason ?? '-');
+                        $evShortInfo = "Pengajuan ditolak. Lihat alasannya di sini.";
+                    } else {
+                        $evMessage = "Pengajuan event '" . $ev->title . "' sedang ditinjau oleh Admin.\n\nMohon tunggu beberapa saat, kamu akan diberi tahu setelah statusnya diperbarui.";
+                        $evShortInfo = "Sedang ditinjau oleh Admin.";
+                    }
+
+                    $eoNotifications->push([
+                        'event_id' => $ev->id,
+                        'invoice_code' => null,
+                        'type' => $evType,
+                        'transaction_type' => 'event_submission',
+                        'title' => $evTitle,
+                        'short_info' => $evShortInfo,
+                        'message' => $evMessage,
+                        'poster' => $ev->poster ? asset($ev->poster) : null,
+                        'created_at' => Carbon::parse($ev->updated_at)->toDateTimeString(),
+                    ]);
+                }
+            }
+        }
+
+        // Gabungkan notifikasi tiket, merchandise, dan status pengajuan EO/Event lalu urutkan berdasarkan tanggal terbaru
+        $allNotifications = $ticketNotifications->concat($merchNotifications)->concat($eoNotifications)
+            ->sortByDesc('created_at')
+            ->values();
 
         return response()->json([
             'status' => true,
-            'total_unread' => $notifications->count(),
-            'data' => $notifications
+            'total_unread' => $allNotifications->count(),
+            'data' => $allNotifications
         ]);
+    }
+
+    /**
+     * Daftar bank yang tersedia di sistem (bersumber dari XenditBankList / xendit_banks.json).
+     * Dipakai Flutter untuk mengisi dropdown "Nama Bank Tujuan" di form refund.
+     */
+    public function listBanks()
+    {
+        return response()->json([
+            'status' => true,
+            'data' => XenditBankList::all(), // [ ['name' => '...', 'code' => 'ID_XXX'], ... ] terurut alfabet
+        ]);
+    }
+
+    /**
+     * Menerima Submit Form Klaim Refund dari Flutter (Mendukung Tiket & Merchandise)
+     */
+    public function submitRefund(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'invoice_code'   => 'required|string',
+            // bank_name WAJIB salah satu nama bank resmi dari daftar Xendit (dipilih lewat dropdown di Flutter),
+            // bukan lagi input bebas, supaya data rekening konsisten & tidak typo.
+            'bank_name'      => ['required', 'string', Rule::in(collect(XenditBankList::all())->pluck('name')->all())],
+            'account_number' => 'required|string',
+            'account_name'   => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Mohon isi semua data rekening Anda dengan benar.',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $invoiceCode = trim($request->invoice_code);
+        
+        $ticketTx = null;
+        $merchTx = null;
+        $grandTotalRefund = 0;
+
+        // 1. Cek apakah ini Kode Invoice Tiket (`transactions`)
+        $ticketTx = DB::table('transactions')->where('kode_unik', $invoiceCode)->first();
+
+        if (!$ticketTx) {
+            // 2. Jika bukan tiket, cek apakah ini Kode Invoice Merchandise (`transaction_merch`)
+            $merchTx = DB::table('transaction_merch')->where('kode_unik', $invoiceCode)->first();
+        }
+
+        // Jika invoice tidak ditemukan di kedua tabel data
+        if (!$ticketTx && !$merchTx) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Nomor invoice transaksi tidak terdaftar di sistem kami.'
+            ], 404);
+        }
+
+        // 3. Validasi Duplikasi Klaim: Cegah agar user tidak melakukan spam kirim ulang dana
+        $alreadyClaimed = DB::table('refunds')
+            ->where(function($q) use ($ticketTx, $merchTx) {
+                if ($ticketTx) $q->where('transaction_id', $ticketTx->id);
+                if ($merchTx) $q->where('transaction_merch_id', $merchTx->id);
+            })->exists();
+
+        if ($alreadyClaimed) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Pengajuan pengembalian dana untuk invoice ini sudah terkirim sebelumnya dan masuk dalam antrean.'
+            ], 400);
+        }
+
+        // Ambil nominal total dana pengembalian dari tabel terkait
+        $grandTotalRefund = $ticketTx ? $ticketTx->grand_total : $merchTx->grand_total;
+
+        DB::beginTransaction();
+        try {
+            // 4. Masukkan baris data baru ke dalam tabel refunds sesuai skema database asli Anda
+            DB::table('refunds')->insert([
+                'transaction_id'       => $ticketTx ? $ticketTx->id : null,
+                'transaction_merch_id' => $merchTx ? $merchTx->id : null,
+                'refund_batch_id'      => null, 
+                'bank_name'            => $request->bank_name, // simpan persis sesuai nama resmi di xendit_banks.json
+                'account_number'       => $request->account_number,
+                'account_name'         => strtoupper($request->account_name),
+                'grand_total_refunded' => $grandTotalRefund,
+                'refunds_tax'          => 2500.00, // Biaya default per refund
+                'status'               => 'waiting', // Default masuk antrean awal 'waiting'
+                'processed_at'         => null,
+                'created_at'           => now(),
+                'updated_at'           => now(),
+            ]);
+
+            // 5. CATATAN: payment_status TIDAK diubah di sini.
+            // Saat user baru MENGAJUKAN refund, status transaksi harus tetap 'paid'/'unpaid'
+            // supaya tiket tetap tampil di "Tiket Saya" dengan badge "refund sedang diproses"
+            // (lihat TicketController::myTickets, yang membaca status dari tabel `refunds`,
+            // bukan dari `transactions.payment_status`).
+            //
+            // `transactions.payment_status` baru boleh diubah menjadi 'refunded' oleh endpoint
+            // ADMIN/EO ketika mereka benar-benar menyelesaikan proses refund (mengubah
+            // `refunds.status` menjadi 'refunded'), bukan pada saat pengajuan pertama kali.
+            //
+            // Untuk merchandise, tidak ada perubahan status yang perlu dilakukan di sini pun;
+            // pencegahan klaim ganda sudah dijamin oleh pengecekan $alreadyClaimed di atas.
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Formulir refund resmi Anda berhasil disimpan ke dalam antrean verifikasi Admin.'
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal memproses pengajuan: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

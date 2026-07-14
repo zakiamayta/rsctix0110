@@ -22,7 +22,12 @@ use App\Http\Controllers\Api\OwnerWalletController;
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AdminPlatformWalletController;
 use App\Http\Controllers\Api\OwnerPlatformRevenue;
-
+use App\Http\Controllers\Api\AdminRevenueController;
+use App\Http\Controllers\Api\AdminCustomerManagementController;
+use App\Http\Controllers\Api\AdminEventController;
+use App\Http\Controllers\Api\AdminWalletController;
+use App\Http\Controllers\Api\EoRefundTransactionController;
+use App\Http\Controllers\Api\EoTransactionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,7 +40,7 @@ Route::get(
     '/logo',
     [GoogleMobileController::class, 'logo']
 );
-
+Route::get('/refunds/banks', [HomeApiController::class, 'listBanks']);
 /// GOOGLE LOGIN
 Route::post(
     '/google-login',
@@ -54,6 +59,7 @@ Route::get(
     [HomeApiController::class, 'index']
 );
 Route::get('/notifications', [App\Http\Controllers\Api\HomeApiController::class, 'notifications']);
+Route::middleware('auth:sanctum')->post('/refunds/submit', [HomeApiController::class, 'submitRefund']);
 /// EVENTS
 Route::get(
     '/events',
@@ -171,7 +177,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/ticket-sales', [EODashboardController::class, 'ticketSales']);
     Route::get('/ticket-sales/{id}', [EODashboardController::class, 'ticketSalesDetail']);
-
+    Route::get('/eo/real-revenue', [EODashboardController::class, 'getRealRevenue']);
+    Route::get('/eo/outgoing-transactions', [EoTransactionController::class, 'getOutgoingTransactions']);
     /*
     |--------------------------------------------------------------------------
     | EO WITHDRAWAL SYSTEM (SINKRON FRONT-END)
@@ -228,4 +235,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/admin/dashboard', [AdminDashboardController::class, 'index']);
     Route::get('/admin/platform-wallet', [AdminPlatformWalletController::class, 'index']);
+    Route::get('/admin/revenue/detail', [App\Http\Controllers\Api\AdminRevenueController::class, 'getRevenueDetail']);
+
+    
+    // Rute untuk mengambil semua daftar customer (GET /api/admin/users)
+    Route::get('/admin/users', [AdminCustomerManagementController::class, 'getCustomerList']);
+    
+    // Rute untuk mengambil detail aktivitas customer berdasarkan ID (GET /api/admin/users/{id}/activity)
+    Route::get('/admin/users/{id}/activity', [AdminCustomerManagementController::class, 'getCustomerActivity']);
+    Route::get('/eo/dashboard', [EODashboardController::class, 'getDashboardData']);
+    Route::get('/eo/active-events', [EODashboardController::class, 'getActiveEvents']);
+    /// ADMIN EVENT MANAGEMENT (DI DALAM AUTH SANCTUM 🔒)
+    Route::prefix('admin/events')->group(function () {
+        Route::get('/', [AdminEventController::class, 'index']);
+        Route::post('{id}/approve', [AdminEventController::class, 'approve']);
+    });
+    
 });
