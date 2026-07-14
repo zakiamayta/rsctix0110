@@ -66,6 +66,34 @@ class AdminEventMonitoringController extends Controller
                     FROM eo_debts ed
                     WHERE ed.eo_id = eo.id AND ed.status != 'paid'
                 ) as outstanding_debt"),
+                 DB::raw("(
+                    SELECT COALESCE(SUM(t.total_amount), 0)
+                    FROM refunds r
+                    JOIN transactions t ON t.id = r.transaction_id
+                    JOIN events e2 ON e2.id = t.event_id
+                    WHERE e2.eo_id = eo.id AND r.status IN ('waiting', 'pending')
+                ) as ticket_pending_refund"),
+                DB::raw("(
+                    SELECT COALESCE(SUM(tm.total_amount), 0)
+                    FROM refunds r
+                    JOIN transaction_merch tm ON tm.id = r.transaction_merch_id
+                    JOIN events e2 ON e2.id = tm.event_id
+                    WHERE e2.eo_id = eo.id AND r.status IN ('waiting', 'pending')
+                ) as merch_pending_refund"),
+                DB::raw("(
+                    SELECT COALESCE(SUM(r.grand_total_refunded), 0)
+                    FROM refunds r
+                    JOIN transactions t ON t.id = r.transaction_id
+                    JOIN events e2 ON e2.id = t.event_id
+                    WHERE e2.eo_id = eo.id AND r.status = 'refunded'
+                ) as ticket_refunded_out"),
+                DB::raw("(
+                    SELECT COALESCE(SUM(r.grand_total_refunded), 0)
+                    FROM refunds r
+                    JOIN transaction_merch tm ON tm.id = r.transaction_merch_id
+                    JOIN events e2 ON e2.id = tm.event_id
+                    WHERE e2.eo_id = eo.id AND r.status = 'refunded'
+                ) as merch_refunded_out"),
                 DB::raw("(
                     SELECT EXISTS(
                         SELECT 1 FROM event_wallets ew
@@ -89,6 +117,12 @@ class AdminEventMonitoringController extends Controller
                          + (float) DB::table('transaction_merch')->where('payment_status', 'paid')->sum('grand_total'),
             'total_wallet_balance' => (float) DB::table('event_wallets')->sum(DB::raw('available_balance + held_balance')),
             'total_debt' => (float) DB::table('eo_debts')->whereIn('status', ['unpaid', 'partially_paid'])->sum('remaining_debt'),
+            'total_pending_refund' => (float) DB::table('refunds')
+                ->leftJoin('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+                ->leftJoin('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+                ->whereIn('refunds.status', ['waiting', 'pending']) // tanggungan = refund belum dieksekusi (waiting + pending)
+                ->sum(DB::raw('COALESCE(transactions.total_amount, transaction_merch.total_amount)')),
+            'total_refunded_out' => (float) DB::table('refunds')->where('status', 'refunded')->sum('grand_total_refunded'),
             'total_locked' => DB::table('events')
                 ->join('event_wallets', 'events.id', '=', 'event_wallets.event_id')
                 ->where('event_wallets.withdraw_locked', 1)
@@ -140,6 +174,24 @@ class AdminEventMonitoringController extends Controller
             ->where('eo_id', $eoId)
             ->whereIn('status', ['unpaid', 'partially_paid'])
             ->sum('remaining_debt');
+
+        // Tanggungan Refund yang belum diproses (masih menunggu, BUKAN utang)
+        $pendingRefundLiability = (float) DB::table('refunds')
+            ->leftJoin('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+            ->leftJoin('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+            ->leftJoin('events', DB::raw('COALESCE(transactions.event_id, transaction_merch.event_id)'), '=', 'events.id')
+            ->where('events.eo_id', $eoId)
+            ->whereIn('refunds.status', ['waiting', 'pending']) // tanggungan = refund belum dieksekusi (waiting + pending)
+            ->sum(DB::raw('COALESCE(transactions.total_amount, transaction_merch.total_amount)'));
+
+        // Total Dana Keluar untuk Refund yang SUDAH direalisasikan (history, final)
+        $totalRefundedOut = (float) DB::table('refunds')
+            ->leftJoin('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+            ->leftJoin('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+            ->leftJoin('events', DB::raw('COALESCE(transactions.event_id, transaction_merch.event_id)'), '=', 'events.id')
+            ->where('events.eo_id', $eoId)
+            ->where('refunds.status', 'refunded')
+            ->sum('refunds.grand_total_refunded');
 
         // Track record distribusi status event
         $now = Carbon::now();
@@ -213,6 +265,7 @@ class AdminEventMonitoringController extends Controller
 
         return view('admin.monitoring.eo-show', compact(
             'eo', 'eoEmail', 'totalRevenue', 'walletBalance', 'outstandingDebt',
+            'pendingRefundLiability', 'totalRefundedOut',
             'statusCount', 'events', 'revenueTrend', 'revenueTrendMax'
         ));
     }

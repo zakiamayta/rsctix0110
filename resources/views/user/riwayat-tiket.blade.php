@@ -17,6 +17,40 @@
 .btn-white {
     background: #fff;
 }
+
+/* 🎨 TINT KARTU BERDASARKAN STATUS EVENT (FULL CARD, bukan cuma strip atas) */
+.card-status-cancelled,
+.card-status-cancelled .card-body {
+    background-color: #fdecea !important;
+    border: 1px solid rgba(220,53,69,.35) !important;
+}
+
+.card-status-rescheduled,
+.card-status-rescheduled .card-body {
+    background-color: #fff6da !important;
+    border: 1px solid rgba(255,193,7,.45) !important;
+}
+
+.card-status-refunded,
+.card-status-refunded .card-body {
+    background-color: #eaf2fe !important;
+    border: 1px solid rgba(13,110,253,.35) !important;
+}
+
+/* Warna alert notifikasi — DIPAKAI SAMA PERSIS baik di card maupun di dalam modal detail,
+   supaya konsisten (bukan scoped ke parent card lagi). */
+.status-tint-cancelled {
+    background-color: rgba(220,53,69,.14);
+    color: #b02a37;
+}
+.status-tint-rescheduled {
+    background-color: rgba(255,193,7,.22);
+    color: #7a5c00;
+}
+.status-tint-refunded {
+    background-color: rgba(13,110,253,.14);
+    color: #0d47a1;
+}
 </style>
 
 <div class="px-6 lg:px-16 xl:px-24 2xl:px-32 py-8 bg-light">
@@ -72,13 +106,43 @@
         $totalQty = $trx->details->count();
         // Membaca status refund secara aman dari data transaksi
         $currentRefundStatus = $trx->refund_status ?? ($trx->refund->status ?? null);
+
+        // Penentu tint kartu berdasarkan status event/refund (refunded = prioritas tertinggi,
+        // karena kalau sudah refund berarti sudah "selesai", bukan lagi butuh perhatian merah/kuning)
+        $cardStatusClass = '';
+        if ($currentRefundStatus === 'refunded' || $trx->payment_status === 'refunded') {
+            $cardStatusClass = 'card-status-refunded';
+        } elseif ($trx->event_status === 'cancelled') {
+            $cardStatusClass = 'card-status-cancelled';
+        } elseif (($trx->event_is_rescheduled ?? 0) > 0) {
+            $cardStatusClass = 'card-status-rescheduled';
+        }
     @endphp
 
-    <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+    <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden {{ $cardStatusClass }}">
         {{-- TOP BAR --}}
         <div style="height:5px; background: {{ $trx->payment_status == 'paid' ? 'linear-gradient(to right,#22c55e,#86efac)' : 'linear-gradient(to right,#f97316,#fbbf24)' }};"></div>
 
         <div class="card-body p-4">
+
+            {{-- 🔔 NOTIFIKASI STATUS EVENT/REFUND DI AWAL CARD (BUKAN DI DETAIL) --}}
+            @if($currentRefundStatus === 'refunded' || $trx->payment_status === 'refunded')
+                <div class="alert status-tint-refunded border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Anda sudah melakukan <strong>refund</strong> untuk tiket ini. Dana telah dikembalikan ke rekening Anda.</span>
+                </div>
+            @elseif($trx->event_status === 'cancelled')
+                <div class="alert status-tint-cancelled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>Event ini telah <strong>dibatalkan</strong> oleh penyelenggara. Anda berhak mengajukan pengembalian dana.</span>
+                </div>
+            @elseif(($trx->event_is_rescheduled ?? 0) > 0)
+                <div class="alert status-tint-rescheduled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                    <i class="bi bi-calendar-event-fill"></i>
+                    <span>Jadwal event ini telah <strong>diubah (reschedule)</strong> oleh penyelenggara.</span>
+                </div>
+            @endif
+
             {{-- HEADER CARD --}}
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
@@ -166,13 +230,17 @@
                 </div>
 
                 <div class="modal-body p-4">
-                    {{-- STATUS EVENT DI DALAM MODAL JIKA CANCELLED/RESCHEDULED --}}
-                    @if($trx->event_status === 'cancelled')
-                        <div class="p-3 rounded-4 mb-3 bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 small">
+                    {{-- STATUS EVENT/REFUND DI DALAM MODAL (SINKRON DENGAN ALERT DI CARD) --}}
+                    @if($currentRefundStatus === 'refunded' || $trx->payment_status === 'refunded')
+                        <div class="p-3 rounded-4 mb-3 status-tint-refunded small">
+                            <i class="bi bi-check-circle-fill me-2"></i> Anda sudah melakukan refund untuk tiket ini. Dana telah dikembalikan ke rekening Anda.
+                        </div>
+                    @elseif($trx->event_status === 'cancelled')
+                        <div class="p-3 rounded-4 mb-3 status-tint-cancelled small">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i> Event ini telah dibatalkan oleh pihak penyelenggara. Anda berhak mengajukan pengembalian dana penuh sesuai ketentuan tiket murni.
                         </div>
                     @elseif($trx->event_is_rescheduled > 0)
-                        <div class="p-3 rounded-4 mb-3 bg-info bg-opacity-10 text-info border border-info border-opacity-20 small">
+                        <div class="p-3 rounded-4 mb-3 status-tint-rescheduled small">
                             <i class="bi bi-info-circle-fill me-2"></i> Penyelenggara telah melakukan penjadwalan ulang pada event ini. Anda berhak melakukan pengajuan refund apabila berhalangan hadir.
                         </div>
                     @endif
@@ -220,9 +288,9 @@
                                     </span>
                                 </div>
                                 
-                                {{-- STATUS EVALUASI PENGGUNAAN TIKET --}}
+                                {{-- STATUS EVALUASI PENGGUNAAN TIKET (PER-ATTENDEE, BUKAN PER-TRANSAKSI) --}}
                                 <div>
-                                    @if(isset($trx->is_registered) && ($trx->is_registered == 1 || $trx->is_registered === true))
+                                    @if($item->attendee_is_registered == 1 || $item->attendee_is_registered === true)
                                         <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1.5 small fw-bold">
                                             <i class="bi bi-check-circle-fill me-1"></i> TIKET SUDAH DIGUNAKAN
                                         </span>
@@ -234,24 +302,24 @@
                                 </div>
                             </div>
 
-                            {{-- SISI KANAN: QR CODE ASLI DARI DATABASE (TANPA GENERATE SENDIRI) --}}
+                            {{-- SISI KANAN: QR CODE MILIK PESERTA INI SENDIRI (BUKAN QR TRANSAKSI INDUK) --}}
                             <div class="col-md-4 text-center text-md-end">
                                 @if($trx->payment_status === 'paid' && $trx->event_status !== 'cancelled')
-                                    @if($trx->qr_code)
+                                    @if($item->attendee_qr_code)
                                         <div class="p-2 border d-inline-block bg-light rounded-3 shadow-sm text-center">
                                             {{-- Menggunakan nama class lengkap \Illuminate\Support\Str agar tidak error Class Not Found --}}
-                                            @if(\Illuminate\Support\Str::contains($trx->qr_code, ['.png', '.jpg', '.jpeg', '.svg']))
-                                                <img src="{{ asset($trx->qr_code) }}" alt="QR Ticket" class="img-fluid" style="width: 110px; height: 110px;">
+                                            @if(\Illuminate\Support\Str::contains($item->attendee_qr_code, ['.png', '.jpg', '.jpeg', '.svg']))
+                                                <img src="{{ asset($item->attendee_qr_code) }}" alt="QR Ticket" class="img-fluid" style="width: 110px; height: 110px;">
                                             @else
                                                 {{-- Jika isi kolom bkn path gambar melainkan teks raw string, tampilkan teksnya saja --}}
                                                 <div class="p-3 text-dark small font-monospace bg-white rounded border text-center" style="width: 110px; min-height: 110px; display: flex; align-items: center; justify-content: center; word-break: break-all;">
-                                                    {{ $trx->qr_code }}
+                                                    {{ $item->attendee_qr_code }}
                                                 </div>
                                             @endif
-                                            <span class="d-block text-muted mt-1 font-monospace" style="font-size: 10px;">{{ $trx->kode_unik }}</span>
+                                            <span class="d-block text-muted mt-1 font-monospace" style="font-size: 10px;">{{ $item->attendee_kode_unik }}</span>
                                         </div>
                                     @else
-                                        {{-- Jika data qr_code di database kosong, tidak menampilkan QR sama sekali --}}
+                                        {{-- Jika data qr_code peserta ini kosong, tidak menampilkan QR sama sekali --}}
                                         <div class="text-center p-3 text-muted small bg-light rounded-3 d-inline-block w-100" style="max-width: 140px;">
                                             <i class="bi bi-qr-code text-secondary" style="font-size: 24px; opacity:0.5;"></i>
                                             <span class="d-block mt-1 text-secondary small">QR Belum Tersedia</span>

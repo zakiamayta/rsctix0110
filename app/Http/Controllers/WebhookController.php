@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Mail;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 // 🌟 PASTIKAN MODEL BERIKUT SUDAH DI-IMPORT AGAR EMAIL MERCHANDISE JALAN
 use App\Models\TransactionMerch; 
+// 🌟 PASTIKAN MODEL BERIKUT SUDAH DI-IMPORT AGAR EMAIL MERCHANDISE JALAN
+use App\Models\TransactionMerch; 
 
 class WebhookController extends Controller
 {
@@ -70,12 +72,17 @@ class WebhookController extends Controller
                 }
 
                 $transaction->refresh();
+                // Pastikan baris buku kas platform ada. update() saja akan gagal diam-diam
+                // jika baris id=1 belum pernah dibuat, sehingga service tax tak pernah terakumulasi.
+                DB::table('platform_wallets')->updateOrInsert(['id' => 1], []);
                 DB::table('platform_wallets')->where('id', 1)->update([
                 'total_service_tax_earned' => DB::raw("total_service_tax_earned + {$transaction->service_tax}"),
                 'current_balance'          => DB::raw("current_balance + {$transaction->service_tax}"),
+                'updated_at'               => now(),
             ]);
                 $this->generateAttendeeQRCodes($transaction);
                 $this->sendAttendeeEmails($transaction);
+                TicketWalletService::recalculate($transaction->event_id);
                 return response()->json(['message' => 'Ticket transaction updated'], 200);
             }
 
@@ -92,6 +99,21 @@ class WebhookController extends Controller
                         'payment_status' => 'paid',
                         'paid_time' => now(),
                     ]);
+                // 🔒 IDEMPOTEN: sama seperti tiket, cegah pemrosesan ganda saat Xendit retry.
+                // Catatan: tabel transaction_merch TIDAK punya kolom payment_method, jadi tidak diset.
+                $affected = TransactionMerch::where('id', $merch->id)
+                    ->where(function ($q) {
+                        $q->where('payment_status', 'unpaid')->orWhereNull('payment_status');
+                    })
+                    ->update([
+                        'payment_status' => 'paid',
+                        'paid_time' => now(),
+                    ]);
+
+                if ($affected === 0) {
+                    Log::info('Webhook PAID merch duplikat diabaikan (sudah diproses).', ['invoice_id' => $invoiceId]);
+                    return response()->json(['message' => 'Merch already processed'], 200);
+                }
 
                 if ($affected === 0) {
                     Log::info('Webhook PAID merch duplikat diabaikan (sudah diproses).', ['invoice_id' => $invoiceId]);
@@ -104,9 +126,15 @@ class WebhookController extends Controller
                     'details.varian',
                     'details.ukuran',
                 ])->find($merch->id);
+                $updatedMerch = TransactionMerch::with([
+                    'details.product',
+                    'details.varian',
+                    'details.ukuran',
+                ])->find($merch->id);
                 
                 $this->generateMerchQRCode($updatedMerch);
                 $this->sendMerchEmail($updatedMerch);
+                MerchWalletService::recalculate($updatedMerch->event_id);
                 return response()->json(['message' => 'Merch transaction updated'], 200);
             }
 
@@ -166,6 +194,30 @@ class WebhookController extends Controller
     try {
         $qrPath = public_path('images/qrcodes');
         if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
+    // public function generateTicketQRCode($transaction)
+    // {
+    //     try {
+    //         $qrPath = public_path('images/qrcodes');
+    //         if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
+
+    //         $qrData = route('absen.form', ['kode' => $transaction->kode_unik]);
+    //         $qrFileName = 'ticket_' . $transaction->kode_unik . '.png';
+    //         $qrFullPath = $qrPath . '/' . $qrFileName;
+
+    //         QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
+
+    //         $transaction->qr_code = 'images/qrcodes/' . $qrFileName;
+    //         $transaction->save();
+    //     } catch (\Exception $e) {
+    //         Log::error('Failed to generate QR Code Tiket: ' . $e->getMessage());
+    //     }
+    // }
+
+    public function generateAttendeeQRCodes($transaction)
+{
+    try {
+        $qrPath = public_path('images/qrcodes');
+        if (!File::exists($qrPath)) File::makeDirectory($qrPath, 0755, true);
 
         $attendees = DB::table('ticket_attendees')->where('transaction_id', $transaction->id)->get();
 
@@ -182,6 +234,30 @@ class WebhookController extends Controller
 
             QrCode::format('png')->size(300)->generate($qrData, $qrFullPath);
 
+            DB::table('ticket_attendees')->where('id', $attendee->id)->update([
+                'qr_code' => 'images/qrcodes/' . $qrFileName,
+            ]);
+        }
+    } catch (\Exception $e) {
+        Log::error('Gagal generate QR per peserta: ' . $e->getMessage());
+    }
+}
+
+public function sendAttendeeEmails($transaction)
+{
+    ini_set('memory_limit', '-1');
+
+    $transaction = \App\Models\Transaction::with(['event', 'attendees.ticket.jadwal'])->find($transaction->id);
+
+    foreach ($transaction->attendees as $attendee) {
+        if (!$attendee->email) {
+            Log::warning('Peserta tanpa email, lewati pengiriman', ['attendee_id' => $attendee->id]);
+            continue;
+        }
+
+        try {
+            Mail::to($attendee->email)->send(new \App\Mail\TicketWithPDF($transaction, $attendee));
+            Log::info('Email tiket terkirim ke peserta', ['attendee_id' => $attendee->id, 'email' => $attendee->email]);
             DB::table('ticket_attendees')->where('id', $attendee->id)->update([
                 'qr_code' => 'images/qrcodes/' . $qrFileName,
             ]);

@@ -34,6 +34,11 @@ class UserController extends Controller
             ->get();
 
         foreach ($transactions as $trx) {
+            // 🎯 SINKRONISASI QR PER-PESERTA: setiap attendee punya qr_code & kode_unik
+            // masing-masing (lihat WebhookController::generateAttendeeQRCodes()), jadi
+            // WAJIB diambil per baris di sini — jangan pakai qr_code/kode_unik milik
+            // transaksi induk untuk semua peserta, karena itu akan salah kalau
+            // pembelian berisi lebih dari 1 tiket.
             $trx->details = DB::table('ticket_attendees')
                 ->join('tickets', 'ticket_attendees.ticket_id', '=', 'tickets.id')
                 ->leftJoin('jadwal', 'tickets.jadwal_id', '=', 'jadwal.id')
@@ -42,6 +47,9 @@ class UserController extends Controller
                 ->select(
                     'ticket_attendees.name',
                     'ticket_attendees.phone_number',
+                    'ticket_attendees.qr_code as attendee_qr_code',
+                    'ticket_attendees.kode_unik as attendee_kode_unik',
+                    'ticket_attendees.is_registered as attendee_is_registered',
                     'tickets.name as ticket_name',
                     'tickets.price',
                     'events.title as event_title',

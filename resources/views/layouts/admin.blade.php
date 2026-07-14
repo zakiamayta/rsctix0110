@@ -518,6 +518,13 @@
                     </svg>
                     Persetujuan Refund
                 </a>
+                <a href="{{ route('admin.refund.transactions') }}"
+                class="nav-link nav-link-danger {{ request()->routeIs('admin.refund.transactions') ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+                    </svg>
+                    Transaksi Refund
+                </a>
             </div>
                          {{-- 🆕 MANAJEMEN PENGGUNA (INTEGRASI FITUR KELOLA USER) --}}
             <div class="nav-group">

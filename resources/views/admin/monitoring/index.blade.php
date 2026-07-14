@@ -21,8 +21,8 @@
         </div>
     </div>
 
-    {{-- ===================== STATISTIK PLATFORM ===================== --}}
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+        {{-- ===================== STATISTIK PLATFORM ===================== --}}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
 
         <div class="card rounded-xl p-3.5 flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#fff7ed;">
@@ -71,6 +71,30 @@
             <div class="min-w-0">
                 <p class="text-[10px] font-semibold uppercase tracking-wide truncate" style="color:#9ca3af;">Utang</p>
                 <p class="text-base font-bold leading-tight truncate" style="color:#ef4444;">Rp {{ number_format($platformStats['total_debt'], 0, ',', '.') }}</p>
+            </div>
+        </div>
+
+        <div class="card rounded-xl p-3.5 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#fffbeb;">
+                <svg class="w-4 h-4" style="color:#d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[10px] font-semibold uppercase tracking-wide truncate" style="color:#9ca3af;">Refund Diproses</p>
+                <p class="text-base font-bold leading-tight truncate" style="color:#d97706;">Rp {{ number_format($platformStats['total_pending_refund'], 0, ',', '.') }}</p>
+            </div>
+        </div>
+
+        <div class="card rounded-xl p-3.5 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#f3f4f6;">
+                <svg class="w-4 h-4" style="color:#6b7280;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                </svg>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[10px] font-semibold uppercase tracking-wide truncate" style="color:#9ca3af;">Dana Keluar Refund</p>
+                <p class="text-base font-bold leading-tight truncate" style="color:#6b7280;">Rp {{ number_format($platformStats['total_refunded_out'], 0, ',', '.') }}</p>
             </div>
         </div>
 
@@ -143,6 +167,7 @@
                     default    => ['bg-gray-100', 'text-gray-600', ucfirst($eo->status ?? '-')],
                 };
                 $gmv = $eo->ticket_gmv + $eo->merch_gmv;
+                $pendingRefund = $eo->ticket_pending_refund + $eo->merch_pending_refund;
             @endphp
 
             <a href="{{ route('admin.monitoring.eo.show', $eo->id) }}"
@@ -186,7 +211,7 @@
                 @endif
 
                 {{-- METRICS --}}
-                <div class="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 mt-auto" style="border-top:1px dashed #e5e7eb;">
+<div class="grid grid-cols-3 gap-x-2 gap-y-2 pt-2 mt-auto" style="border-top:1px dashed #e5e7eb;">
                     <div>
                         <p class="text-[9px] uppercase tracking-wide font-semibold" style="color:#9ca3af;">GMV</p>
                         <p class="font-bold text-xs truncate" style="color:#111827;">Rp {{ number_format($gmv, 0, ',', '.') }}</p>
@@ -202,10 +227,17 @@
                         </p>
                     </div>
                     <div>
+                        <p class="text-[9px] uppercase tracking-wide font-semibold" style="color:#9ca3af;">Refund Pending</p>
+                        <p class="font-bold text-xs truncate" style="color: {{ $pendingRefund > 0 ? '#d97706' : '#111827' }};">
+                            Rp {{ number_format($pendingRefund, 0, ',', '.') }}
+                        </p>
+                    </div>
+                    <div>
                         <p class="text-[9px] uppercase tracking-wide font-semibold" style="color:#9ca3af;">Event</p>
                         <p class="font-bold text-xs truncate" style="color:#111827;">{{ $eo->total_event }} ({{ $eo->total_event_approved }} apv)</p>
                     </div>
                 </div>
+
             </a>
         @empty
             <div class="col-span-full">

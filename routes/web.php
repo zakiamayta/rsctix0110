@@ -33,6 +33,7 @@ use App\Http\Controllers\Admin\AdminFinanceController;
 use App\Http\Controllers\Admin\PlatformWalletController;
 use App\Http\Controllers\Admin\AdminEventMonitoringController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\RefundTransactionController;
 
 // Controllers - Event Organizer (EO) Area
 use App\Http\Controllers\Eo\EoController;
@@ -235,6 +236,8 @@ Route::middleware('auth')->group(function () {
             Route::post('/absensi/manual/{id}', 'absenManual')->name('absensi.manual');
             Route::post('/absensi/batal/{id}', 'batalAbsen')->name('absensi.batal');
         });
+
+        Route::get('/refund-transactions', [RefundTransactionController::class, 'index'])->name('refund.transactions');
 
         // Route::controller(AdminController::class)->group(function () {
         //     Route::post('/absensi/{transaction}/mark', 'markPresence')->name('absensi.mark');

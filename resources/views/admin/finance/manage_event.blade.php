@@ -32,43 +32,80 @@
     {{-- AREA KONTROL UTAMA --}}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
         
-        {{-- KOTAK I: DETAIL PROTEKSI & RESUME FINANCIAL DOMPET --}}
-        <div class="bg-white border border-gray-200 rounded p-4 shadow-sm flex flex-col justify-between">
+ {{-- KOTAK I: DETAIL PROTEKSI & RESUME FINANCIAL DOMPET --}}
+<div class="bg-white border border-gray-200 rounded p-4 shadow-sm flex flex-col justify-between">
+    <div>
+        <div class="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2">Informasi Umum Event</div>
+        <div class="space-y-2 text-xs">
+            <div><span class="text-gray-400">Judul Event:</span> <strong class="text-gray-900 text-sm block font-sans tracking-tight">{{ $event->title }}</strong></div>
             <div>
-                <div class="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2">Informasi Umum Event</div>
-                <div class="space-y-2 text-xs">
-                    <div><span class="text-gray-400">Judul Event:</span> <strong class="text-gray-900 text-sm block font-sans tracking-tight">{{ $event->title }}</strong></div>
-                    <div>
-                        <span class="text-gray-400">Status Event Saat Ini:</span> 
-                        @if($event->event_status === 'canceled')
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">CANCELED / BATAL</span>
-                        @elseif($event->event_status === 'approved' && $event->is_rescheduled > 0)
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">ACTIVE/RESCHEDULED</span>
-                        @else
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 border border-green-200">{{ strtoupper($event->event_status) }}</span>
-                        @endif
+                <span class="text-gray-400">Status Event Saat Ini:</span>
+                @if($event->event_status === 'cancelled')
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">CANCELLED / BATAL</span>
+                @elseif(in_array($event->event_status, ['pending_cancel', 'pending_reschedule']))
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">{{ strtoupper(str_replace('_', ' ', $event->event_status)) }}</span>
+                @elseif($event->event_status === 'approved' && $event->is_rescheduled > 0)
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">ACTIVE/RESCHEDULED</span>
+                @else
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 border border-green-200">{{ strtoupper($event->event_status) }}</span>
+                @endif
+            </div>
+            <div class="pt-1">
+                <span class="text-gray-400">Status Proteksi Penarikan:</span>
+                @if(($event->withdraw_locked ?? 0) == 1)
+                    <span class="text-red-600 font-bold">🔒 Terkunci (Withdraw Locked)</span>
+                @else
+                    <span class="text-green-600 font-bold">✅ Terbuka (Normal)</span>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 pt-3 border-t border-gray-100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {{-- ===== KOLOM TIKET ===== --}}
+            <div class="space-y-2">
+                <div class="text-[10px] font-bold uppercase text-orange-600 tracking-wider">🎫 Dompet Tiket</div>
+                <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
+                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Saldo (Tersedia + Held)</div>
+                    <div class="text-base font-bold text-orange-700">Rp {{ number_format(($event->available_balance ?? 0) + ($event->held_balance ?? 0), 0, ',', '.') }}</div>
+                    <div class="text-[10px] text-gray-500 mt-1 font-sans">
+                        Tersedia: Rp {{ number_format($event->available_balance ?? 0, 0, ',', '.') }} | Held: Rp {{ number_format($event->held_balance ?? 0, 0, ',', '.') }}
                     </div>
-                    <div class="pt-1">
-                        <span class="text-gray-400">Status Proteksi Penarikan:</span> 
-                        @if(($event->withdraw_locked ?? 0) == 1)
-                            <span class="text-red-600 font-bold">🔒 Terkunci (Withdraw Locked)</span>
-                        @else
-                            <span class="text-green-600 font-bold">✅ Terbuka (Normal)</span>
-                        @endif
-                    </div>
+                </div>
+                <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
+                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Sisa Utang Tiket</div>
+                    <div class="text-base font-bold {{ $ticketDebt > 0 ? 'text-amber-600' : 'text-green-600' }}">Rp {{ number_format($ticketDebt, 0, ',', '.') }}</div>
+                </div>
+                <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
+                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Refund Menunggu (Tiket)</div>
+                    <div class="text-base font-bold {{ $ticketRefundLiability > 0 ? 'text-amber-600' : 'text-green-600' }}">Rp {{ number_format($ticketRefundLiability, 0, ',', '.') }}</div>
                 </div>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-gray-100">
+            {{-- ===== KOLOM MERCH ===== --}}
+            <div class="space-y-2">
+                <div class="text-[10px] font-bold uppercase text-purple-600 tracking-wider">👕 Dompet Merch</div>
                 <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
-                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Total Saldo Tersedia (+ Held)</div>
-                    <div class="text-lg font-bold text-orange-700">Rp {{ number_format(($event->available_balance ?? 0) + ($event->held_balance ?? 0), 0, ',', '.') }}</div>
+                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Saldo (Tersedia + Held)</div>
+                    <div class="text-base font-bold text-purple-700">Rp {{ number_format(($merchWallet->available_balance ?? 0) + ($merchWallet->held_balance ?? 0), 0, ',', '.') }}</div>
                     <div class="text-[10px] text-gray-500 mt-1 font-sans">
-                        Tersedia: Rp {{ number_format($event->available_balance ?? 0, 0, ',', '.') }} | Ditahan (Held): Rp {{ number_format($event->held_balance ?? 0, 0, ',', '.') }}
+                        Tersedia: Rp {{ number_format($merchWallet->available_balance ?? 0, 0, ',', '.') }} | Held: Rp {{ number_format($merchWallet->held_balance ?? 0, 0, ',', '.') }}
                     </div>
+                </div>
+                <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
+                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Sisa Utang Merch</div>
+                    <div class="text-base font-bold {{ $merchDebt > 0 ? 'text-amber-600' : 'text-green-600' }}">Rp {{ number_format($merchDebt, 0, ',', '.') }}</div>
+                </div>
+                <div class="bg-gray-50 border rounded p-3 text-xs font-mono">
+                    <div class="text-[10px] font-bold uppercase text-gray-400 font-sans tracking-wider mb-1">Refund Menunggu (Merch)</div>
+                    <div class="text-base font-bold {{ $merchRefundLiability > 0 ? 'text-amber-600' : 'text-green-600' }}">Rp {{ number_format($merchRefundLiability, 0, ',', '.') }}</div>
                 </div>
             </div>
         </div>
+        <div class="text-[10px] text-gray-400 mt-2 font-sans">⚠️ Top-up yang disetujui otomatis memotong utang dompet bersangkutan. "Refund Menunggu" = antrean yang belum dieksekusi (terpisah dari utang).</div>
+    </div>
+</div>
 
         {{-- KOTAK II: INSTIGATOR REQUEST TAGIHAN TOP UP KE EO --}}
         <div class="bg-white border border-gray-200 rounded p-4 shadow-sm">
@@ -77,9 +114,19 @@
             <form action="{{ route('admin.finance.requestTopup', $event->id) }}" method="POST" class="space-y-3">
                 @csrf
                 <div>
+                    <label class="block text-[11px] font-bold text-gray-600 mb-1">Dompet Tujuan Suntikan:</label>
+                    <select name="type" id="topupType" required
+                            data-ticket-debt="{{ (int) $ticketDebt }}" data-merch-debt="{{ (int) $merchDebt }}"
+                            class="w-full rounded border border-gray-300 p-2 text-xs focus:outline-none focus:border-orange-500 bg-white text-gray-800">
+                        <option value="ticket">🎫 Tiket (event_wallets)</option>
+                        <option value="merch">👕 Merchandise (merch_wallets)</option>
+                    </select>
+                    <span class="text-[10px] text-gray-400 mt-0.5 block leading-normal">Pilih sesuai jenis refund yang kekurangan dana.</span>
+                </div>
+                <div>
                     <label class="block text-[11px] font-bold text-gray-600 mb-1">Jumlah Dana yang Diminta (Rp):</label>
-                    <input type="number" name="amount_requested" required min="1000" placeholder="Contoh: 15000000" class="w-full rounded border border-gray-300 p-2 font-mono text-xs focus:outline-none focus:border-orange-500 bg-white text-gray-800">
-                    <span class="text-[10px] text-gray-400 mt-0.5 block leading-normal">Tagihan ini akan otomatis muncul di dashboard EO terkait.</span>
+                    <input type="number" name="amount_requested" id="topupAmount" required min="1000" placeholder="Contoh: 15000000" class="w-full rounded border border-gray-300 p-2 font-mono text-xs focus:outline-none focus:border-orange-500 bg-white text-gray-800">
+                    <span class="text-[10px] text-gray-400 mt-0.5 block leading-normal">Terisi otomatis sebesar sisa utang dompet terpilih (boleh diubah manual). <span id="topupDebtHint" class="font-semibold text-amber-600"></span></span>
                 </div>
 
                 <div>
@@ -91,6 +138,35 @@
                     🚀 Tembak Tagihan ke EO
                 </button>
             </form>
+
+            <script>
+                (function () {
+                    var sel  = document.getElementById('topupType');
+                    var amt  = document.getElementById('topupAmount');
+                    var hint = document.getElementById('topupDebtHint');
+                    if (!sel || !amt) return;
+
+                    var debts = {
+                        ticket: parseInt(sel.dataset.ticketDebt || '0', 10),
+                        merch:  parseInt(sel.dataset.merchDebt  || '0', 10)
+                    };
+                    var userEdited = false;
+                    amt.addEventListener('input', function () { userEdited = true; });
+
+                    function apply() {
+                        var d = debts[sel.value] || 0;
+                        if (hint) {
+                            hint.textContent = d > 0
+                                ? 'Sisa utang: Rp ' + d.toLocaleString('id-ID')
+                                : 'Tidak ada utang aktif — isi manual untuk pra-danai refund.';
+                        }
+                        if (!userEdited && d > 0) { amt.value = d; }
+                    }
+                    // Ganti dompet = reset auto-fill agar mengikuti utang dompet baru
+                    sel.addEventListener('change', function () { userEdited = false; apply(); });
+                    apply();
+                })();
+            </script>
         </div>
 
     </div>
@@ -122,18 +198,17 @@
                         <td class="p-3 border-r text-right font-mono font-bold text-gray-900">
                             Rp {{ number_format($t->amount_requested, 0, ',', '.') }}
                         </td>
-      <td class="p-3 border-r text-center">
-    @if($t->proof_of_transfer)
-        <button type="button" 
-                data-proof="/{{ $t->proof_of_transfer }}"
-                onclick="openProofModal(this)" 
-                class="bg-gray-100 hover:bg-gray-200 border text-gray-700 px-2 py-1 rounded text-[11px] font-medium transition inline-flex items-center gap-1 shadow-sm">
-            📸 Lihat Gambar
-        </button>
-    @else
-        <span class="text-gray-400 italic text-[11px]">Belum Upload</span>
-    @endif
-</td>
+                        <td class="p-3 border-r text-center">
+                            @if($t->proof_of_transfer)
+                                <button type="button"
+                                        data-proof="/{{ $t->proof_of_transfer }}"
+                                        onclick="openProofModal(this)"
+                                        class="bg-gray-100 hover:bg-gray-200 border text-gray-700 px-2 py-1 rounded text-[11px] font-medium transition inline-flex items-center gap-1 shadow-sm">
+                                    📸 Lihat Gambar
+                                </button>
+                            @else
+                                <span class="text-gray-400 italic text-[11px]">Belum Upload</span>
+                            @endif
                         </td>
                         <td class="p-3 border-r text-center">
                             @if($t->status === 'approved')

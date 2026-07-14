@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Exports\RefundXenditExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\TicketWalletService;
+use App\Services\MerchWalletService;
 
 class AdminRefundController extends Controller
 {
@@ -324,40 +326,50 @@ class AdminRefundController extends Controller
 
         $biayaOperasionalXendit = $pendingRefunds->sum('refunds_tax');
         $walletTable = $batch->type === 'ticket' ? 'event_wallets' : 'merch_wallets';
+
+        // Pastikan angka fresh sebelum uang benar-benar dipotong
+        if ($batch->type === 'ticket') {
+            TicketWalletService::recalculate($batch->event_id);
+        } else {
+            MerchWalletService::recalculate($batch->event_id);
+        }
+
         $wallet = DB::table($walletTable)->where('event_id', $batch->event_id)->first();
-        
-        $isCancelled = ($batch->event->status === 'cancelled');
-        $sumberSaldoUang = $wallet ? ($isCancelled ? $wallet->held_balance : $wallet->available_balance) : 0;
+
+        // Sumber dana refund = SELURUH kas riil event (available + held), bukan hanya plafon
+        // available (50%). Untuk event cancelled available memang 0 sehingga otomatis setara held.
+        // Utang HANYA muncul bila refund melebihi kas riil (mis. EO sudah menarik dananya duluan).
+        $sumberSaldoUang = $wallet ? ($wallet->available_balance + $wallet->held_balance) : 0;
 
         DB::beginTransaction();
         try {
-            if ($sumberSaldoUang >= $totalBebanEO) {
-                $fieldToDecrement = $isCancelled ? 'held_balance' : 'available_balance';
-                DB::table($walletTable)->where('event_id', $batch->event_id)->decrement($fieldToDecrement, $totalBebanEO);
-            } else {
+            if ($sumberSaldoUang < $totalBebanEO) {
                 $kekuranganDana = $totalBebanEO - $sumberSaldoUang;
 
-                if ($sumberSaldoUang > 0) {
-                    $fieldToZero = $isCancelled ? 'held_balance' : 'available_balance';
-                    DB::table($walletTable)->where('event_id', $batch->event_id)->update([$fieldToZero => 0]);
+                if ($wallet) {
+                    // Kosongkan kas riil; kekurangan menjadi utang (sekali catat), bukan saldo minus ganda.
+                    DB::table($walletTable)->where('event_id', $batch->event_id)->update([
+                        'available_balance' => 0,
+                        'held_balance'      => 0,
+                    ]);
+                    DB::table($walletTable)->where('event_id', $batch->event_id)->increment('negative_balance', $kekuranganDana);
+                    DB::table($walletTable)->where('event_id', $batch->event_id)->update(['withdraw_locked' => 1]);
                 }
 
-                // Catat utang EO
+                // Catat utang EO (dengan tipe komoditas agar pelunasan diarahkan ke dompet yang benar)
                 EODebt::create([
                     'eo_id'          => $batch->eo_id,
                     'event_id'       => $batch->event_id,
+                    'type'           => $batch->type,
                     'total_debt'     => $kekuranganDana,
                     'remaining_debt' => $kekuranganDana,
                     'status'         => 'unpaid',
                 ]);
 
-                if ($wallet) {
-                    DB::table($walletTable)->where('event_id', $batch->event_id)->increment('negative_balance', $kekuranganDana);
-                    DB::table($walletTable)->where('event_id', $batch->event_id)->update(['withdraw_locked' => 1]);
-                }
-
                 DB::table('eo')->where('id', $batch->eo_id)->increment('total_debt', $kekuranganDana);
             }
+            // Bila kas mencukupi tidak ada pemotongan manual: recalculate() di akhir menyusun
+            // ulang available/held dari paidTotal setelah transaksi di-flip menjadi 'refunded'.
 
             // Potong wallet platform untuk biaya mass transfer
             DB::table('platform_wallets')->where('id', 1)->update([
@@ -392,6 +404,12 @@ class AdminRefundController extends Controller
             $batch->update(['status' => 'completed']);
 
             DB::commit();
+
+            if ($batch->type === 'ticket') {
+                TicketWalletService::recalculate($batch->event_id);
+            } else {
+                MerchWalletService::recalculate($batch->event_id);
+            }
             return redirect()->route('admin.refunds.index', ['tab' => $batch->type])
                 ->with('success', 'Batch berhasil ditutup sepenuhnya dan finansial disinkronkan.');
         } catch (\Exception $e) {

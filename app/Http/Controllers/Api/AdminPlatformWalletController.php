@@ -41,9 +41,10 @@ class AdminPlatformWalletController extends Controller
                     ->whereIn('payment_status', ['paid', 'refunded'])
                     ->sum('service_tax');
 
-                // Ambil service_tax dari transaksi merchandise (status paid)
+                // Ambil service_tax dari transaksi merchandise (status paid atau refunded)
+                // Service tax TIDAK dikembalikan saat refund — platform tetap menyimpannya, konsisten dengan tiket.
                 $merchTax = DB::table('transaction_merch')
-                    ->where('payment_status', 'paid')
+                    ->whereIn('payment_status', ['paid', 'refunded'])
                     ->sum('service_tax');
 
                 $totalServiceTaxEarned = (float)($ticketTax + $merchTax);

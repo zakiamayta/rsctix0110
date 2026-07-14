@@ -248,7 +248,11 @@ class AdminDashboardController extends Controller
                     'total_events'  => DB::table('events')->where('eo_id', $eo->id)->count(),
                     'total_revenue' => (int)$totalRevenue,
                     'balance'       => (float)$eo->balance,
-                    'debt'          => (float)$eo->total_debt,
+                    // Sumber utang KANONIK = eo_debts (bukan cache eo.total_debt) agar konsisten lintas halaman
+                    'debt'          => (float) DB::table('eo_debts')
+                                        ->where('eo_id', $eo->id)
+                                        ->whereIn('status', ['unpaid', 'partially_paid'])
+                                        ->sum('remaining_debt'),
                     'status'        => $eo->status,
                     'track_record'  => [
                         'done'        => $doneEvents,
