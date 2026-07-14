@@ -40,6 +40,12 @@ class EventApprovalController extends Controller
      */
     public function approve(Event $event)
     {
+        // Guard: tombol ini khusus menyetujui event BARU / hasil resubmit (status 'pending').
+        // Cegah "menghidupkan" kembali event cancelled/rejected lewat link basi.
+        if ($event->status !== 'pending') {
+            return back()->with('error', 'Hanya event berstatus "pending" yang bisa di-approve di sini.');
+        }
+
         $event->update([
             'status' => 'approved'
         ]);

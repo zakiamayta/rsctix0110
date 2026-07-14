@@ -36,7 +36,15 @@ class TicketWalletService
             $wallet = DB::table('event_wallets')->where('id', $walletId)->first();
         }
 
-        $actualEndDate = DB::table('jadwal')->where('event_id', $eventId)->max('tanggal') ?? $event->date;
+        // Tanggal SELESAI event = yang paling akhir antara jadwal & events.date.
+        // Penting pasca-reschedule: events.date bisa lebih baru dari jadwal (yang belum
+        // disesuaikan). Jangan anggap event "selesai" hanya karena jadwal lama sudah lewat —
+        // itu membuka plafon penarikan 100% padahal event (yang dijadwal ulang) belum terjadi.
+        $maxJadwal = DB::table('jadwal')->where('event_id', $eventId)->max('tanggal');
+        $actualEndDate = $event->date;
+        if ($maxJadwal && Carbon::parse($maxJadwal)->greaterThan(Carbon::parse($event->date))) {
+            $actualEndDate = $maxJadwal;
+        }
 
         $paidTotal = DB::table('transactions')
             ->where('event_id', $eventId)

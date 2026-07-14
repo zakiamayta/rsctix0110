@@ -138,4 +138,60 @@ class XenditPayoutService
             return ['success' => false, 'refund' => $refund, 'message' => 'Kesalahan jaringan: ' . $e->getMessage()];
         }
     }
+
+    /**
+     * 🔍 Tarik status TERKINI sebuah payout langsung dari Xendit (GET).
+     * Dipakai untuk sinkronisasi manual saat webhook tidak/terlambat diterima.
+     *
+     * return: ['success' => bool, 'status' => string|null, 'raw' => array|null, 'message' => string]
+     */
+    public function fetchPayoutStatus(Refund $refund): array
+    {
+        // Utamakan lookup by payout id (unik). Fallback ke reference_id bila id belum tersimpan.
+        if ($refund->xendit_payout_id) {
+            $url = $this->baseUrl . '/' . $refund->xendit_payout_id;
+        } elseif ($refund->xendit_reference_id) {
+            $url = $this->baseUrl . '?reference_id=' . urlencode($refund->xendit_reference_id);
+        } else {
+            return ['success' => false, 'status' => null, 'raw' => null, 'message' => 'Refund belum pernah dikirim ke Xendit.'];
+        }
+
+        try {
+            $response = Http::withBasicAuth($this->apiKey, '')->timeout(30)->get($url);
+            $body = $response->json();
+
+            if (!$response->successful()) {
+                Log::error('Gagal cek status payout Xendit', [
+                    'refund_id' => $refund->id,
+                    'http'      => $response->status(),
+                    'body'      => $body,
+                ]);
+                return [
+                    'success' => false,
+                    'status'  => null,
+                    'raw'     => $body,
+                    'message' => $body['message'] ?? ('HTTP ' . $response->status()),
+                ];
+            }
+
+            // Query by reference_id mengembalikan list {data:[...]}; by id mengembalikan objek langsung.
+            $payout = (isset($body['data']) && is_array($body['data']))
+                ? ($body['data'][0] ?? null)
+                : $body;
+
+            if (!$payout) {
+                return ['success' => false, 'status' => null, 'raw' => $body, 'message' => 'Payout tidak ditemukan di Xendit.'];
+            }
+
+            return [
+                'success' => true,
+                'status'  => strtoupper($payout['status'] ?? ''),
+                'raw'     => $payout,
+                'message' => 'OK',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Exception cek status payout Xendit: ' . $e->getMessage(), ['refund_id' => $refund->id]);
+            return ['success' => false, 'status' => null, 'raw' => null, 'message' => 'Kesalahan jaringan: ' . $e->getMessage()];
+        }
+    }
 }

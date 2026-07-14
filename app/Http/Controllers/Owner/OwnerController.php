@@ -95,23 +95,33 @@ class OwnerController extends Controller
         // =====================================================================
         // 3. METRIK FINANSIAL & KEUNTUNGAN SERVICE TAX (REVISI)
         // =====================================================================
-        // Ambil Data Transaksi Tiket Terbayar (Paid) beserta Pajak Layanannya
-        $ticketSalesQuery = DB::table('transactions')->where('payment_status', 'paid');
+        // Transaksi tiket yang PERNAH terbayar (paid + refunded). Wajib menyertakan 'refunded'
+        // karena service tax TIDAK dikembalikan saat refund — platform tetap menyimpannya.
+        // Tanpa 'refunded', keuntungan platform keliru jadi 0 saat semua pembeli refund.
+        $ticketSalesQuery = DB::table('transactions')->whereIn('payment_status', ['paid', 'refunded']);
         $ticketSalesQuery = $applyDateFilter($ticketSalesQuery, 'created_at');
         $totalTicketSales = $ticketSalesQuery->sum('grand_total');
-        $platformTicketTax = $ticketSalesQuery->sum('service_tax'); // Menghitung untung platform dari tiket
+        $platformTicketTax = $ticketSalesQuery->sum('service_tax'); // Untung platform dari tiket (tetap dihitung walau refund)
 
-        // Ambil Data Transaksi Merchandise Terbayar (Paid) beserta Pajak Layanannya
-        $merchSalesQuery = DB::table('transaction_merch')->where('payment_status', 'paid');
+        // Idem untuk merchandise: service tax tetap milik platform meski transaksi di-refund.
+        $merchSalesQuery = DB::table('transaction_merch')->whereIn('payment_status', ['paid', 'refunded']);
         $merchSalesQuery = $applyDateFilter($merchSalesQuery, 'created_at');
         $totalMerchSales = $merchSalesQuery->sum('grand_total');
-        $platformMerchTax = $merchSalesQuery->sum('service_tax'); // Menghitung untung platform dari merch
+        $platformMerchTax = $merchSalesQuery->sum('service_tax'); // Untung platform dari merch (tetap dihitung walau refund)
 
         // TOTAL OMZET PLATFORM (Semua dana masuk kotor sebelum WD EO & Refund Pembeli)
         $totalPlatformSales = $totalTicketSales + $totalMerchSales;
 
-        // TOTAL KEUNTUNGAN BERSIH PLATFORM (Akumulasi Service Tax Tiket + Merch)
-        $totalPlatformEarnings = $platformTicketTax + $platformMerchTax;
+        // Biaya transfer Xendit (Rp2.500 per refund) untuk setiap refund yang BERHASIL diproses.
+        // Biaya ini ditanggung platform (dipotong dari service tax), jadi keuntungan yang
+        // ditampilkan adalah BERSIH. Difilter status 'refunded' karena fee baru benar-benar
+        // dibebankan saat transfer sukses (konsisten dgn platform_wallets.total_refund_fees_spent).
+        $refundFeeQuery = DB::table('refunds')->where('status', 'refunded');
+        $refundFeeQuery = $applyDateFilter($refundFeeQuery, 'processed_at');
+        $totalRefundFees = $refundFeeQuery->sum('refunds_tax');
+
+        // TOTAL KEUNTUNGAN BERSIH PLATFORM = Service Tax (paid+refunded) − Biaya transfer refund Xendit
+        $totalPlatformEarnings = ($platformTicketTax + $platformMerchTax) - $totalRefundFees;
 
         // =====================================================================
         // 4. GRAFIK TREN HARIAN INTERAKTIF
@@ -263,7 +273,7 @@ class OwnerController extends Controller
             'totalEO', 'approvedEO', 'pendingEO', 'rejectedEO',
             'totalEvents', 'approvedEvents', 'pendingEvents', 'rejectedEvents',
             'pendingEventBaru', 'pendingReschedule', 'pendingCancel', 'pendingWithdrawal', 'pendingMerchWithdrawal', 'totalPending',
-            'totalUsers', 'totalTicketSales', 'totalMerchSales', 'totalPlatformSales', 'totalPlatformEarnings', 
+            'totalUsers', 'totalTicketSales', 'totalMerchSales', 'totalPlatformSales', 'totalPlatformEarnings', 'totalRefundFees',
             'chartLabels', 'chartTicketData', 'chartMerchData', 'eoPerformances',
             'trendLabels', 'trendApproved', 'trendPending', 'trendRejected',
             'recentEO', 'recentEvents', 'recentActivity', 'period'

@@ -271,7 +271,7 @@
         .admin-content { flex: 1; padding: 24px; }
 
         /* Flash Messages */
-        .flash-success, .flash-error, .flash-warning {
+        .flash-success, .flash-error, .flash-warning, .flash-info {
             display: flex; align-items: flex-start; gap: 10px;
             border-radius: 10px; padding: 12px 16px;
             font-size: 13px; font-weight: 500; margin-bottom: 22px;
@@ -279,7 +279,8 @@
         .flash-success { background: #E8F5EE; border: 1px solid #B7DFC9; color: #1A7A44; }
         .flash-error   { background: #FDECEC; border: 1px solid #F5B8B8; color: #9C2222; }
         .flash-warning { background: #FFF5E0; border: 1px solid #F5D98A; color: #9A6200; }
-        .flash-success svg, .flash-error svg, .flash-warning svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+        .flash-info    { background: #E7F1FE; border: 1px solid #B6D4F7; color: #1E5FB4; }
+        .flash-success svg, .flash-error svg, .flash-warning svg, .flash-info svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
 
         /* Responsive */
         @media (max-width: 991.98px) {
@@ -346,6 +347,74 @@
 .dropdown-item-danger { color: #B92929; }
 .dropdown-item-danger svg { color: #B92929; }
 .dropdown-item-danger:hover { background: #FFF0F0; }
+
+/* Badge angka di menu sidebar (mis. jumlah refund waiting) */
+.nav-badge {
+    margin-left: auto;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #E03131;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    border-radius: 999px;
+}
+/* Lonceng notifikasi header */
+.topbar-bell-wrap { position: relative; }
+.topbar-bell-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px; height: 38px;
+    border-radius: 9px;
+    border: 1px solid var(--rsc-border);
+    background: var(--rsc-surface);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.topbar-bell-btn:hover { background: var(--rsc-orange-light); border-color: #F5C4A0; }
+.topbar-bell-btn svg { width: 18px; height: 18px; color: var(--rsc-dark); }
+.topbar-bell-dot {
+    position: absolute;
+    top: -6px; right: -6px;
+    min-width: 17px; height: 17px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #E03131;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    border-radius: 999px;
+    border: 2px solid var(--rsc-surface);
+}
+.bell-dropdown { width: 320px; max-height: 400px; overflow-y: auto; }
+.bell-item {
+    display: block;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rsc-border);
+    transition: background 0.1s;
+}
+.bell-item:hover { background: var(--rsc-bg); }
+.bell-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bell-item-email { font-size: 12px; font-weight: 700; color: var(--rsc-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bell-item-amount { font-size: 12px; font-weight: 800; color: #E8590C; white-space: nowrap; }
+.bell-item-event { font-size: 11px; color: var(--rsc-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bell-item-time { font-size: 10px; color: var(--rsc-muted); margin-top: 2px; }
+.bell-tag { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; }
+.bell-tag-ticket { background: #FFF0E6; color: #E8590C; }
+.bell-tag-merch  { background: #FFF9DB; color: #B08900; }
+.bell-empty { padding: 26px 16px; text-align: center; font-size: 12px; color: var(--rsc-muted); }
+.bell-footer { padding: 10px 14px; text-align: center; }
+.bell-footer a { font-size: 12px; font-weight: 700; color: var(--rsc-orange); }
     </style>
 
     @stack('styles')
@@ -517,6 +586,9 @@
                         <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
                     </svg>
                     Persetujuan Refund
+                    @if(($refundWaitingCount ?? 0) > 0)
+                        <span class="nav-badge" title="{{ $refundWaitingCount }} pengajuan refund menunggu batch">{{ $refundWaitingCount > 99 ? '99+' : $refundWaitingCount }}</span>
+                    @endif
                 </a>
                 <a href="{{ route('admin.refund.transactions') }}"
                 class="nav-link nav-link-danger {{ request()->routeIs('admin.refund.transactions') ? 'active' : '' }}">
@@ -567,7 +639,52 @@
                 <h1 class="topbar-page-title">@yield('title', 'Dashboard')</h1>
             </div>
 
-<div class="topbar-right">
+<div class="topbar-right" style="display:flex; align-items:center; gap:10px;">
+
+    {{-- 🔔 Lonceng notifikasi pengajuan refund menunggu (waiting) --}}
+    <div class="topbar-bell-wrap">
+        <button id="topbar-bell-btn" type="button" class="topbar-bell-btn" title="Pengajuan refund menunggu batch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            @if(($refundWaitingCount ?? 0) > 0)
+                <span class="topbar-bell-dot">{{ $refundWaitingCount > 99 ? '99+' : $refundWaitingCount }}</span>
+            @endif
+        </button>
+
+        <div id="topbar-bell-dropdown" class="topbar-dropdown bell-dropdown">
+            <div class="dropdown-header" style="display:flex; align-items:center; justify-content:space-between;">
+                <span class="dropdown-name">🔔 Refund Menunggu</span>
+                @if(($refundWaitingCount ?? 0) > 0)
+                    <span class="nav-badge" style="margin-left:0;">{{ $refundWaitingCount }}</span>
+                @endif
+            </div>
+
+            @forelse(($refundWaitingItems ?? collect()) as $item)
+                <a href="{{ route('admin.refunds.index', ['tab' => $item->tab]) }}" class="bell-item">
+                    <div class="bell-item-top">
+                        <span class="bell-item-email">🧑 {{ $item->buyer_email ?? 'N/A' }}</span>
+                        <span class="bell-item-amount">Rp {{ number_format($item->grand_total_refunded, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="bell-item-event">
+                        <span class="bell-tag {{ $item->tab === 'ticket' ? 'bell-tag-ticket' : 'bell-tag-merch' }}">{{ $item->tab === 'ticket' ? 'Tiket' : 'Merch' }}</span>
+                        {{ $item->event_title ?? 'Event N/A' }}
+                    </div>
+                    <div class="bell-item-time">{{ \Carbon\Carbon::parse($item->created_at)->diffForHumans() }}</div>
+                </a>
+            @empty
+                <div class="bell-empty">🎉 Tidak ada pengajuan refund yang menunggu.</div>
+            @endforelse
+
+            @if(($refundWaitingCount ?? 0) > 0)
+                <div class="bell-footer">
+                    <a href="{{ route('admin.refunds.index') }}">Lihat & proses semua →</a>
+                </div>
+            @endif
+        </div>
+    </div>
+
     <div class="topbar-avatar-wrap">
         <button id="topbar-avatar-btn" type="button" class="topbar-avatar-btn">
             <img src="{{ $user->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($user->name) }}"
@@ -651,6 +768,17 @@
             </div>
             @endif
 
+            @if(session('info'))
+            <div class="flash-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                {{ session('info') }}
+            </div>
+            @endif
+
             @yield('content')
 
         </main>
@@ -695,15 +823,34 @@ document.addEventListener("DOMContentLoaded", function () {
     const avatarBtn = document.getElementById('topbar-avatar-btn');
     const dropdown  = document.getElementById('topbar-dropdown');
 
+    // Dropdown Lonceng Notifikasi Refund
+    const bellBtn      = document.getElementById('topbar-bell-btn');
+    const bellDropdown = document.getElementById('topbar-bell-dropdown');
+
     if (avatarBtn && dropdown) {
         avatarBtn.addEventListener('click', function (e) {
             e.stopPropagation();
+            if (bellDropdown) bellDropdown.classList.remove('open'); // tutup lonceng bila avatar dibuka
             dropdown.classList.toggle('open');
         });
 
         document.addEventListener('click', function (e) {
             if (!dropdown.contains(e.target) && e.target !== avatarBtn) {
                 dropdown.classList.remove('open');
+            }
+        });
+    }
+
+    if (bellBtn && bellDropdown) {
+        bellBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (dropdown) dropdown.classList.remove('open'); // tutup avatar bila lonceng dibuka
+            bellDropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!bellDropdown.contains(e.target) && !bellBtn.contains(e.target)) {
+                bellDropdown.classList.remove('open');
             }
         });
     }
@@ -726,6 +873,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             if (dropdown) dropdown.classList.remove('open');
+            if (bellDropdown) bellDropdown.classList.remove('open');
             if (sidebar && sidebar.classList.contains('open')) {
                 sidebar.classList.remove('open');
                 overlay.classList.remove('open');

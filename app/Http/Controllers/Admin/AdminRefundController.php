@@ -14,6 +14,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Services\TicketWalletService;
 use App\Services\MerchWalletService;
 use App\Services\XenditPayoutService;
+use App\Services\RefundSettlementService;
+use Illuminate\Support\Facades\Log;
 
 class AdminRefundController extends Controller
 {
@@ -94,11 +96,51 @@ class AdminRefundController extends Controller
                 ->get();
         }
 
+        // 📥 LOG PEMBERITAHUAN: pengajuan refund dari pembeli yang masih 'waiting'
+        // (belum terserap ke batch mana pun). Ini penanda agar admin membuka batch untuk
+        // event terkait sehingga pengajuan tersebut masuk antrean pemrosesan.
+        if ($activeTab === 'ticket') {
+            $waitingRefundLogs = DB::table('refunds')
+                ->join('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+                ->join('events', 'transactions.event_id', '=', 'events.id')
+                ->leftJoin('eo', 'events.eo_id', '=', 'eo.id')
+                ->where('refunds.status', 'waiting')
+                ->select(
+                    'refunds.id',
+                    'refunds.grand_total_refunded',
+                    'refunds.bank_name',
+                    'refunds.created_at',
+                    'events.title as event_title',
+                    'eo.nama_badan_usaha as eo_name',
+                    'transactions.email as buyer_email'
+                )
+                ->orderByDesc('refunds.created_at')
+                ->get();
+        } else {
+            $waitingRefundLogs = DB::table('refunds')
+                ->join('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+                ->join('events', 'transaction_merch.event_id', '=', 'events.id')
+                ->leftJoin('eo', 'events.eo_id', '=', 'eo.id')
+                ->where('refunds.status', 'waiting')
+                ->select(
+                    'refunds.id',
+                    'refunds.grand_total_refunded',
+                    'refunds.bank_name',
+                    'refunds.created_at',
+                    'events.title as event_title',
+                    'eo.nama_badan_usaha as eo_name',
+                    'transaction_merch.email as buyer_email'
+                )
+                ->orderByDesc('refunds.created_at')
+                ->get();
+        }
+
         return view('admin.refunds.index', compact(
-            'batches', 
-            'eligibleEvents', 
-            'allEventsWithBatches', 
+            'batches',
+            'eligibleEvents',
+            'allEventsWithBatches',
             'eventNewsLogs',
+            'waitingRefundLogs',
             'activeTab'
         ));
     }
@@ -615,5 +657,62 @@ public function sendToXendit($id, XenditPayoutService $payoutService)
         $refund->update(['status' => 'rejected']);
 
         return redirect()->back()->with('success', 'Refund #' . $refund->id . ' ditandai gagal permanen. Pembeli akan diminta mengajukan ulang.');
+    }
+
+    /**
+     * 🔄 10. Sinkronkan status payout langsung dari Xendit (fallback bila webhook
+     * tidak/terlambat diterima — mis. saat tunnel down, atau di sandbox yang butuh
+     * simulasi manual). Menarik status real lalu menerapkan aksi yang sama dgn webhook.
+     */
+    public function syncStatus($refundId, XenditPayoutService $payoutService)
+    {
+        $refund = Refund::findOrFail($refundId);
+
+        if ($refund->status !== 'processing') {
+            return redirect()->back()->with('error', 'Hanya refund berstatus "processing" yang perlu disinkronkan. Status saat ini: ' . $refund->status . '.');
+        }
+
+        $result = $payoutService->fetchPayoutStatus($refund);
+
+        if (!$result['success']) {
+            Log::warning('Sinkronisasi status payout gagal menghubungi Xendit.', [
+                'refund_id' => $refund->id,
+                'message'   => $result['message'],
+            ]);
+            return redirect()->back()->with('error', 'Gagal menghubungi Xendit: ' . $result['message']);
+        }
+
+        $status = $result['status'];
+        Log::info('🔄 Sinkronisasi manual status payout oleh admin.', [
+            'refund_id'    => $refund->id,
+            'xendit_status'=> $status,
+        ]);
+
+        if ($status === 'SUCCEEDED') {
+            try {
+                $r = RefundSettlementService::settleSuccessfulPayout($refund->id);
+                $msg = $r === 'already'
+                    ? 'Refund ini ternyata sudah selesai diproses sebelumnya.'
+                    : 'Status Xendit: SUKSES. Saldo & pembukuan berhasil disinkronkan, refund kini selesai.';
+                return redirect()->back()->with('success', $msg);
+            } catch (\Throwable $e) {
+                return redirect()->back()->with('error', 'Status Xendit sukses, tetapi gagal memproses pembukuan: ' . $e->getMessage());
+            }
+        }
+
+        if ($status === 'FAILED') {
+            Refund::where('id', $refund->id)->where('status', 'processing')->update([
+                'status'               => 'failed',
+                'xendit_payout_status' => 'FAILED',
+                'failure_code'         => $result['raw']['failure_code'] ?? 'UNKNOWN',
+                'failure_message'      => $result['raw']['failure_code'] ?? 'Payout gagal (hasil sinkronisasi manual).',
+                'updated_at'           => now(),
+            ]);
+            return redirect()->back()->with('warning', 'Status Xendit: GAGAL. Refund ditandai "failed" — silakan Retry atau tandai gagal permanen.');
+        }
+
+        // ACCEPTED / REQUESTED / PENDING — payout belum tuntas di Xendit.
+        Refund::where('id', $refund->id)->update(['xendit_payout_status' => $status]);
+        return redirect()->back()->with('info', "⏳ Payout masih diproses Xendit (status: {$status}) — transfer belum tuntas, jadi belum ada yang perlu dicatat. Ini normal. Jika Anda memakai mode sandbox, simulasikan dulu payout-nya di menu Payouts Xendit, lalu klik Sinkronkan Status lagi. Di mode live, cukup tunggu — status akan otomatis tuntas.");
     }
 }

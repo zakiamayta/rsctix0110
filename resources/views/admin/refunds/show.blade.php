@@ -24,7 +24,7 @@
         </div>
     </div>
 
-    {{-- ALERTS --}}
+    <!-- {{-- ALERTS --}}
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded mb-3 text-xs">✅ {{ session('success') }}</div>
     @endif
@@ -33,7 +33,7 @@
     @endif
     @if(session('warning'))
         <div class="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded mb-3 text-xs">⚠️ {{ session('warning') }}</div>
-    @endif
+    @endif -->
 
     @php
         $pendingCount     = $refunds->where('status', 'pending')->count();
@@ -230,6 +230,14 @@
                                 @method('PATCH')
                                 <button type="submit" class="w-full bg-gray-500 hover:bg-gray-600 text-white text-[10px] font-semibold py-1 px-2 rounded">
                                     ❌ Gagal Permanen
+                                </button>
+                            </form>
+                        @elseif($refund->status === 'processing')
+                            <form action="{{ route('admin.refunds.item.sync', $refund->id) }}" method="POST"
+                                  onsubmit="return confirm('Cek & sinkronkan status refund #{{ $refund->id }} langsung dari Xendit? Berguna bila webhook belum masuk.')">
+                                @csrf
+                                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-semibold py-1 px-2 rounded" title="Tarik status terkini dari Xendit tanpa menunggu webhook">
+                                    🔄 Sinkronkan Status
                                 </button>
                             </form>
                         @else

@@ -36,7 +36,7 @@
             </button>
         </form>
     </div>
-
+<!-- 
     {{-- ALERTS RINGKAS --}}
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded mb-3 text-xs flex items-center justify-between shadow-sm">
@@ -49,7 +49,7 @@
             <span>❌ {{ session('error') }}</span>
             <button class="text-red-500 hover:text-red-700 font-bold" onclick="this.parentElement.remove()">×</button>
         </div>
-    @endif
+    @endif -->
 
     {{-- TAB NAVIGATION --}}
     <div class="flex border-b border-gray-200 mb-5">
@@ -61,6 +61,58 @@
            class="py-2.5 px-5 text-xs font-bold border-b-2 transition flex items-center gap-2 {{ $activeTab === 'merch' ? 'border-amber-600 text-amber-600 bg-amber-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
             🛍️ Refund Merchandise Event
         </a>
+    </div>
+
+    {{-- 🔔 PEMBERITAHUAN: PENGAJUAN REFUND BARU DARI PEMBELI (STATUS WAITING) --}}
+    <div class="bg-white border border-orange-200 rounded overflow-hidden shadow-sm mb-3">
+        <div class="bg-orange-50 px-3 py-2 border-b border-orange-200 flex items-center justify-between sticky top-0 z-10">
+            <span class="text-xs font-bold uppercase text-orange-700 tracking-wider flex items-center gap-1.5">
+                🔔 Pengajuan Refund Menunggu Batch (Waiting) — {{ $activeTab === 'ticket' ? 'Tiket' : 'Merchandise' }}
+                @if($waitingRefundLogs->count() > 0)
+                    <span class="ml-1 px-1.5 py-0.5 rounded-full bg-orange-600 text-white text-[10px] font-bold">{{ $waitingRefundLogs->count() }} baru</span>
+                @endif
+            </span>
+            <span class="text-[11px] text-orange-400 italic">Buka batch event terkait agar pengajuan ini masuk antrean</span>
+        </div>
+
+        <div class="max-h-[200px] overflow-y-auto text-xs scrollbar-thin">
+            <table class="w-full text-left border-collapse table-fixed">
+                <thead class="bg-orange-50/60 border-b border-orange-100 text-[11px] font-bold uppercase text-orange-600 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                        <th class="p-2 w-40 bg-orange-50/60">Waktu Pengajuan</th>
+                        <th class="p-2 bg-orange-50/60">Pembeli</th>
+                        <th class="p-2 w-56 bg-orange-50/60">Event Terkait</th>
+                        <th class="p-2 text-right w-32 bg-orange-50/60">Nominal Refund</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($waitingRefundLogs as $wr)
+                    <tr class="hover:bg-orange-50/40 transition">
+                        <td class="p-2 text-gray-500 font-mono text-[11px] whitespace-nowrap overflow-hidden text-ellipsis">
+                            {{ date('d M Y - H:i', strtotime($wr->created_at)) }} WIB
+                        </td>
+                        <td class="p-2 text-gray-900 truncate">
+                            🧑 <span class="font-medium">{{ $wr->buyer_email ?? 'N/A' }}</span>
+                            <span class="text-gray-400 text-[10px]">({{ strtoupper($wr->bank_name) }})</span>
+                        </td>
+                        <td class="p-2 font-medium text-gray-700 truncate">
+                            {{ $wr->event_title }}
+                            <div class="text-gray-400 text-[10px]">EO: {{ $wr->eo_name ?? 'N/A' }}</div>
+                        </td>
+                        <td class="p-2 text-right font-bold text-orange-600 whitespace-nowrap">
+                            Rp {{ number_format($wr->grand_total_refunded, 0, ',', '.') }}
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="4" class="p-4 text-center text-gray-400 italic">
+                            Tidak ada pengajuan refund yang menunggu batch pada kategori {{ $activeTab === 'ticket' ? 'Tiket' : 'Merchandise' }} ini. 🎉
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
 
     {{-- 📢 TABEL RIWAYAT / BERITA PROSES EVENT TERKINI --}}

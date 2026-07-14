@@ -139,7 +139,7 @@
             @elseif($trx->event_status === 'cancelled')
                 <div class="alert status-tint-cancelled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
                     <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span>Event ini telah <strong>dibatalkan</strong> oleh penyelenggara. Anda berhak mengajukan pengembalian dana.</span>
+                    <span>Event ini telah <strong>dibatalkan</strong> oleh penyelenggara. Anda berhak mengajukan pengembalian dana tiket anda.</span>
                 </div>
             @elseif(($trx->event_is_rescheduled ?? 0) > 0)
                 <div class="alert status-tint-rescheduled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">

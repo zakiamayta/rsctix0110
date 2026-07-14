@@ -211,6 +211,18 @@ class EoEventController extends Controller
             abort(403, 'Batas maksimum penyesuaian jadwal (3 kali) untuk event ini telah habis.');
         }
 
+        // 🔒 Proteksi pembeli: penyesuaian jadwal ini membangun ulang tiket & jadwal
+        // (menghapus baris lama). Karena ticket_attendees.ticket_id ber-ON DELETE CASCADE,
+        // menghapus tiket yang sudah terjual akan MENGHAPUS data pembelinya. Jadi blokir
+        // bila event sudah punya penjualan — pembeli harus refund dulu.
+        $soldCount = DB::table('ticket_attendees as ta')
+            ->join('transactions as t', 'ta.transaction_id', '=', 't.id')
+            ->where('t.event_id', $event->id)
+            ->count();
+        if ($soldCount > 0) {
+            return back()->with('error', "Jadwal tidak dapat dibangun ulang karena sudah ada {$soldCount} tiket terjual pada event ini — tindakan ini akan menghapus data pembeli. Tanggal event sudah otomatis diperbarui saat reschedule disetujui. Jika perlu mengubah detail jadwal, pembeli harus melakukan refund terlebih dahulu atau hubungi admin.");
+        }
+
         $request->validate([
             'title' => 'required|string|max:255',
             'date' => 'required|date',
@@ -302,6 +314,17 @@ class EoEventController extends Controller
             abort(403);
         }
 
+        // 🔒 Jangan hapus event yang sudah punya pembeli — cascade akan menghapus tiket
+        // beserta data peserta/pembelinya. Untuk membatalkan event berpembeli, pakai
+        // alur "Ajukan Pembatalan" (yang memicu refund), bukan hapus.
+        $soldCount = DB::table('ticket_attendees as ta')
+            ->join('transactions as t', 'ta.transaction_id', '=', 't.id')
+            ->where('t.event_id', $event->id)
+            ->count();
+        if ($soldCount > 0) {
+            return back()->with('error', "Event tidak dapat dihapus karena sudah ada {$soldCount} tiket terjual. Gunakan menu \"Ajukan Pembatalan\" agar pembeli mendapat refund.");
+        }
+
         if ($event->poster && file_exists(public_path($event->poster))) {
             File::delete(public_path($event->poster));
         }
@@ -370,6 +393,14 @@ class EoEventController extends Controller
 
         if (!$eo || $event->eo_id != $eo->id) {
             abort(403);
+        }
+
+        // 🔒 Guard status: resubmit membangun ulang tiket & jadwal (menghapus yang lama).
+        // Hanya boleh untuk event yang DITOLAK (belum pernah aktif, dijamin tanpa pembeli).
+        // Tanpa guard ini, event 'approved' yang sedang laku bisa direset & tiket terjual
+        // ikut terhapus (cascade ke ticket_attendees).
+        if ($event->status !== 'rejected') {
+            return back()->with('error', 'Hanya event berstatus "ditolak" yang bisa di-resubmit.');
         }
 
         $request->validate([

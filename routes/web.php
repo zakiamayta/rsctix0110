@@ -273,6 +273,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/refunds/batch/{id}/send-xendit', 'sendToXendit')->name('refunds.sendToXendit');
             Route::post('/refunds/item/{id}/retry', 'retryRefund')->name('refunds.item.retry');
             Route::patch('/refunds/item/{id}/reject', 'rejectRefund')->name('refunds.item.reject');
+            Route::post('/refunds/item/{id}/sync', 'syncStatus')->name('refunds.item.sync');
         });
 
         // Ruang Kendali Finansial & Dompet Audit EO
