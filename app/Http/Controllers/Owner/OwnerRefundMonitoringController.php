@@ -54,7 +54,11 @@ class OwnerRefundMonitoringController extends Controller
             ->get();
 
         // 4. Ambil ringkasan total utang global seluruh EO yang belum lunas (Summary papan atas)
-        $totalUtangGlobal = Eo::sum('total_debt');
+        // Sumber utang KANONIK = eo_debts.remaining_debt (unpaid + partially_paid), sama seperti
+        // dashboard Admin. eo.total_debt hanya cache dan tidak dipakai sebagai sumber tampilan.
+        $totalUtangGlobal = DB::table('eo_debts')
+            ->whereIn('status', ['unpaid', 'partially_paid'])
+            ->sum('remaining_debt');
 
         return view('owner.refunds.monitor', compact(
             'batches', 

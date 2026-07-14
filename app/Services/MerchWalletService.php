@@ -48,6 +48,14 @@ class MerchWalletService
             ->whereIn('status', ['approved', 'pending'])
             ->sum('amount') ?? 0;
 
+        // Kas SUNTIKAN dari top-up EO (khusus tipe 'merch') yang sudah disetujui admin untuk
+        // mendanai refund merch. Masuk sebagai cadangan (held), BUKAN saldo tarik (available).
+        $topupInjected = DB::table('eo_topups')
+            ->where('event_id', $eventId)
+            ->where('type', 'merch')
+            ->where('status', 'approved')
+            ->sum('amount_requested') ?? 0;
+
         $potentialRevenue = DB::table('products_ukuran')
             ->where('event_id', $eventId)
             ->select(DB::raw('SUM(stok * harga) as total_potential'))
@@ -73,11 +81,13 @@ class MerchWalletService
 
         $plafonPercent = $isHMinus10 ? 0.7 : 0.5;
 
+        // available (hak tarik) dihitung dari PENJUALAN saja — top-up tidak menaikkan hak tarik EO.
         $maxEligibleBalance = floor($paidTotal * $plafonPercent);
         $calculatedAvailable = $maxEligibleBalance - $alreadyWithdrawn;
         if ($calculatedAvailable < 0) $calculatedAvailable = 0;
 
-        $sisaKasSistem = $paidTotal - $alreadyWithdrawn;
+        // Total kas riil = penjualan + suntikan top-up − penarikan. Selisih di atas available jadi held.
+        $sisaKasSistem = $paidTotal + $topupInjected - $alreadyWithdrawn;
         $heldBalance = $sisaKasSistem - $calculatedAvailable;
         if ($heldBalance < 0) $heldBalance = 0;
 
@@ -87,18 +97,18 @@ class MerchWalletService
         if ($wallet->withdraw_locked == 1) {
             $canWithdraw = false;
             $calculatedAvailable = 0;
-            $heldBalance = $paidTotal - $alreadyWithdrawn;
+            $heldBalance = $sisaKasSistem;
             $systemReason = 'Fitur penarikan dana dinonaktifkan sementara oleh admin.';
         } elseif ($paidTotal < $minBalanceRequired) {
             $canWithdraw = false;
             $calculatedAvailable = 0;
-            $heldBalance = $paidTotal - $alreadyWithdrawn;
+            $heldBalance = $sisaKasSistem;
             $systemReason = 'Total omset belum mencapai batas minimal Rp '
                 . number_format($minBalanceRequired, 0, ',', '.');
         } elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance) {
             $canWithdraw = false;
             $calculatedAvailable = 0;
-            $heldBalance = $paidTotal - $alreadyWithdrawn;
+            $heldBalance = $sisaKasSistem;
             $systemReason = 'Sisa saldo berjalan di bawah target mengendap Rp '
                 . number_format($minHeldBalance, 0, ',', '.');
         } elseif ($calculatedAvailable <= 0) {
@@ -108,6 +118,12 @@ class MerchWalletService
                 ? 'Gerbang H-10 terbuka otomatis! Namun saldo hak tarik Anda masih 0 karena limit plafon 70% sudah diambil atau belum ada merch laku baru.'
                 : 'Kuota limit penarikan termin berjalan (Plafon 50%) Anda saat ini sudah diambil.';
         }
+
+        // Guard akhir: cabang status di atas bisa menetapkan ulang held = paidTotal - withdrawn
+        // yang menjadi NEGATIF setelah refund menurunkan paidTotal di bawah total penarikan.
+        // Kekurangan itu sudah tercatat sebagai utang/negative_balance, jadi saldo tidak boleh minus.
+        if ($calculatedAvailable < 0) $calculatedAvailable = 0;
+        if ($heldBalance < 0) $heldBalance = 0;
 
         DB::table('merch_wallets')->where('event_id', $eventId)->update([
             'available_balance' => (int) $calculatedAvailable,

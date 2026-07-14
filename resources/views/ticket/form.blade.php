@@ -175,10 +175,24 @@
               <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
 
-            @if($errors->any())
+            @php
+                $phoneErrorsByIndex = [];
+                foreach (old('phone', []) as $i => $p) {
+                    if ($errors->has("phone.$i")) {
+                        $phoneErrorsByIndex[$i] = $errors->first("phone.$i");
+                    }
+                }
+            @endphp
+
+            @php
+                $nonPhoneErrors = collect($errors->keys())
+                    ->reject(fn($k) => str_starts_with($k, 'phone.'))
+                    ->flatMap(fn($k) => $errors->get($k));
+            @endphp
+            @if($nonPhoneErrors->isNotEmpty())
               <div class="alert alert-danger">
                 <ul class="mb-0 ps-3">
-                  @foreach($errors->all() as $err)
+                  @foreach($nonPhoneErrors as $err)
                     <li>{{ $err }}</li>
                   @endforeach
                 </ul>
@@ -245,7 +259,13 @@
 
 @if($activeTicket)
   <script>
-    const maxQty = {{ $event->max_tickets_per_email }}; // dari server
+    const maxQty = {{ $event->max_tickets_per_email }};
+    const oldTicketIds = @json(old('ticket_id', []));
+    const oldQtys = @json(old('qty', []));
+    const oldNames = @json(old('name', []));
+    const oldPhones = @json(old('phone', []));
+    const oldEmails = @json(old('attendee_email', []));
+    const phoneErrorsByIndex = @json($phoneErrorsByIndex);
     let cart = {};      // { ticketId: qty }
     let order = [];     // sequence of ticketId (menentukan mapping tiap pengunjung ke tiket)
     let savedValues = []; // menyimpan name/phone sementara saat rebuild form
@@ -462,6 +482,48 @@ emailInput.addEventListener('input', syncSaved);
   }
 }
 
+    // Isi ulang data peserta dari input sebelumnya (dipakai saat checkout gagal validasi,
+    // mis. nomor telepon duplikat). Semua kolom dipertahankan agar pembeli tidak perlu
+    // mengetik ulang; HANYA kolom nomor telepon yang terdeteksi duplikat yang dikosongkan
+    // lalu ditandai merah + diberi pesan, supaya pembeli tahu nomor mana yang bermasalah.
+    function fillOldAttendeeData() {
+      const entries = document.querySelectorAll('#pengunjung-list .pengunjung-entry');
+      entries.forEach((entry, i) => {
+        const nameInput = entry.querySelector('input[name="name[]"]');
+        const phoneInput = entry.querySelector('input[name="phone[]"]');
+        const emailInput = entry.querySelector('input[name="attendee_email[]"]');
+
+        if (oldNames[i] !== undefined) nameInput.value = oldNames[i];
+        if (oldEmails[i] !== undefined) emailInput.value = oldEmails[i];
+
+        if (phoneErrorsByIndex[i]) {
+          // Kolom ini yang terdeteksi duplikat -> kosongkan, tandai, kasih peringatan
+          phoneInput.value = '';
+          phoneInput.placeholder = 'Nomor ini sudah digunakan, isi ulang';
+          phoneInput.classList.add('is-invalid', 'border-danger');
+
+          const warn = document.createElement('div');
+          warn.className = 'text-danger small mt-1 fw-semibold';
+          warn.textContent = phoneErrorsByIndex[i];
+          phoneInput.insertAdjacentElement('afterend', warn);
+
+          phoneInput.addEventListener('input', function handler() {
+            phoneInput.classList.remove('is-invalid', 'border-danger');
+            warn.remove();
+            phoneInput.removeEventListener('input', handler);
+          });
+        } else if (oldPhones[i] !== undefined) {
+          phoneInput.value = oldPhones[i];
+        }
+
+        savedValues[i] = {
+          name: nameInput.value,
+          phone: phoneInput.value,
+          email: emailInput.value
+        };
+      });
+    }
+
     // Hapus pengunjung pada index tertentu -> juga hapus mapping ticket dari order & kurangi cart
     function removePengunjung(index) {
       index = Number(index);
@@ -478,20 +540,36 @@ emailInput.addEventListener('input', syncSaved);
     }
 
     // Inisialisasi saat DOM siap
-    window.addEventListener('DOMContentLoaded', () => {
-      // render control untuk setiap ticket (mengambil data dari data-* yang sudah kita tambahkan server-side)
-      document.querySelectorAll('.ticket-control').forEach(ctrl => {
-        const id = ctrl.id.replace('ticket-control-', '');
-        renderTicketControls(id, 0);
-      });
+window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.ticket-control').forEach(ctrl => {
+    const id = ctrl.id.replace('ticket-control-', '');
+    renderTicketControls(id, 0);
+  });
 
-      // jika aturan event mengharuskan maxQty == 1, auto-add 1 tiket ke activeTicket
-      const initialQty = (maxQty === 1) ? 1 : 0;
-      if (initialQty === 1) {
-        const initialTicketId = {{ $activeTicket->id }};
-        addTicket(initialTicketId);
-      }
+  if (oldTicketIds.length > 0) {
+    // Checkout sebelumnya gagal -> bangun ulang pilihan tiket & isi form dari data lama
+    oldTicketIds.forEach((ticketIdRaw, i) => {
+      const ticketId = parseInt(ticketIdRaw);
+      const qty = parseInt(oldQtys[i] || 0);
+      for (let q = 0; q < qty; q++) order.push(ticketId);
+      cart[ticketId] = (cart[ticketId] || 0) + qty;
     });
+
+    Object.keys(cart).forEach(ticketId => renderTicketControls(ticketId, cart[ticketId]));
+    updateSummary();
+    fillOldAttendeeData();
+
+    if (Object.keys(phoneErrorsByIndex).length > 0) {
+      showPageAlert('Ada nomor telepon yang sudah terpakai. Silakan isi ulang kolom yang ditandai merah.');
+    }
+  } else {
+    const initialQty = (maxQty === 1) ? 1 : 0;
+    if (initialQty === 1) {
+      const initialTicketId = {{ $activeTicket->id }};
+      addTicket(initialTicketId);
+    }
+  }
+});
 
     // Validasi sebelum submit (telepon numeric dan length)
     document.getElementById('ticket-form')?.addEventListener('submit', function(e) {
@@ -522,14 +600,28 @@ emailInput.addEventListener('input', syncSaved);
 
 {{-- Script modal S&K — di luar @if($activeTicket) supaya tetap jalan walau tiket belum tersedia --}}
 <script>
-  document.getElementById('tnc-agree-btn')?.addEventListener('click', function () {
-    const overlay = document.getElementById('tnc-overlay');
-    if (overlay) overlay.remove();
-    document.body.style.overflow = ''; // pastikan scroll balik normal
-  });
+  // Penanda persetujuan S&K disimpan per event selama sesi tab berlangsung.
+  // Tujuannya: modal hanya muncul sekali saat pertama membuka halaman form.
+  // Jika checkout gagal lalu halaman ter-refresh (mis. kasus nomor duplikat),
+  // penanda ini masih ada sehingga modal tidak muncul lagi.
+  const TNC_KEY = 'tnc_agreed_event_{{ $event->id }}';
+  const tncOverlay = document.getElementById('tnc-overlay');
 
-  // Kunci scroll body selama modal tampil
-  document.body.style.overflow = 'hidden';
+  if (sessionStorage.getItem(TNC_KEY)) {
+    // Sudah pernah menyetujui di sesi ini -> langsung lewati modal
+    if (tncOverlay) tncOverlay.remove();
+    document.body.style.overflow = '';
+  } else {
+    // Kunci scroll body selama modal tampil
+    document.body.style.overflow = 'hidden';
+
+    document.getElementById('tnc-agree-btn')?.addEventListener('click', function () {
+      sessionStorage.setItem(TNC_KEY, '1'); // ingat persetujuan untuk sesi ini
+      if (tncOverlay) tncOverlay.remove();
+      document.body.style.overflow = ''; // pastikan scroll balik normal
+    });
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('tnc-overlay')) {
       document.body.style.overflow = '';

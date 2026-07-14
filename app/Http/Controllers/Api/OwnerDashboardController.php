@@ -96,7 +96,7 @@ class OwnerDashboardController extends Controller
                 (SELECT COALESCE(SUM(service_tax), 0) FROM transactions WHERE payment_status = 'paid' AND $txCondition) AS ticket_tax_paid,
                 (SELECT COALESCE(SUM(service_tax), 0) FROM transactions WHERE payment_status = 'refunded' AND $txCondition) AS ticket_tax_refunded,
                 (SELECT COALESCE(SUM(refunds_tax), 0) FROM refunds WHERE $rfCondition) AS refund_tax_spent,
-                (SELECT COALESCE(SUM(service_tax), 0) FROM transaction_merch WHERE payment_status = 'paid' AND $tmCondition) AS merch_service_tax,
+                (SELECT COALESCE(SUM(service_tax), 0) FROM transaction_merch WHERE payment_status IN ('paid', 'refunded') AND $tmCondition) AS merch_service_tax,
 
                 -- Volume Total Kuantitas Item Terjual (Paid + Refunded agar record list tetap muncul)
                 (SELECT COUNT(*) FROM ticket_attendees 

@@ -72,9 +72,13 @@ class WebhookController extends Controller
                 }
 
                 $transaction->refresh();
+                // Pastikan baris buku kas platform ada. update() saja akan gagal diam-diam
+                // jika baris id=1 belum pernah dibuat, sehingga service tax tak pernah terakumulasi.
+                DB::table('platform_wallets')->updateOrInsert(['id' => 1], []);
                 DB::table('platform_wallets')->where('id', 1)->update([
                 'total_service_tax_earned' => DB::raw("total_service_tax_earned + {$transaction->service_tax}"),
                 'current_balance'          => DB::raw("current_balance + {$transaction->service_tax}"),
+                'updated_at'               => now(),
             ]);
                 $this->generateAttendeeQRCodes($transaction);
                 $this->sendAttendeeEmails($transaction);

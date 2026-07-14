@@ -48,6 +48,15 @@ class TicketWalletService
             ->whereIn('status', ['approved', 'pending'])
             ->sum('amount') ?? 0;
 
+        // Kas SUNTIKAN dari top-up EO yang sudah disetujui admin (untuk mendanai refund).
+        // Masuk sebagai cadangan (held), BUKAN saldo tarik (available) — lihat perhitungan held di bawah.
+        // Ter-offset otomatis oleh $alreadyWithdrawn saat top-up dipakai melunasi hutang, jadi tidak dobel.
+        $topupInjected = DB::table('eo_topups')
+            ->where('event_id', $eventId)
+            ->where('type', 'ticket')
+            ->where('status', 'approved')
+            ->sum('amount_requested') ?? 0;
+
         $potentialRevenue = DB::table('tickets')
             ->where('event_id', $eventId)
             ->select(DB::raw('SUM(stock * price) as total_potential_revenue'))
@@ -80,11 +89,13 @@ class TicketWalletService
             $isBypassedByHMinus10 = true;
         }
 
+        // available (hak tarik) dihitung dari PENJUALAN saja — top-up tidak menaikkan hak tarik EO.
         $maxEligibleBalance = floor($paidTotal * $plafonPercent);
         $calculatedAvailable = $maxEligibleBalance - $alreadyWithdrawn;
         if ($calculatedAvailable < 0) $calculatedAvailable = 0;
 
-        $sisaKasSistem = $paidTotal - $alreadyWithdrawn;
+        // Total kas riil = penjualan + suntikan top-up − penarikan. Selisih di atas available jadi held.
+        $sisaKasSistem = $paidTotal + $topupInjected - $alreadyWithdrawn;
         $heldBalance = $sisaKasSistem - $calculatedAvailable;
         if ($heldBalance < 0) $heldBalance = 0;
 
@@ -100,18 +111,18 @@ class TicketWalletService
             if ($wallet->withdraw_locked == 1) {
                 $canWithdraw = false;
                 $calculatedAvailable = 0;
-                $heldBalance = $paidTotal - $alreadyWithdrawn;
+                $heldBalance = $sisaKasSistem;
                 $systemReason = 'Fitur penarikan dana dinonaktifkan sementara oleh admin.';
             } elseif ($paidTotal < $minBalanceRequired && !$isEventFinished) {
                 $canWithdraw = false;
                 $calculatedAvailable = 0;
-                $heldBalance = $paidTotal - $alreadyWithdrawn;
+                $heldBalance = $sisaKasSistem;
                 $systemReason = 'Total omset belum mencapai batas minimal pembuka gerbang Rp '
                     . number_format($minBalanceRequired, 0, ',', '.');
             } elseif (($paidTotal - $alreadyWithdrawn) < $minHeldBalance && !$isEventFinished) {
                 $canWithdraw = false;
                 $calculatedAvailable = 0;
-                $heldBalance = $paidTotal - $alreadyWithdrawn;
+                $heldBalance = $sisaKasSistem;
                 $systemReason = 'Sisa saldo berjalan di bawah target mengendap Rp '
                     . number_format($minHeldBalance, 0, ',', '.');
             } elseif ($calculatedAvailable <= 0) {
@@ -122,6 +133,12 @@ class TicketWalletService
                     : 'Kuota limit penarikan termin berjalan Anda saat ini sudah diambil.';
             }
         }
+
+        // Guard akhir: cabang status di atas bisa menetapkan ulang held = paidTotal - withdrawn
+        // yang menjadi NEGATIF setelah refund menurunkan paidTotal di bawah total penarikan.
+        // Kekurangan itu sudah tercatat sebagai utang/negative_balance, jadi saldo tidak boleh minus.
+        if ($calculatedAvailable < 0) $calculatedAvailable = 0;
+        if ($heldBalance < 0) $heldBalance = 0;
 
         DB::table('event_wallets')->where('event_id', $eventId)->update([
             'available_balance' => (int) $calculatedAvailable,

@@ -71,6 +71,18 @@
                         Rp {{ number_format($outstandingDebt, 0, ',', '.') }}
                     </span>
                 </div>
+                <div class="flex items-center justify-between text-xs pt-2" style="border-top:1px dashed #e5e7eb;">
+                    <span style="color:#9ca3af;">Refund Menunggu Diproses</span>
+                    <span class="font-bold" style="color: {{ $pendingRefundLiability > 0 ? '#d97706' : '#111827' }};">
+                        Rp {{ number_format($pendingRefundLiability, 0, ',', '.') }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between text-xs pt-2" style="border-top:1px dashed #e5e7eb;">
+                    <span style="color:#9ca3af;">Total Dana Keluar (Refund)</span>
+                    <span class="font-bold" style="color:#6b7280;">
+                        Rp {{ number_format($totalRefundedOut, 0, ',', '.') }}
+                    </span>
+                </div>
             </div>
         </div>
 

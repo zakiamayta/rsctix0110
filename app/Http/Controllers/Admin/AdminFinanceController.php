@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\TicketWalletService;
+use App\Services\MerchWalletService;
 
 class AdminFinanceController extends Controller
 {
@@ -48,6 +50,15 @@ class AdminFinanceController extends Controller
                     ->whereIn('status', ['unpaid', 'partially_paid'])
                     ->sum('remaining_debt');
 
+                // 3b. Hitung Total Tanggungan Refund yang BELUM DIPROSES (status pending) — bukan bagian dari utang
+                $pendingRefundLiability = DB::table('refunds')
+                    ->leftJoin('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+                    ->leftJoin('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+                    ->leftJoin('events', DB::raw('COALESCE(transactions.event_id, transaction_merch.event_id)'), '=', 'events.id')
+                    ->where('events.eo_id', $selectedEoId)
+                    ->whereIn('refunds.status', ['waiting', 'pending']) // tanggungan = refund yang belum dieksekusi (waiting + pending)
+                    ->sum(DB::raw('COALESCE(transactions.total_amount, transaction_merch.total_amount)'));
+
                 // 4. Ambil Status Kunci Dompet Terkini (Cek apakah ada salah satu yang terkunci)
                 $isLocked = DB::table('events')
                     ->join('event_wallets', 'events.id', '=', 'event_wallets.event_id')
@@ -57,6 +68,7 @@ class AdminFinanceController extends Controller
 
                 $eoDetails->total_balance = $totalBalance;
                 $eoDetails->total_debt = $totalDebt;
+                $eoDetails->pending_refund_liability = $pendingRefundLiability;
                 $eoDetails->is_locked = $isLocked;
 
                 // 5. Ambil daftar event milik EO tersebut beserta saldo masing-masing dompetnya
@@ -83,38 +95,67 @@ class AdminFinanceController extends Controller
     /**
      * Halaman 2: Kelola Finansial Spesifik Per Event
      */
-    public function manageEvent($eventId)
-    {
-        // Ambil data detail event beserta dompet dan profil EO-nya
-        $event = DB::table('events')
-            ->join('eo', 'events.eo_id', '=', 'eo.id')
-            ->leftJoin('event_wallets', 'events.id', '=', 'event_wallets.event_id')
-            ->where('events.id', $eventId)
-            ->select(
-                'events.id',
-                'events.title',
-                'events.status as event_status',
-                'events.is_rescheduled',
-                'events.eo_id',
-                'eo.nama_badan_usaha',
-                'event_wallets.available_balance',
-                'event_wallets.held_balance',
-                'event_wallets.withdraw_locked'
-            )
-            ->first();
+public function manageEvent($eventId)
+{
+    // Ambil data detail event beserta dompet dan profil EO-nya
+    $event = DB::table('events')
+        ->join('eo', 'events.eo_id', '=', 'eo.id')
+        ->leftJoin('event_wallets', 'events.id', '=', 'event_wallets.event_id')
+        ->where('events.id', $eventId)
+        ->select(
+            'events.id',
+            'events.title',
+            'events.status as event_status',
+            'events.is_rescheduled',
+            'events.eo_id',
+            'eo.nama_badan_usaha',
+            'event_wallets.available_balance',
+            'event_wallets.held_balance',
+            'event_wallets.withdraw_locked'
+        )
+        ->first();
 
-        if (!$event) {
-            return redirect()->route('admin.finance.index')->with('error', 'Data Event tidak ditemukan.');
-        }
-
-        // Ambil riwayat pengajuan/permintaan Top Up khusus untuk event ini
-        $topups = DB::table('eo_topups')
-            ->where('event_id', $event->id) // SINKRON: Sekarang memfilter berdasarkan event_id baru
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return view('admin.finance.manage_event', compact('event', 'topups'));
+    if (!$event) {
+        return redirect()->route('admin.finance.index')->with('error', 'Data Event tidak ditemukan.');
     }
+
+    // Dompet MERCH (terpisah dari dompet tiket yang sudah ikut di $event)
+    $merchWallet = DB::table('merch_wallets')->where('event_id', $eventId)->first();
+
+    // 🔴 Sisa utang aktif per TIPE komoditas (tiket vs merch) untuk event ini
+    $ticketDebt = (float) DB::table('eo_debts')
+        ->where('event_id', $eventId)->where('type', 'ticket')
+        ->whereIn('status', ['unpaid', 'partially_paid'])->sum('remaining_debt');
+    $merchDebt = (float) DB::table('eo_debts')
+        ->where('event_id', $eventId)->where('type', 'merch')
+        ->whereIn('status', ['unpaid', 'partially_paid'])->sum('remaining_debt');
+    $outstandingDebt = $ticketDebt + $merchDebt; // total gabungan (kompatibilitas tampilan lama)
+
+    // 🟡 Tanggungan refund (waiting + pending) per TIPE komoditas — terpisah dari utang
+    $ticketRefundLiability = (float) DB::table('refunds')
+        ->join('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+        ->where('transactions.event_id', $eventId)
+        ->whereIn('refunds.status', ['waiting', 'pending'])
+        ->sum('transactions.total_amount');
+    $merchRefundLiability = (float) DB::table('refunds')
+        ->join('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+        ->where('transaction_merch.event_id', $eventId)
+        ->whereIn('refunds.status', ['waiting', 'pending'])
+        ->sum('transaction_merch.total_amount');
+    $pendingRefundLiability = $ticketRefundLiability + $merchRefundLiability;
+
+    // Ambil riwayat pengajuan/permintaan Top Up khusus untuk event ini
+    $topups = DB::table('eo_topups')
+        ->where('event_id', $event->id)
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+    return view('admin.finance.manage_event', compact(
+        'event', 'merchWallet', 'topups',
+        'outstandingDebt', 'ticketDebt', 'merchDebt',
+        'pendingRefundLiability', 'ticketRefundLiability', 'merchRefundLiability'
+    ));
+}
 
     /**
      * Kirim Instruksi Tagihan Top-Up Baru ke EO
@@ -123,7 +164,8 @@ class AdminFinanceController extends Controller
     {
         $request->validate([
             'amount_requested' => 'required|numeric|min:1',
-            'admin_note' => 'required|string'
+            'admin_note' => 'required|string',
+            'type' => 'required|in:ticket,merch' // dompet tujuan: tiket atau merch
         ]);
 
         $event = DB::table('events')->where('id', $eventId)->first();
@@ -135,7 +177,8 @@ class AdminFinanceController extends Controller
         DB::table('eo_topups')->insert([
             'eo_id' => $event->eo_id,
             'event_id' => $event->id, // SINKRON: Memasukkan event_id saat pembuatan instruksi tagihan
-            'refund_id' => null, 
+            'type' => $request->type, // menentukan dompet (event_wallets / merch_wallets) yang disuntik
+            'refund_id' => null,
             'amount_requested' => $request->amount_requested,
             'status' => 'requested',
             'admin_note' => $request->admin_note,
@@ -178,31 +221,22 @@ class AdminFinanceController extends Controller
                     'updated_at' => now()
                 ]);
 
-                // B. OTOMATIS TAMBAHKAN SALDO KE DOMPET EVENT (Menggunakan topup->event_id hasil Alter Table)
-                $wallet = DB::table('event_wallets')->where('event_id', $topup->event_id)->first();
-                if ($wallet) {
-                    DB::table('event_wallets')->where('event_id', $topup->event_id)->increment('available_balance', $topup->amount_requested);
-                } else {
-                    // Jika dompet belum ada di database, buat baru otomatis
-                    DB::table('event_wallets')->insert([
-                        'event_id' => $topup->event_id,
-                        'available_balance' => $topup->amount_requested,
-                        'held_balance' => 0,
-                        'withdraw_locked' => 0,
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-                }
+                // B. Top up = suntikan dana ke DOMPET sesuai tipe (tiket/merch). Dana masuk sebagai
+                //    cadangan (held) via recalculate(); jika ada hutang bertipe sama, hutang itu dilunasi.
+                //    available_balance TIDAK ditambah langsung (murni dari penjualan via recalculate()).
+                $walletTable = $topup->type === 'merch' ? 'merch_wallets' : 'event_wallets';
 
-                // C. OTOMATIS POTONG SISA UTANG EO (DEBTS) YANG BELUM LUNAS UNTUK EVENT INI
                 $debt = DB::table('eo_debts')
                     ->where('event_id', $topup->event_id)
+                    ->where('type', $topup->type)
                     ->whereIn('status', ['unpaid', 'partially_paid'])
                     ->first();
 
+                $debtReduced = 0;
                 if ($debt) {
                     $newRemainingDebt = max(0, $debt->remaining_debt - $topup->amount_requested);
                     $newDebtStatus = $newRemainingDebt <= 0 ? 'paid' : 'partially_paid';
+                    $debtReduced = $debt->remaining_debt - $newRemainingDebt;
 
                     DB::table('eo_debts')->where('id', $debt->id)->update([
                         'remaining_debt' => $newRemainingDebt,
@@ -210,17 +244,40 @@ class AdminFinanceController extends Controller
                         'updated_at' => now()
                     ]);
 
-                    // Jika utang untuk event ini sudah lunas sepenuhnya (remaining = 0), buka kunci withdraw dompet!
+                    // SINKRONISASI: eo.total_debt (cache) ikut turun; eo_debts tetap sumber utama.
+                    if ($debtReduced > 0) {
+                        DB::table('eo')->where('id', $topup->eo_id)->decrement('total_debt', $debtReduced);
+                    }
+
+                    // Mirror ke dompet BERTIPE SAMA: turunkan negative_balance; buka kunci bila lunas.
                     if ($newRemainingDebt <= 0) {
-                        DB::table('event_wallets')->where('event_id', $topup->event_id)->update([
-                            'withdraw_locked' => 0,
-                            'updated_at' => now()
+                        DB::table($walletTable)->where('event_id', $topup->event_id)->update([
+                            'negative_balance' => 0,
+                            'withdraw_locked'  => 0,
+                            'updated_at'       => now(),
+                        ]);
+                    } elseif ($debtReduced > 0) {
+                        DB::table($walletTable)->where('event_id', $topup->event_id)->update([
+                            'negative_balance' => DB::raw('GREATEST(0, negative_balance - ' . (float) $debtReduced . ')'),
+                            'updated_at'       => now(),
                         ]);
                     }
                 }
 
                 DB::commit();
-                return redirect()->back()->with('success', 'Pembayaran disetujui! Saldo event otomatis ditambahkan sebesar Rp ' . number_format($topup->amount_requested, 0, ',', '.') . ' dan pemotongan nota utang berhasil dilakukan.');
+
+                // Sinkronkan dompet bertipe sama agar suntikan (held) & pembukaan kunci langsung terlihat.
+                if ($topup->type === 'merch') {
+                    MerchWalletService::recalculate($topup->event_id);
+                } else {
+                    TicketWalletService::recalculate($topup->event_id);
+                }
+
+                $labelDompet = $topup->type === 'merch' ? 'merchandise' : 'tiket';
+                $msg = $debtReduced > 0
+                    ? 'Pembayaran disetujui! Nota utang ' . $labelDompet . ' EO berhasil dipotong sebesar Rp ' . number_format($debtReduced, 0, ',', '.') . '.'
+                    : 'Pembayaran disetujui & dana masuk sebagai cadangan refund (held) dompet ' . $labelDompet . ' event ini.';
+                return redirect()->back()->with('success', $msg);
 
             } else {
                 // JIKA DITOLAK

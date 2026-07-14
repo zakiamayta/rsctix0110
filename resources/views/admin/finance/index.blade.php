@@ -63,7 +63,7 @@
     @else
 
         {{-- 💳 CARD BLOCK KINERJA RINGKASAN KEUANGAN EO --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
             {{-- Card 1: Akumulasi Saldo Gabungan --}}
             <div class="bg-white border border-gray-200 rounded p-4 shadow-sm relative overflow-hidden">
                 <div class="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1">Total Saldo Bersih Gabungan (Total Balance)</div>
@@ -86,6 +86,16 @@
                     <p class="text-[10px] text-green-600 font-semibold mt-1">✅ Bersih dari catatan utang platform.</p>
                 @endif
                 <div class="absolute right-3 bottom-2 text-2xl text-gray-100 font-bold pointer-events-none">📉</div>
+            </div>
+
+            {{-- Card Baru: Refund Menunggu Diproses (terpisah dari utang) --}}
+            <div class="bg-white border border-gray-200 rounded p-4 shadow-sm relative overflow-hidden">
+                <div class="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1">Refund Menunggu Diproses</div>
+                <div class="text-xl font-bold tracking-tight {{ $eoDetails->pending_refund_liability > 0 ? 'text-amber-600' : 'text-green-600' }}">
+                    Rp {{ number_format($eoDetails->pending_refund_liability, 0, ',', '.') }}
+                </div>
+                <p class="text-[10px] text-gray-400 mt-1">Total refund yang sudah masuk antrean tapi belum dieksekusi/dipotong dari saldo.</p>
+                <div class="absolute right-3 bottom-2 text-2xl text-gray-100 font-bold pointer-events-none">⏳</div>
             </div>
 
             {{-- Card 3: Status Gerbang Penarikan Uang --}}

@@ -11,6 +11,7 @@ class EoDebt extends Model
     protected $fillable = [
         'eo_id',
         'event_id',
+        'type',
         'total_debt',
         'remaining_debt',
         'status'
