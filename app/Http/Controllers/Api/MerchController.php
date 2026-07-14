@@ -95,6 +95,7 @@ class MerchController extends Controller
             $items = $request->items;
             $email = $request->email;
             $name  = $request->name;
+            $phone = $request->phone; // 🔥 Tangkap input phone dari Flutter
 
             if (!$items || count($items) == 0) {
                 return response()->json([
@@ -123,7 +124,7 @@ class MerchController extends Controller
             $grandTotal = $totalAmount + $serviceTax; /// GRAND TOTAL
 
             /// =========================
-            /// INSERT TRANSACTION (Tidak NULL Sejak Awal)
+            /// INSERT TRANSACTION (Sesuai Skema Asli)
             /// =========================
             $trxId = DB::table('transaction_merch')->insertGetId([
                 'kode_unik' => $kode,
@@ -132,19 +133,20 @@ class MerchController extends Controller
                 'grand_total' => $grandTotal,
                 'email' => $email,
                 'payment_status' => $grandTotal == 0 ? 'paid' : 'unpaid',
-                'payment_method' => $grandTotal == 0 ? 'Free' : 'Xendit Gateway', // 🔥 FIX: Set nilai awal agar tidak NULL
+                'payment_method' => $grandTotal == 0 ? 'Free' : 'Xendit Gateway',
                 'checkout_time' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             /// =========================
-            /// INSERT DETAIL
+            /// INSERT DETAIL (Gunakan buyer_phone)
             /// =========================
             foreach ($items as $item) {
                 DB::table('transaction_merch_details')->insert([
                     'transaction_merch_id' => $trxId,
                     'buyer_name' => $name,
+                    'buyer_phone' => $phone, // 🔥 Simpan phone ke kolom database asli
                     'product_id' => $item['product_id'],
                     'varian_id' => $item['varian_id'],
                     'ukuran_id' => $item['ukuran_id'],
@@ -177,6 +179,7 @@ class MerchController extends Controller
                     'data' => [
                         'kode_unik' => $kode,
                         'email' => $email,
+                        'phone' => $phone,
                         'payment_status' => 'paid',
                         'payment_method' => 'Free',
                         'total_amount' => $totalAmount,
@@ -198,17 +201,25 @@ class MerchController extends Controller
                 'failure_redirect_url' => 'myapp://merch-failed',
             ];
 
+            // Masukkan data pelanggan ke tagihan Xendit jika nomor HP tersedia
+            if ($phone) {
+                $params['customer'] = [
+                    'given_names' => $name,
+                    'mobile_number' => $phone
+                ];
+            }
+
             $invoice = \Xendit\Invoice::create($params);
 
             /// =========================
-            /// SIMPAN INVOICE & METODE DEFAULT
+            /// SIMPAN INVOICE
             /// =========================
             DB::table('transaction_merch')
                 ->where('id', $trxId)
                 ->update([
                     'xendit_invoice_id' => $invoice['id'],
                     'xendit_invoice_url' => $invoice['invoice_url'],
-                    'payment_method' => 'Xendit Gateway', // 🔥 FIX: Update penanda awal gerbang payment
+                    'payment_method' => 'Xendit Gateway',
                 ]);
 
             DB::commit();
@@ -220,7 +231,8 @@ class MerchController extends Controller
                 'data' => [
                     'kode_unik' => $kode,
                     'email' => $email,
-                    'payment_status' => 'unpaid', // 🔥 FIX: String aman dari Undefined variable
+                    'phone' => $phone,
+                    'payment_status' => 'unpaid',
                     'payment_method' => 'Xendit Gateway',
                     'total_amount' => $totalAmount,
                     'service_tax' => $serviceTax,
@@ -260,6 +272,7 @@ class MerchController extends Controller
                 'kode_unik' => $trx->kode_unik,
                 'email' => $trx->email,
                 'name' => $detail->buyer_name ?? '-',
+                'phone' => $detail->buyer_phone ?? '-', // 🔥 Ambil dari tabel details
                 'payment_status' => $trx->payment_status,
                 'payment_method' => $trx->payment_method ?? ($trx->grand_total == 0 ? 'Free' : 'Xendit Gateway'),
                 'total_amount' => $trx->total_amount,
@@ -293,6 +306,7 @@ class MerchController extends Controller
                 ->select(
                     'tmd.id',
                     'p.name as product_name',
+                    'p.event_id as event_id',
                     'pv.varian',
                     'pu.ukuran',
                     'tmd.quantity',
@@ -305,24 +319,54 @@ class MerchController extends Controller
 
             $totalItem = $items->sum('quantity');
 
-            // --- PERBAIKAN GENERASI PATH/URL QR CODE ---
-            // Mengambil nama file dari database atau fallback ke kode_unik + .png
+            // AMBIL EVENT TERKAIT (asumsi 1 transaksi merch hanya berisi produk dari 1 event yang sama)
+            $eventId = $items->first()->event_id ?? null;
+            $event = $eventId ? DB::table('events')->where('id', $eventId)->first() : null;
+
+            $eventTitle = $event->title ?? 'Event';
+            $eventStatus = $event->status ?? 'approved';
+            // 'refund' | 'ship_independently' | null (EO belum memutuskan)
+            $merchCancelDecision = $event->merch_cancel_decision ?? null;
+
+            // Merch hanya perlu keputusan/tindakan kalau EVENT-nya dibatalkan.
+            // Reschedule TIDAK memengaruhi merch (barang tetap bisa diambil/dikirim seperti biasa).
+            $isCancelled = in_array($eventStatus, ['cancelled', 'pending_cancel']);
+
+            // AMBIL DATA REFUND TERBARU UNTUK TRANSAKSI MERCH INI (JIKA ADA)
+            $refund = DB::table('refunds')
+                ->where('transaction_merch_id', $trx->id)
+                ->orderBy('id', 'desc')
+                ->first();
+            $refundStatus = $refund->status ?? null; // waiting | pending | refunded | rejected | null
+
+            // JIKA REFUND SUDAH SELESAI (REFUNDED), PESANAN TIDAK PERLU DITAMPILKAN LAGI
+            if ($refundStatus === 'refunded') {
+                continue;
+            }
+
+            // Tombol "Ajukan Refund" HANYA aktif jika event dibatalkan DAN EO memutuskan 'refund'.
+            $canRefund = $isCancelled && $merchCancelDecision === 'refund';
+            // EO memutuskan merch tetap dikirim sendiri walau event batal -> tidak ada opsi refund.
+            $isShipIndependently = $isCancelled && $merchCancelDecision === 'ship_independently';
+            // Event batal tapi EO belum menentukan keputusan merch-nya.
+            $isWaitingDecision = $isCancelled && $merchCancelDecision === null;
+
+            // "PERLU TINDAKAN" hanya jika refund memang bisa diajukan, dan belum ada pengajuan
+            // atau pengajuan sebelumnya ditolak.
+            $needsAction = $canRefund && ($refundStatus === null || $refundStatus === 'rejected');
+
             $qrFile = $trx->qr_code ?? ($trx->kode_unik . '.png');
-            
-            // Jika di database nama filenya mengandung path, ambil nama filenya saja
             $qrFileName = basename($qrFile); 
-            
-            // Satukan menjadi URL penuh menuju public/images/qrcodes_merch/
             $qrCodeUrl = asset('images/qrcodes_merch/' . $qrFileName);
-            // --------------------------------------------
 
             $result[] = [
                 'id' => $trx->id,
                 'kode_unik' => $trx->kode_unik,
-                'qr_code' => $qrCodeUrl, // Mengembalikan URL penuh (e.g., http://domain.com/images/qrcodes_merch/filename.png)
+                'qr_code' => $qrCodeUrl,
                 'payment_status' => $trx->payment_status,
                 'payment_method' => $trx->payment_method ?? ($trx->grand_total == 0 ? 'Free' : 'Xendit Gateway'),
                 'email' => $trx->email,
+                'phone' => $items->first()->buyer_phone ?? '-', // 🔥 Tampilkan phone detail pertama di list
                 'total_amount' => $trx->total_amount,
                 'service_tax' => $trx->service_tax,
                 'grand_total' => $trx->grand_total,
@@ -331,13 +375,24 @@ class MerchController extends Controller
                 'xendit_invoice_id' => $trx->xendit_invoice_id,
                 'total_item' => $totalItem,
                 'items' => $items,
+
+                // 📌 Data status event & keputusan pembatalan merch (dipakai Flutter untuk banner tindakan)
+                'event_id' => $eventId,
+                'event_title' => $eventTitle,
+                'event_status' => $eventStatus,
+                'merch_cancel_decision' => $merchCancelDecision,
+                'refund_status' => $refundStatus,
+                'can_refund' => $canRefund,
+                'is_ship_independently' => $isShipIndependently,
+                'is_waiting_decision' => $isWaitingDecision,
+                'needs_action' => $needsAction,
             ];
         }
 
         return response()->json([
             'success' => true,
             'email' => $email,
-            'total_transaction' => count($transactions),
+            'total_transaction' => count($result),
             'data' => $result,
         ]);
     }

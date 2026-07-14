@@ -68,6 +68,49 @@ class AdminDashboardController extends Controller
             $totalRefundFees = $platformWallet ? (float)$platformWallet->total_refund_fees_spent : 0.00;
 
             // =====================================================================
+            // [BARU] DATA GRAFIK ANALITIK PENGGUNAAN PLATFORM (6 Bulan Terakhir)
+            // =====================================================================
+            $months = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $months[] = now()->subMonths($i)->format('Y-m');
+            }
+
+            $chartUsageData = [];
+            foreach ($months as $month) {
+                $label = date('M Y', strtotime($month . '-01'));
+                
+                // 1. Pertumbuhan Pengguna Berdasarkan 4 Tipe Role Utama
+                // Catatan: Asumsi role 'user' / 'pembeli' merujuk ke record bernilai 'user'.
+                $countAdmin  = DB::table('users')->where('role', 'admin')->where('created_at', 'like', "$month%")->count();
+                $countOwner  = DB::table('users')->where('role', 'owner')->where('created_at', 'like', "$month%")->count();
+                $countEo     = DB::table('users')->where('role', 'eo')->where('created_at', 'like', "$month%")->count();
+                $countBuyer  = DB::table('users')->where('role', 'user')->where('created_at', 'like', "$month%")->count();
+
+                // 2. Tren Omset Keuangan Bulanan (Tiket vs Merch)
+                $ticketSalesMonthly = DB::table('transactions')
+                    ->where('payment_status', 'paid')
+                    ->where('paid_time', 'like', "$month%")->sum('grand_total');
+
+                $merchSalesMonthly = DB::table('transaction_merch')
+                    ->where('payment_status', 'paid')
+                    ->where('paid_time', 'like', "$month%")->sum('grand_total');
+
+                $chartUsageData[] = [
+                    'month' => $label,
+                    'roles_growth' => [
+                        'admin' => $countAdmin,
+                        'owner' => $countOwner,
+                        'eo'    => $countEo,
+                        'buyer' => $countBuyer
+                    ],
+                    'financial_growth' => [
+                        'ticket' => (int)$ticketSalesMonthly,
+                        'merch'  => (int)$merchSalesMonthly,
+                    ]
+                ];
+            }
+
+            // =====================================================================
             // 3. DATA TRANSAKSI TIKET TERBARU & MANIFEST ATTENDEES
             // =====================================================================
             $rawTicketTransactions = DB::table('transactions as t')
@@ -79,7 +122,6 @@ class AdminDashboardController extends Controller
 
             $recentTicketTransactions = [];
             foreach ($rawTicketTransactions as $tx) {
-                // Ambil data manifest peserta tiket dari table `ticket_attendees` dan hubungkan kategori komponen `tickets`
                 $attendees = DB::table('ticket_attendees as ta')
                     ->join('tickets as tk', 'ta.ticket_id', '=', 'tk.id')
                     ->where('ta.transaction_id', $tx->id)
@@ -108,7 +150,6 @@ class AdminDashboardController extends Controller
 
             $recentMerchTransactions = [];
             foreach ($rawMerchTransactions as $tx) {
-                // Tarik rincian item, varian, dan ukuran sesuai skema relasi `transaction_merch_details`
                 $items = DB::table('transaction_merch_details as tmd')
                     ->join('products as p', 'tmd.product_id', '=', 'p.id')
                     ->join('products_varian as pv', 'tmd.varian_id', '=', 'pv.id')
@@ -134,33 +175,69 @@ class AdminDashboardController extends Controller
             $eoPerformance = [];
 
             foreach ($eoList as $eo) {
-                // Hitung data analitik track record performa event internal EO dari tabel `events`
                 $doneEvents = DB::table('events')->where('eo_id', $eo->id)->where('date', '<', now())->where('status', 'approved')->count();
                 $activeEvents = DB::table('events')->where('eo_id', $eo->id)->where('date', '>=', now())->where('status', 'approved')->count();
                 $rescheduledEvents = DB::table('events')->where('eo_id', $eo->id)->where('is_rescheduled', '>', 0)->count();
                 $cancelledEvents = DB::table('events')->where('eo_id', $eo->id)->whereIn('status', ['cancelled', 'pending_cancel'])->count();
 
-                // Tarik total omzet pendapatan kotor sales tiket EO lewat relasi tabel `transactions` -> `events`
                 $totalRevenue = DB::table('transactions as t')
                     ->join('events as e', 't.event_id', '=', 'e.id')
                     ->where('e.eo_id', $eo->id)
                     ->where('t.payment_status', 'paid')
                     ->sum('t.grand_total');
 
-                // Portofolio semua event yang dikelola mitra EO ini
+                // Rincian keuangan per-event (Omset, Pendapatan EO, Pendapatan Bersih Platform)
+                // Diagregasikan sekaligus per EO agar tidak query berulang untuk tiap event (hindari N+1).
+                // grand_total = total_amount (bagian EO) + service_tax (bagian platform)
+                $eventFinancials = DB::table('transactions as t')
+                    ->join('events as e', 't.event_id', '=', 'e.id')
+                    ->where('e.eo_id', $eo->id)
+                    ->where('t.payment_status', 'paid')
+                    ->select(
+                        't.event_id',
+                        DB::raw('COUNT(*) as tickets_sold'),
+                        DB::raw('SUM(t.grand_total) as gross_revenue'),
+                        DB::raw('SUM(t.total_amount) as eo_revenue'),
+                        DB::raw('SUM(t.service_tax) as platform_gross_tax')
+                    )
+                    ->groupBy('t.event_id')
+                    ->get()
+                    ->keyBy('event_id');
+
+                // Biaya refund (refunds_tax) yang menggerus pendapatan bersih platform, per event
+                $refundFeesByEvent = DB::table('refunds as r')
+                    ->join('transactions as t', 'r.transaction_id', '=', 't.id')
+                    ->join('events as e', 't.event_id', '=', 'e.id')
+                    ->where('e.eo_id', $eo->id)
+                    ->where('r.status', 'refunded')
+                    ->select('t.event_id', DB::raw('SUM(r.refunds_tax) as refund_fees'))
+                    ->groupBy('t.event_id')
+                    ->get()
+                    ->keyBy('event_id');
+
                 $eventsPortfolio = DB::table('events')
                     ->where('eo_id', $eo->id)
                     ->select('id', 'title', 'status', 'date')
                     ->orderBy('id', 'desc')
                     ->get()
-                    ->map(function($ev) {
-                        $ticketSold = DB::table('transactions')->where('event_id', $ev->id)->where('payment_status', 'paid')->count();
-                        $revenue = DB::table('transactions')->where('event_id', $ev->id)->where('payment_status', 'paid')->sum('grand_total');
+                    ->map(function($ev) use ($eventFinancials, $refundFeesByEvent) {
+                        $fin = $eventFinancials->get($ev->id);
+                        $ticketSold        = $fin->tickets_sold ?? 0;
+                        $grossRevenue      = $fin->gross_revenue ?? 0;      // Omset keseluruhan
+                        $eoRevenue         = $fin->eo_revenue ?? 0;         // Pendapatan untuk EO
+                        $platformGrossTax  = $fin->platform_gross_tax ?? 0;
+
+                        $refundRow   = $refundFeesByEvent->get($ev->id);
+                        $refundFees  = $refundRow->refund_fees ?? 0;
+                        $platformNetRevenue = $platformGrossTax - $refundFees; // Pendapatan bersih platform
+
                         return [
-                            'title'        => $ev->title,
-                            'status'       => $ev->status,
-                            'tickets_sold' => $ticketSold,
-                            'revenue'      => (int)$revenue
+                            'title'                 => $ev->title,
+                            'status'                => $ev->status,
+                            'tickets_sold'          => (int)$ticketSold,
+                            'revenue'               => (int)$grossRevenue,
+                            'eo_revenue'            => (int)$eoRevenue,
+                            'platform_net_revenue'  => (int)$platformNetRevenue,
                         ];
                     });
 
@@ -246,11 +323,11 @@ class AdminDashboardController extends Controller
                     'pending_refund_count'   => (int)$totalRefundPending,
                     'global_ticket_sales'    => (int)$globalTicketSales,
                     'global_merch_sales'     => (int)$globalMerchSales,
-                    // Penambahan Detail Data Finansial Komprehensif Dompet Platform (`platform_wallets`)
                     'platform_balance'       => (int)$platformBalance,
                     'total_service_tax'      => (int)$totalServiceTax,
                     'total_refund_fees'      => (int)$totalRefundFees,
                 ],
+                'chart_usage'                => $chartUsageData, // Inject Data Grafik Baru
                 'recent_ticket_transactions' => $recentTicketTransactions,
                 'recent_merch_transactions'  => $recentMerchTransactions,
                 'eo_performance'             => $eoPerformance,

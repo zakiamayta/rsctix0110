@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
+
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
@@ -77,27 +78,41 @@ class GoogleMobileController extends Controller
                       !empty($user->gender);
 
         // Ambil data EO jika diperlukan untuk kebutuhan internal fitur di dalam MainNavigation
+        // NOTE: DB::table() adalah query builder mentah (bukan Eloquent model), jadi TIDAK
+        // menjalankan $casts apapun. Tipe data yang balik dari MySQL bisa berbeda antara
+        // environment lokal (SQLite/driver dev) vs hosting production (MySQL asli di Domainesia).
+        // Karena itu SEMUA field yang dikirim ke Flutter WAJIB di-cast eksplisit di bawah ini,
+        // supaya SharedPreferences.setInt/setString/setBool di sisi Flutter tidak throw
+        // "type 'X' is not a subtype of type 'Y'" saat build release.
         $eo = DB::table('eo')->where('user_id', $user->id)->first();
 
         return response()->json([
             'user' => [
-                'id'               => $user->id,
-                'name'             => $user->name,
-                'email'            => $user->email,
-                'phone'            => $user->phone,
-                'birth_date'       => $user->birth_date,
-                'gender'           => $user->gender,
-                'avatar'           => $user->avatar,
-                'profile_complete' => (bool)$user->profile_complete,
-                'role'             => $user->role, // Flutter akan membaca role ini ('owner', 'eo', atau 'user')
+                'id'               => (int) $user->id,
+                'name'             => (string) ($user->name ?? ''),
+                'email'            => (string) ($user->email ?? ''),
+                'phone'            => $user->phone !== null ? (string) $user->phone : null,
+                'birth_date'       => $user->birth_date !== null ? (string) $user->birth_date : null,
+                'gender'           => $user->gender !== null ? (string) $user->gender : null,
+                'avatar'           => $user->avatar !== null ? (string) $user->avatar : null,
+                'profile_complete' => (bool) $user->profile_complete,
+                'role'             => (string) ($user->role ?? 'user'), // Flutter akan membaca role ini ('owner', 'eo', atau 'user')
             ],
-            'token'               => $token,
-            'is_profile_complete' => $isComplete,
-            
+            'token'               => (string) $token,
+            'is_profile_complete' => (bool) $isComplete,
+
             // Flag pendukung untuk fitur di dalam aplikasi (jika role dia owner atau punya data di tabel eo)
-            'is_eo'               => ($user->role === 'owner' || $eo) ? true : false,
-            'eo_id'               => $eo?->id,
-            'eo_status'           => $eo?->status ?? ($user->role === 'owner' ? 'active' : null),
+            'is_eo'               => (bool) (($user->role === 'owner' || $eo) ? true : false),
+
+            // eo_id dipaksa integer murni agar tidak dibaca String oleh Flutter Release
+            'eo_id'               => $eo ? (int) $eo->id : null,
+
+            // eo_status dipaksa string murni (fix bug sama seperti eo_id di atas —
+            // sebelumnya field ini tidak di-cast dan menyebabkan error type mismatch
+            // di SharedPreferences.setString saat login sebagai EO di flutter build apk release)
+            'eo_status'           => $eo && $eo->status !== null
+                                        ? (string) $eo->status
+                                        : ($user->role === 'owner' ? 'active' : null),
         ]);
     }
 
@@ -122,6 +137,7 @@ class GoogleMobileController extends Controller
         $user = $request->user();
 
         $profileComplete =
+            !empty($request->name) && // Tambahan validasi jika name wajib diisi saat lengkap
             !empty($request->phone) &&
             !empty($request->birth_date) &&
             !empty($request->gender);
@@ -149,6 +165,4 @@ class GoogleMobileController extends Controller
             'message' => 'Logout berhasil'
         ]);
     }
-
-    
 }

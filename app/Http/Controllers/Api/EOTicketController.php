@@ -18,15 +18,15 @@ class EOTicketController extends Controller
             ]);
 
             // 1. BUAT SUBQUERY UNTUK MENGHITUNG TOTAL OMSET TRANSAKSI PER EVENT
-            // Ini mencegah duplikasi data akibat One-to-Many Join
             $trxSub = DB::table('transactions')
                 ->select('event_id', DB::raw('SUM(total_amount) as total_omset_paid'))
                 ->where('payment_status', 'paid')
                 ->groupBy('event_id');
 
             $query = DB::table('withdrawals')
-                ->join('events', 'withdrawals.event_id', '=', 'events.id')
-                ->join('eo', 'withdrawals.eo_id', '=', 'eo.id')
+                // Menggunakan leftJoin ke events berdasarkan event_id yang berelasi
+                ->leftJoin('events', 'withdrawals.event_id', '=', 'events.id')
+                ->leftJoin('eo', 'withdrawals.eo_id', '=', 'eo.id')
                 // 2. LEFT JOIN MENGGUNAKAN SUBQUERY AGAR AMAN
                 ->leftJoinSub($trxSub, 'trx_summary', function($join) {
                     $join->on('withdrawals.event_id', '=', 'trx_summary.event_id');
@@ -38,10 +38,10 @@ class EOTicketController extends Controller
                     'withdrawals.event_id',
                     'withdrawals.amount',
                     'withdrawals.note',
+                    'withdrawals.owner_note', // Menambahkan kolom owner_note sesuai DB
                     'withdrawals.status',
                     'withdrawals.transfer_proof',
                     'withdrawals.invoice_file',
-                    'withdrawals.reference_number',
                     'withdrawals.created_at',
                     'withdrawals.approved_at',
                     'withdrawals.paid_at',
@@ -52,7 +52,6 @@ class EOTicketController extends Controller
                     // Ambil nilai total omset riil yang terjual
                     DB::raw('IFNULL(trx_summary.total_omset_paid, 0) as total_sales_real')
                 );
-                // KINI KITA TIDAK MEMBUTUHKAN GROUP BY YANG MERUSAK DATA LAGI
 
             if ($request->has('event_id') && !is_null($request->event_id)) {
                 $query->where('withdrawals.event_id', $request->event_id);
@@ -65,12 +64,13 @@ class EOTicketController extends Controller
                     'id' => $item->id,
                     'amount' => (int) $item->amount,
                     'note' => $item->note ?? '',
+                    'owner_note' => $item->owner_note ?? '',
                     'status' => $item->status ?? 'pending',
                     'transfer_proof' => $item->transfer_proof,
                     'invoice_file' => $item->invoice_file,
                     'event_name' => $item->event_name ?? 'Event Tidak Diketahui',
-                    'total_sales_event' => (int) $item->total_sales_real, // Data penjualan sukses sekarang keluar di sini
-                    'reference_number' => $item->reference_number ?? '-',
+                    'total_sales_event' => (int) $item->total_sales_real, 
+                    'reference_number' => '-', // Dihapus dari select karena tidak ada di tabel, dihardcode '-' agar FE tidak break
                     'bank_name' => $item->bank_name ?? '-',
                     'account_number' => $item->account_number ?? '-',
                     'account_name' => $item->account_name ?? '-',
@@ -153,11 +153,50 @@ class EOTicketController extends Controller
                     ->where('payment_status', 'paid')
                     ->sum('total_amount') ?? 0;
 
-                // 2. Total penarikan yang SUKSES maupun PENDING
+                // 1b. 🛠️ FIX SALDO RIL: potong refund yang SUDAH selesai (status 'refunded')
+                // dari omset, supaya sinkron dengan EODashboardController::getRealRevenue()
+                // yang menganggap event_wallets sebagai sumber kebenaran saldo (sudah
+                // dipotong refund & WD). Sebelumnya refund tidak pernah dikurangi dari
+                // sini, jadi tiap kali endpoint ini dipanggil, saldo di DB ke-overwrite
+                // balik ke omset kotor dan menghapus efek potongan refund.
+                $refundedTotal = DB::table('refunds')
+                    ->where('status', 'refunded')
+                    ->whereIn('transaction_id', function ($q) use ($event) {
+                        $q->select('id')->from('transactions')->where('event_id', $event->event_id);
+                    })
+                    ->sum('grand_total_refunded') ?? 0;
+
+                // 🛠️ FIX BUG: SALDO MINUS TIDAK PERNAH MUNCUL
+                // Sebelumnya selisih minus dari (paidTotal - refundedTotal) dibuang lewat
+                // max(0, ...), sehingga negative_balance TIDAK PERNAH terisi walau EO
+                // sebenarnya berutang (mis. refund tiket melebihi total omset event ini).
+                // Sekarang selisih minus ditangkap ke $negativeBalance & disimpan ke DB;
+                // $paidTotal tetap di-floor ke 0 untuk perhitungan plafon di bawah (tidak
+                // masuk akal menghitung plafon dari omset yang minus).
+                $negativeBalance = 0;
+
+                $netAfterRefund = $paidTotal - $refundedTotal;
+                if ($netAfterRefund < 0) {
+                    $negativeBalance += abs($netAfterRefund);
+                }
+                $paidTotal = max(0, $netAfterRefund);
+
+                // 2. Total penarikan yang SUDAH APPROVED SAJA.
+                //    (Penarikan berstatus 'pending' TIDAK memotong saldo yang
+                //    ditampilkan — saldo baru berkurang setelah owner approve.
+                //    Proteksi dobel-pengajuan tetap ada lewat pengecekan
+                //    $hasPendingWithdrawal di requestWithdraw().)
                 $alreadyWithdrawn = DB::table('withdrawals')
                     ->where('event_id', $event->event_id)
-                    ->whereIn('status', ['approved', 'pending']) 
+                    ->where('status', 'approved')
                     ->sum('amount') ?? 0;
+
+                // Deficit tambahan: dana yang sudah/sedang ditarik ternyata melebihi sisa
+                // omset bersih event ini (mis. WD disetujui duluan, baru belakangan ada
+                // refund besar yang menggerus omsetnya) -> EO berutang ke platform.
+                if (($paidTotal - $alreadyWithdrawn) < 0) {
+                    $negativeBalance += abs($paidTotal - $alreadyWithdrawn);
+                }
 
                 // 3. Deteksi skala berdasarkan Potensi Nilai Omset
                 try {
@@ -177,17 +216,21 @@ class EOTicketController extends Controller
                 // 4. Hitung masa waktu kalender (H-10 & Selesai)
                 $isEventFinished = false;
                 $isHMinus10 = false;
-                
-                if (!is_null($event->start_date)) {
-                    $today = now()->startOfDay();
-                    $startDate = Carbon::parse($event->start_date)->startOfDay();
-                    $daysLeft = $today->diffInDays($startDate);
-                    
-                    $isHMinus10 = ($daysLeft <= 10) && $today->isBefore($startDate);
-                }
-                
+
+                // PERBAIKAN BUG: H-10 HARUS dihitung dari END_DATE (MAX(jadwal.tanggal)),
+                // BUKAN dari start_date (events.date). Sebelumnya, untuk event multi-hari
+                // yang sudah berjalan (today >= start_date), kondisi "isBefore($startDate)"
+                // selalu false selamanya sehingga bypass H-10 tidak akan pernah aktif
+                // walaupun acara sebenarnya sudah mendekati/berada di H-10 menuju end_date.
                 if (!is_null($actualEndDate)) {
-                    $isEventFinished = Carbon::parse($actualEndDate)->isPast();
+                    $today = now()->startOfDay();
+                    $endDate = Carbon::parse($actualEndDate)->startOfDay();
+
+                    // Inklusif: hari H-10 sampai dengan hari terakhir acara (end_date) dihitung sebagai H-10
+                    $isHMinus10 = $today->greaterThanOrEqualTo($endDate->copy()->subDays(10))
+                                  && $today->lessThanOrEqualTo($endDate);
+
+                    $isEventFinished = $today->greaterThan($endDate);
                 }
 
                 if ($isEventFinished) {
@@ -197,7 +240,14 @@ class EOTicketController extends Controller
                 }
 
                 $isBypassedByHMinus10 = false;
-                if ($isHMinus10 && $paidTotal < $minBalanceRequired) {
+                // 🛠️ FIX BUG #1: Sebelumnya gerbang syarat omset minimum HANYA
+                // dibypass saat isHMinus10, padahal plafon sudah otomatis 100%
+                // ketika event SELESAI. Akibatnya event yang sudah selesai tapi
+                // belum pernah menembus omset minimum tetap terkunci (tombol mati).
+                // Sekarang event selesai ikut membuka gerbang ini sepenuhnya.
+                if ($isEventFinished) {
+                    $minBalanceRequired = 0;
+                } elseif ($isHMinus10 && $paidTotal < $minBalanceRequired) {
                     $minBalanceRequired = 0; 
                     $isBypassedByHMinus10 = true;
                 }
@@ -250,10 +300,13 @@ class EOTicketController extends Controller
                     ->update([
                         'available_balance' => (int) $calculatedAvailable,
                         'held_balance'      => (int) $heldBalance,
+                        'negative_balance'  => (int) $negativeBalance,
                         'updated_at'        => now()
                     ]);
 
-                $statusBypassMsg = $isBypassedByHMinus10 ? ' (Bypass H-10 Aktif)' : '';
+                $statusBypassMsg = $isBypassedByHMinus10
+                    ? ' (Bypass H-10 Aktif)'
+                    : ($isEventFinished ? ' (Event Selesai - Plafon 100%)' : '');
 
                 $result[] = [
                     'event_id'          => (int) $event->event_id,
@@ -266,11 +319,12 @@ class EOTicketController extends Controller
                     'is_h_minus_10'     => $isHMinus10,
                     'skala_event'       => $isSkalaBesar ? 'Besar (Potensi Capai ' . $this->formatRupiah($potentialRevenue) . ')' : 'Kecil (Potensi ' . $this->formatRupiah($potentialRevenue) . ')',
                     'total_sales'       => (int) $paidTotal,
+                    'total_refunded'    => (int) $refundedTotal,
                     'already_withdrawn' => (int) $alreadyWithdrawn,
                     'available_balance' => (int) $calculatedAvailable, 
                     'held_balance_ui'   => (int) $heldBalance, 
                     'held_balance'      => (int) $heldBalance, 
-                    'negative_balance'  => (int) $event->negative_balance,
+                    'negative_balance'  => (int) $negativeBalance,
                     'withdraw_locked'   => (int) $event->withdraw_locked,
                     'can_withdraw'      => $canWithdraw,
                     'system_reason'     => $systemReason . $statusBypassMsg,
@@ -366,9 +420,26 @@ class EOTicketController extends Controller
                 ->where('payment_status', 'paid')
                 ->sum('total_amount') ?? 0;
 
+            // 🛠️ FIX SALDO RIL: disamakan dengan eventWallets() — potong refund yang
+            // sudah selesai (status 'refunded') dari omset sebelum dipakai untuk
+            // validasi & perhitungan plafon penarikan.
+            $refundedTotal = DB::table('refunds')
+                ->where('status', 'refunded')
+                ->whereIn('transaction_id', function ($q) use ($request) {
+                    $q->select('id')->from('transactions')->where('event_id', $request->event_id);
+                })
+                ->sum('grand_total_refunded') ?? 0;
+
+            $paidTotal = max(0, $paidTotal - $refundedTotal);
+
+            // Saldo yang sudah "terpakai" hanya dihitung dari withdrawal yang
+            // sudah APPROVED. Withdrawal 'pending' tidak ikut memotong plafon
+            // di sini karena EO tidak mungkin sampai ke titik ini jika masih
+            // ada pengajuan pending untuk event yang sama (lihat pengecekan
+            // $hasPendingWithdrawal di atas).
             $alreadyWithdrawn = DB::table('withdrawals')
                 ->where('event_id', $request->event_id)
-                ->whereIn('status', ['approved', 'pending']) 
+                ->where('status', 'approved')
                 ->sum('amount') ?? 0;
 
             try {
@@ -388,16 +459,16 @@ class EOTicketController extends Controller
             $isEventFinished = false;
             $isHMinus10 = false;
 
-            if (!is_null($event->start_date)) {
-                $today = now()->startOfDay();
-                $startDate = Carbon::parse($event->start_date)->startOfDay();
-                $daysLeft = $today->diffInDays($startDate);
-
-                $isHMinus10 = ($daysLeft <= 10) && $today->isBefore($startDate);
-            }
-
+            // PERBAIKAN BUG: disamakan dengan eventWallets() — H-10 dihitung dari
+            // END_DATE (MAX(jadwal.tanggal)), bukan dari start_date (events.date).
             if (!is_null($actualEndDate)) {
-                $isEventFinished = Carbon::parse($actualEndDate)->isPast();
+                $today = now()->startOfDay();
+                $endDate = Carbon::parse($actualEndDate)->startOfDay();
+
+                $isHMinus10 = $today->greaterThanOrEqualTo($endDate->copy()->subDays(10))
+                              && $today->lessThanOrEqualTo($endDate);
+
+                $isEventFinished = $today->greaterThan($endDate);
             }
 
             if ($isEventFinished) {
@@ -406,7 +477,11 @@ class EOTicketController extends Controller
                 $plafonPercent = 0.5;
             }
 
-            if ($isHMinus10 && $paidTotal < $minBalanceRequired) {
+            if ($isEventFinished) {
+                // 🛠️ FIX BUG #1: sinkron dengan eventWallets() — event yang sudah
+                // selesai otomatis membuka gerbang syarat omset minimum sepenuhnya.
+                $minBalanceRequired = 0;
+            } elseif ($isHMinus10 && $paidTotal < $minBalanceRequired) {
                 $minBalanceRequired = 0;
             }
 
@@ -438,8 +513,12 @@ class EOTicketController extends Controller
             if ($request->hasFile('invoice')) {
                 $file = $request->file('invoice');
                 $filename = 'invoice_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/invoices', $filename);
-                $invoicePath = 'invoices/' . $filename;
+                
+                // Simpan fisik file langsung ke folder public/images/invoices_withdrawals
+                $file->move(public_path('images/invoices_withdrawals'), $filename);
+                
+                // Isi path yang akan disimpan ke database secara langsung
+                $invoicePath = 'images/invoices_withdrawals/' . $filename;
             }
 
             $adminReviewNote = "[Sistem Log] Skala Omset Potensial: " . $this->formatRupiah($potentialRevenue) . " | Plafon: " . ($plafonPercent * 100) . "%" . ($isHMinus10 ? " | Darurat H-10 Terbuka" : "");
