@@ -32,17 +32,18 @@ class OwnerRefundMonitoringController extends Controller
             ->withCount([
                 'refunds as total_pengajuan',
                 'refunds as total_sukses_transfer' => function($query) {
-                    $query->where('status', 'transferred');
+                    $query->where('status', 'refunded');
                 }
             ])
             ->latest()
             ->get();
 
         // 2. Ambil rekapitulasi total nominal refund yang sudah keluar di sistem (Audit internal Owner)
+        // Hanya refund berstatus 'refunded' yang dihitung sebagai dana & pajak yang benar-benar keluar.
         $rekapFinansial = DB::table('refunds')
             ->select(
-                DB::raw('SUM(grand_total_refunded) as total_dana_kembali'),
-                DB::raw('SUM(platform_service_tax_share) as total_pajak_ditanggung'),
+                DB::raw("SUM(CASE WHEN status = 'refunded' THEN grand_total_refunded ELSE 0 END) as total_dana_kembali"),
+                DB::raw("SUM(CASE WHEN status = 'refunded' THEN refunds_tax ELSE 0 END) as total_pajak_ditanggung"),
                 DB::raw('COUNT(id) as total_seluruh_tiket')
             )
             ->first();
@@ -76,11 +77,19 @@ class OwnerRefundMonitoringController extends Controller
         // Owner dapat melihat rincian isi dari batch refund tanpa tombol eksekusi (Aksi dikunci)
         $batch = RefundBatch::with(['event', 'eo'])->findOrFail($id);
         
+        // leftJoin ke dua tabel: batch tiket memakai transaction_id, batch merch memakai
+        // transaction_merch_id. Inner join ke transactions saja akan membuang seluruh
+        // refund merch. Ordering dibuat eksplisit ke refunds.created_at agar tidak ambigu.
         $refunds = DB::table('refunds')
-            ->join('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+            ->leftJoin('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+            ->leftJoin('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
             ->where('refunds.refund_batch_id', $batch->id)
-            ->select('refunds.*', 'transactions.kode_unik', 'transactions.email as buyer_email')
-            ->latest()
+            ->select(
+                'refunds.*',
+                DB::raw('COALESCE(transactions.kode_unik, transaction_merch.kode_unik) as kode_unik'),
+                DB::raw('COALESCE(transactions.email, transaction_merch.email) as buyer_email')
+            )
+            ->orderByDesc('refunds.created_at')
             ->get();
 
         $totalNominalBatch = $refunds->sum('grand_total_refunded');

@@ -131,10 +131,15 @@
                     <i class="bi bi-check-circle-fill"></i>
                     <span>Anda sudah melakukan <strong>refund</strong> untuk tiket ini. Dana telah dikembalikan ke rekening Anda.</span>
                 </div>
+            @elseif($currentRefundStatus === 'rejected')
+                <div class="alert border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-start gap-2" style="background:#fff3cd;color:#664d03;">
+                    <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                    <span>Pengajuan refund Anda <strong>gagal diproses / ditolak</strong>. Mohon periksa kembali <strong>nomor rekening</strong> dan <strong>nama pemilik rekening</strong> sudah benar, lalu <strong>ajukan ulang</strong> refund Anda.</span>
+                </div>
             @elseif($trx->event_status === 'cancelled')
                 <div class="alert status-tint-cancelled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
                     <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span>Event ini telah <strong>dibatalkan</strong> oleh penyelenggara. Anda berhak mengajukan pengembalian dana.</span>
+                    <span>Event ini telah <strong>dibatalkan</strong> oleh penyelenggara. Anda berhak mengajukan pengembalian dana tiket anda.</span>
                 </div>
             @elseif(($trx->event_is_rescheduled ?? 0) > 0)
                 <div class="alert status-tint-rescheduled border-0 rounded-3 py-2 px-3 mb-3 small d-flex align-items-center gap-2">
@@ -198,9 +203,9 @@
                             <i class="bi bi-hourglass-split"></i> Refund Diproses Admin
                         </span>
                     @elseif($currentRefundStatus === 'rejected')
-                        <span class="badge bg-danger rounded-pill px-3 py-2 small">
-                            <i class="bi bi-x-circle"></i> Refund Ditolak
-                        </span>
+                        <a href="{{ route('buyer.refund.create', $trx->id) }}" class="btn btn-warning rounded-pill px-3 text-white fw-semibold" title="Refund sebelumnya ditolak. Periksa nomor & nama rekening Anda lalu ajukan ulang.">
+                            <i class="bi bi-arrow-repeat me-1"></i> Ajukan Ulang Refund
+                        </a>
                     @elseif($trx->payment_status === 'paid' && ($trx->event_status === 'cancelled' || $trx->event_status === 'cancelled' || $trx->event_is_rescheduled > 0))
                         <a href="{{ route('buyer.refund.create', $trx->id) }}" class="btn btn-warning rounded-pill px-3 text-white fw-semibold">
                             <i class="bi bi-exclamation-circle me-1"></i> Ajukan Refund
@@ -388,9 +393,12 @@
                                 <i class="bi bi-hourglass-split"></i> Status: Masuk Antrean Batch (Diproses Admin)
                             </button>
                         @elseif($currentRefundStatus === 'rejected')
-                            <button class="btn btn-danger rounded-pill px-4" disabled>
-                                <i class="bi bi-x-circle"></i> Status: Pengajuan Refund Ditolak
-                            </button>
+                            <div class="alert border-0 rounded-3 py-2 px-3 mb-2 small text-start" style="background:#fff3cd;color:#664d03;">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> Refund ditolak. Periksa kembali <strong>nomor rekening</strong> &amp; <strong>nama pemilik rekening</strong> sudah benar sebelum mengajukan ulang.
+                            </div>
+                            <a href="{{ route('buyer.refund.create', $trx->id) }}" class="btn btn-warning rounded-pill px-4 text-white fw-semibold">
+                                <i class="bi bi-arrow-repeat me-1"></i> Ajukan Ulang Refund
+                            </a>
                         @elseif($trx->payment_status === 'paid' && ($trx->event_status === 'cancelled' || $trx->event_is_rescheduled > 0))
                             <a href="{{ route('buyer.refund.create', $trx->id) }}" class="btn btn-warning rounded-pill px-4 text-white fw-semibold">
                                 <i class="bi bi-exclamation-circle me-1"></i> Ajukan Pengembalian Dana (Refund)

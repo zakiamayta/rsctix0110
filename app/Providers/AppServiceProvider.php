@@ -66,5 +66,33 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('buyerNotifications', $notifications);
         });
+
+        // 4. NOTIFIKASI ADMIN: pengajuan refund pembeli yang masih 'waiting' (belum masuk
+        //    batch). Disuntik ke layout admin untuk badge sidebar & lonceng header, sehingga
+        //    admin tahu ada pembeli mengajukan refund tanpa harus membuka halaman refund.
+        view()->composer('layouts.admin', function ($view) {
+            if (!auth()->check() || auth()->user()->role !== 'admin') {
+                return;
+            }
+
+            $waiting = DB::table('refunds')
+                ->leftJoin('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+                ->leftJoin('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+                ->leftJoin('events', DB::raw('COALESCE(transactions.event_id, transaction_merch.event_id)'), '=', 'events.id')
+                ->where('refunds.status', 'waiting')
+                ->orderByDesc('refunds.created_at')
+                ->select(
+                    'refunds.id',
+                    'refunds.created_at',
+                    'refunds.grand_total_refunded',
+                    DB::raw('COALESCE(transactions.email, transaction_merch.email) as buyer_email'),
+                    DB::raw("CASE WHEN refunds.transaction_id IS NOT NULL THEN 'ticket' ELSE 'merch' END as tab"),
+                    'events.title as event_title'
+                )
+                ->get();
+
+            $view->with('refundWaitingCount', $waiting->count());
+            $view->with('refundWaitingItems', $waiting->take(8));
+        });
     }
 }

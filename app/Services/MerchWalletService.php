@@ -69,7 +69,11 @@ class MerchWalletService
         if (!is_null($event->date)) {
             $startDate = Carbon::parse($event->date)->startOfDay();
             $today = now()->startOfDay();
-            $isHMinus10 = $today->diffInDays($startDate, false) <= 10;
+            // Hanya berlaku pada jendela ≤10 hari SEBELUM event. diffInDays bertanda saja
+            // (tanpa guard isBefore) akan bernilai negatif untuk event yang sudah lewat,
+            // sehingga gerbang H-10 keliru menyala permanen setelah tanggal event.
+            $daysLeft = $today->diffInDays($startDate, false);
+            $isHMinus10 = ($daysLeft >= 0 && $daysLeft <= 10);
         }
 
         $isBypassedByHMinus10 = false;
@@ -94,7 +98,15 @@ class MerchWalletService
         $canWithdraw = true;
         $systemReason = 'Silakan masukkan nominal pengajuan Anda.';
 
-        if ($wallet->withdraw_locked == 1) {
+        if ($event->status === 'cancelled' && $event->merch_cancel_decision === 'refund') {
+            // Event dibatalkan & diputuskan refund → seluruh kas ditahan untuk mengembalikan
+            // uang pembeli. Tanpa ini, EO bisa menarik dana yang seharusnya dipakai refund
+            // dan menyisakan utang. Sejajar dengan guard cancelled di TicketWalletService.
+            $canWithdraw = false;
+            $calculatedAvailable = 0;
+            $heldBalance = $sisaKasSistem;
+            $systemReason = 'Event dibatalkan & diputuskan refund. Dana dibekukan untuk dialokasikan ke sirkuit refund.';
+        } elseif ($wallet->withdraw_locked == 1) {
             $canWithdraw = false;
             $calculatedAvailable = 0;
             $heldBalance = $sisaKasSistem;

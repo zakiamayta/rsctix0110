@@ -53,6 +53,12 @@ Route::post(
     [WebhookController::class, 'handleCallback']
 );
 
+/// XENDIT WEBHOOK - PAYOUT REFUND (BARU)
+Route::post(
+    '/xendit/webhook-payout',
+    [WebhookController::class, 'handlePayoutCallback']
+);
+
 /// HOME
 Route::get(
     '/home',

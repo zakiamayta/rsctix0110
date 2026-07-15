@@ -13,6 +13,9 @@ use App\Exports\RefundXenditExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Services\TicketWalletService;
 use App\Services\MerchWalletService;
+use App\Services\XenditPayoutService;
+use App\Services\RefundSettlementService;
+use Illuminate\Support\Facades\Log;
 
 class AdminRefundController extends Controller
 {
@@ -93,11 +96,51 @@ class AdminRefundController extends Controller
                 ->get();
         }
 
+        // 📥 LOG PEMBERITAHUAN: pengajuan refund dari pembeli yang masih 'waiting'
+        // (belum terserap ke batch mana pun). Ini penanda agar admin membuka batch untuk
+        // event terkait sehingga pengajuan tersebut masuk antrean pemrosesan.
+        if ($activeTab === 'ticket') {
+            $waitingRefundLogs = DB::table('refunds')
+                ->join('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+                ->join('events', 'transactions.event_id', '=', 'events.id')
+                ->leftJoin('eo', 'events.eo_id', '=', 'eo.id')
+                ->where('refunds.status', 'waiting')
+                ->select(
+                    'refunds.id',
+                    'refunds.grand_total_refunded',
+                    'refunds.bank_name',
+                    'refunds.created_at',
+                    'events.title as event_title',
+                    'eo.nama_badan_usaha as eo_name',
+                    'transactions.email as buyer_email'
+                )
+                ->orderByDesc('refunds.created_at')
+                ->get();
+        } else {
+            $waitingRefundLogs = DB::table('refunds')
+                ->join('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+                ->join('events', 'transaction_merch.event_id', '=', 'events.id')
+                ->leftJoin('eo', 'events.eo_id', '=', 'eo.id')
+                ->where('refunds.status', 'waiting')
+                ->select(
+                    'refunds.id',
+                    'refunds.grand_total_refunded',
+                    'refunds.bank_name',
+                    'refunds.created_at',
+                    'events.title as event_title',
+                    'eo.nama_badan_usaha as eo_name',
+                    'transaction_merch.email as buyer_email'
+                )
+                ->orderByDesc('refunds.created_at')
+                ->get();
+        }
+
         return view('admin.refunds.index', compact(
-            'batches', 
-            'eligibleEvents', 
-            'allEventsWithBatches', 
+            'batches',
+            'eligibleEvents',
+            'allEventsWithBatches',
             'eventNewsLogs',
+            'waitingRefundLogs',
             'activeTab'
         ));
     }
@@ -292,6 +335,137 @@ class AdminRefundController extends Controller
     /**
      * 🏁 5. Aksi Tombol: Menyelesaikan Batch Refund
      */
+    // public function completeBatch(Request $request, $id)
+    // {
+    //     $batch = RefundBatch::with('event')->findOrFail($id);
+
+    //     if ($batch->status !== 'closed') {
+    //         return redirect()->back()->with('error', 'Batch wajib dikunci/ditutup terlebih dahulu sebelum diselesaikan.');
+    //     }
+
+    //     $pendingRefunds = Refund::where('refund_batch_id', $batch->id)
+    //         ->where('status', 'pending')
+    //         ->with(['transaction', 'transactionMerch'])
+    //         ->get();
+
+    //     if ($pendingRefunds->isEmpty()) {
+    //         $batch->update(['status' => 'completed']);
+    //         return redirect()->route('admin.refunds.index', ['tab' => $batch->type])->with('success', 'Batch diselesaikan tanpa antrean transfer.');
+    //     }
+
+    //     // Kalkulasi total beban EO berdasarkan jenis komoditas masing-masing
+    //     $totalBebanEO = 0;
+    //     foreach ($pendingRefunds as $refund) {
+    //         $relation = $batch->type === 'ticket' ? $refund->transaction : $refund->transactionMerch;
+    //         if ($relation) {
+    //             $totalBebanEO += $relation->total_amount;
+    //         }
+    //     }
+
+    //     if ($totalBebanEO <= 0) {
+    //         $batch->update(['status' => 'completed']);
+    //         return redirect()->route('admin.refunds.index', ['tab' => $batch->type])->with('success', 'Batch ditutup tanpa pemotongan saldo.');
+    //     }
+
+    //     $biayaOperasionalXendit = $pendingRefunds->sum('refunds_tax');
+    //     $walletTable = $batch->type === 'ticket' ? 'event_wallets' : 'merch_wallets';
+
+    //     // Pastikan angka fresh sebelum uang benar-benar dipotong
+    //     if ($batch->type === 'ticket') {
+    //         TicketWalletService::recalculate($batch->event_id);
+    //     } else {
+    //         MerchWalletService::recalculate($batch->event_id);
+    //     }
+
+    //     $wallet = DB::table($walletTable)->where('event_id', $batch->event_id)->first();
+
+    //     // Sumber dana refund = SELURUH kas riil event (available + held), bukan hanya plafon
+    //     // available (50%). Untuk event cancelled available memang 0 sehingga otomatis setara held.
+    //     // Utang HANYA muncul bila refund melebihi kas riil (mis. EO sudah menarik dananya duluan).
+    //     $sumberSaldoUang = $wallet ? ($wallet->available_balance + $wallet->held_balance) : 0;
+
+    //     DB::beginTransaction();
+    //     try {
+    //         if ($sumberSaldoUang < $totalBebanEO) {
+    //             $kekuranganDana = $totalBebanEO - $sumberSaldoUang;
+
+    //             if ($wallet) {
+    //                 // Kosongkan kas riil; kekurangan menjadi utang (sekali catat), bukan saldo minus ganda.
+    //                 DB::table($walletTable)->where('event_id', $batch->event_id)->update([
+    //                     'available_balance' => 0,
+    //                     'held_balance'      => 0,
+    //                 ]);
+    //                 DB::table($walletTable)->where('event_id', $batch->event_id)->increment('negative_balance', $kekuranganDana);
+    //                 DB::table($walletTable)->where('event_id', $batch->event_id)->update(['withdraw_locked' => 1]);
+    //             }
+
+    //             // Catat utang EO (dengan tipe komoditas agar pelunasan diarahkan ke dompet yang benar)
+    //             EODebt::create([
+    //                 'eo_id'          => $batch->eo_id,
+    //                 'event_id'       => $batch->event_id,
+    //                 'type'           => $batch->type,
+    //                 'total_debt'     => $kekuranganDana,
+    //                 'remaining_debt' => $kekuranganDana,
+    //                 'status'         => 'unpaid',
+    //             ]);
+
+    //             DB::table('eo')->where('id', $batch->eo_id)->increment('total_debt', $kekuranganDana);
+    //         }
+    //         // Bila kas mencukupi tidak ada pemotongan manual: recalculate() di akhir menyusun
+    //         // ulang available/held dari paidTotal setelah transaksi di-flip menjadi 'refunded'.
+
+    //         // Potong wallet platform untuk biaya mass transfer
+    //         DB::table('platform_wallets')->where('id', 1)->update([
+    //             'total_refund_fees_spent' => DB::raw("total_refund_fees_spent + $biayaOperasionalXendit"),
+    //             'current_balance'         => DB::raw("current_balance - $biayaOperasionalXendit")
+    //         ]);
+
+    //         // Update status item refund
+    //         foreach ($pendingRefunds as $refund) {
+    //             $relation = $batch->type === 'ticket' ? $refund->transaction : $refund->transactionMerch;
+    //             $pureAmountToBuyer = $relation ? $relation->total_amount : $refund->grand_total_refunded;
+
+    //             $refund->update([
+    //                 'grand_total_refunded' => $pureAmountToBuyer, 
+    //                 'status'               => 'refunded',
+    //                 'processed_at'         => now(),
+    //             ]);
+    //         }
+
+    //         // Sinkronisasi payment_status transaksi asli menjadi 'refunded'
+    //         $targetTable = $batch->type === 'ticket' ? 'transactions' : 'transaction_merch';
+    //         $foreignKey = $batch->type === 'ticket' ? 'transaction_id' : 'transaction_merch_id';
+    //         $ids = $pendingRefunds->pluck($foreignKey)->filter()->toArray();
+
+    //         if (!empty($ids)) {
+    //             DB::table($targetTable)->whereIn('id', $ids)->update([
+    //                 'payment_status' => 'refunded',
+    //                 'updated_at'     => now()
+    //             ]);
+    //         }
+
+    //         $batch->update(['status' => 'completed']);
+
+    //         DB::commit();
+
+    //         if ($batch->type === 'ticket') {
+    //             TicketWalletService::recalculate($batch->event_id);
+    //         } else {
+    //             MerchWalletService::recalculate($batch->event_id);
+    //         }
+    //         return redirect()->route('admin.refunds.index', ['tab' => $batch->type])
+    //             ->with('success', 'Batch berhasil ditutup sepenuhnya dan finansial disinkronkan.');
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return redirect()->back()->with('error', 'Gagal memproses penyelesaian akibat kesalahan database: ' . $e->getMessage());
+    //     }
+    // }
+
+    /**
+     * 🏁 5. Aksi Tombol: Menyelesaikan Batch Refund
+     * Sudah TIDAK melakukan pemotongan saldo di sini — itu terjadi per-item
+     * di webhook payout.succeeded. Method ini murni penutup administratif.
+     */
     public function completeBatch(Request $request, $id)
     {
         $batch = RefundBatch::with('event')->findOrFail($id);
@@ -300,122 +474,36 @@ class AdminRefundController extends Controller
             return redirect()->back()->with('error', 'Batch wajib dikunci/ditutup terlebih dahulu sebelum diselesaikan.');
         }
 
-        $pendingRefunds = Refund::where('refund_batch_id', $batch->id)
-            ->where('status', 'pending')
-            ->with(['transaction', 'transactionMerch'])
-            ->get();
+        $belumFinal = Refund::where('refund_batch_id', $batch->id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->count();
 
-        if ($pendingRefunds->isEmpty()) {
-            $batch->update(['status' => 'completed']);
-            return redirect()->route('admin.refunds.index', ['tab' => $batch->type])->with('success', 'Batch diselesaikan tanpa antrean transfer.');
+        if ($belumFinal > 0) {
+            return redirect()->back()->with('error', "Masih ada {$belumFinal} refund yang belum selesai diproses (pending/processing). Kirim ke Xendit dulu atau tunggu webhook masuk.");
         }
 
-        // Kalkulasi total beban EO berdasarkan jenis komoditas masing-masing
-        $totalBebanEO = 0;
-        foreach ($pendingRefunds as $refund) {
-            $relation = $batch->type === 'ticket' ? $refund->transaction : $refund->transactionMerch;
-            if ($relation) {
-                $totalBebanEO += $relation->total_amount;
-            }
+        // Refund yang gagal transfer / perlu ditinjau WAJIB ditangani dulu: kirim ulang
+        // (retry) sampai berhasil, atau tandai gagal permanen (reject). Batch tidak boleh
+        // ditutup selama masih ada yang menggantung — supaya tidak ada pembeli yang
+        // dananya tak jelas tanpa penanda apa pun.
+        $belumDitangani = Refund::where('refund_batch_id', $batch->id)
+            ->whereIn('status', ['failed', 'needs_review'])
+            ->count();
+
+        if ($belumDitangani > 0) {
+            return redirect()->back()->with('error', "Masih ada {$belumDitangani} refund gagal/perlu ditinjau. Kirim ulang (retry) sampai berhasil, atau tandai gagal permanen (reject) dulu sebelum menyelesaikan batch.");
         }
 
-        if ($totalBebanEO <= 0) {
-            $batch->update(['status' => 'completed']);
-            return redirect()->route('admin.refunds.index', ['tab' => $batch->type])->with('success', 'Batch ditutup tanpa pemotongan saldo.');
+        $jumlahGagal = Refund::where('refund_batch_id', $batch->id)->where('status', 'rejected')->count();
+
+        $batch->update(['status' => 'completed']);
+
+        $message = 'Batch berhasil diselesaikan.';
+        if ($jumlahGagal > 0) {
+            $message .= " Catatan: {$jumlahGagal} refund gagal permanen dan perlu diajukan ulang oleh pembeli.";
         }
 
-        $biayaOperasionalXendit = $pendingRefunds->sum('refunds_tax');
-        $walletTable = $batch->type === 'ticket' ? 'event_wallets' : 'merch_wallets';
-
-        // Pastikan angka fresh sebelum uang benar-benar dipotong
-        if ($batch->type === 'ticket') {
-            TicketWalletService::recalculate($batch->event_id);
-        } else {
-            MerchWalletService::recalculate($batch->event_id);
-        }
-
-        $wallet = DB::table($walletTable)->where('event_id', $batch->event_id)->first();
-
-        // Sumber dana refund = SELURUH kas riil event (available + held), bukan hanya plafon
-        // available (50%). Untuk event cancelled available memang 0 sehingga otomatis setara held.
-        // Utang HANYA muncul bila refund melebihi kas riil (mis. EO sudah menarik dananya duluan).
-        $sumberSaldoUang = $wallet ? ($wallet->available_balance + $wallet->held_balance) : 0;
-
-        DB::beginTransaction();
-        try {
-            if ($sumberSaldoUang < $totalBebanEO) {
-                $kekuranganDana = $totalBebanEO - $sumberSaldoUang;
-
-                if ($wallet) {
-                    // Kosongkan kas riil; kekurangan menjadi utang (sekali catat), bukan saldo minus ganda.
-                    DB::table($walletTable)->where('event_id', $batch->event_id)->update([
-                        'available_balance' => 0,
-                        'held_balance'      => 0,
-                    ]);
-                    DB::table($walletTable)->where('event_id', $batch->event_id)->increment('negative_balance', $kekuranganDana);
-                    DB::table($walletTable)->where('event_id', $batch->event_id)->update(['withdraw_locked' => 1]);
-                }
-
-                // Catat utang EO (dengan tipe komoditas agar pelunasan diarahkan ke dompet yang benar)
-                EODebt::create([
-                    'eo_id'          => $batch->eo_id,
-                    'event_id'       => $batch->event_id,
-                    'type'           => $batch->type,
-                    'total_debt'     => $kekuranganDana,
-                    'remaining_debt' => $kekuranganDana,
-                    'status'         => 'unpaid',
-                ]);
-
-                DB::table('eo')->where('id', $batch->eo_id)->increment('total_debt', $kekuranganDana);
-            }
-            // Bila kas mencukupi tidak ada pemotongan manual: recalculate() di akhir menyusun
-            // ulang available/held dari paidTotal setelah transaksi di-flip menjadi 'refunded'.
-
-            // Potong wallet platform untuk biaya mass transfer
-            DB::table('platform_wallets')->where('id', 1)->update([
-                'total_refund_fees_spent' => DB::raw("total_refund_fees_spent + $biayaOperasionalXendit"),
-                'current_balance'         => DB::raw("current_balance - $biayaOperasionalXendit")
-            ]);
-
-            // Update status item refund
-            foreach ($pendingRefunds as $refund) {
-                $relation = $batch->type === 'ticket' ? $refund->transaction : $refund->transactionMerch;
-                $pureAmountToBuyer = $relation ? $relation->total_amount : $refund->grand_total_refunded;
-
-                $refund->update([
-                    'grand_total_refunded' => $pureAmountToBuyer, 
-                    'status'               => 'refunded',
-                    'processed_at'         => now(),
-                ]);
-            }
-
-            // Sinkronisasi payment_status transaksi asli menjadi 'refunded'
-            $targetTable = $batch->type === 'ticket' ? 'transactions' : 'transaction_merch';
-            $foreignKey = $batch->type === 'ticket' ? 'transaction_id' : 'transaction_merch_id';
-            $ids = $pendingRefunds->pluck($foreignKey)->filter()->toArray();
-
-            if (!empty($ids)) {
-                DB::table($targetTable)->whereIn('id', $ids)->update([
-                    'payment_status' => 'refunded',
-                    'updated_at'     => now()
-                ]);
-            }
-
-            $batch->update(['status' => 'completed']);
-
-            DB::commit();
-
-            if ($batch->type === 'ticket') {
-                TicketWalletService::recalculate($batch->event_id);
-            } else {
-                MerchWalletService::recalculate($batch->event_id);
-            }
-            return redirect()->route('admin.refunds.index', ['tab' => $batch->type])
-                ->with('success', 'Batch berhasil ditutup sepenuhnya dan finansial disinkronkan.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses penyelesaian akibat kesalahan database: ' . $e->getMessage());
-        }
+        return redirect()->route('admin.refunds.index', ['tab' => $batch->type])->with('success', $message);
     }
 
     /**
@@ -475,5 +563,156 @@ class AdminRefundController extends Controller
         $fileName = 'XENDIT_TEMPLATE_' . strtoupper($cleanBatchName) . '_' . date('Ymd_His') . '.xlsx';
 
         return Excel::download(new RefundXenditExport($refundItems), $fileName);
+    }
+
+
+/**
+     * 🚀 7. Kirim seluruh refund pending/failed di batch ke Xendit Payouts API
+     */
+public function sendToXendit($id, XenditPayoutService $payoutService)
+{
+    $batch = RefundBatch::findOrFail($id);
+
+    if ($batch->status !== 'closed') {
+        return redirect()->back()->with('error', 'Batch wajib dikunci (closed) terlebih dahulu sebelum dikirim ke Xendit.');
+    }
+
+    $pendingRefunds = Refund::where('refund_batch_id', $batch->id)
+        ->whereIn('status', ['pending', 'failed'])
+        ->get();
+
+    if ($pendingRefunds->isEmpty()) {
+        return redirect()->back()->with('warning', 'Tidak ada antrean refund yang perlu dikirim di batch ini.');
+    }
+
+    // Batch TETAP 'closed'. Yang bergerak hanya status per-item refund.
+    $successCount = 0;
+    $failedCount  = 0;
+    $failedItems  = [];
+
+    foreach ($pendingRefunds as $refund) {
+        $result = $payoutService->createPayout($refund);
+        if ($result['success']) {
+            $successCount++;
+        } else {
+            $failedCount++;
+            $failedItems[] = '#' . $refund->id . ': ' . $result['message'];
+        }
+    }
+
+    $message = "{$successCount} payout berhasil dikirim ke Xendit dan sedang diproses.";
+    if ($failedCount > 0) {
+        $message .= " {$failedCount} gagal dibuat: " . implode('; ', array_slice($failedItems, 0, 5));
+        return redirect()->route('admin.refunds.show', $batch->id)->with('warning', $message);
+    }
+
+    return redirect()->route('admin.refunds.show', $batch->id)->with('success', $message);
+}
+
+    /**
+     * 🔁 8. Kirim ulang 1 refund yang gagal (opsional: koreksi data rekening dulu)
+     */
+    public function retryRefund(Request $request, $refundId, XenditPayoutService $payoutService)
+    {
+        $refund = Refund::findOrFail($refundId);
+
+        if ($refund->status !== 'failed') {
+            return redirect()->back()->with('error', 'Hanya refund berstatus gagal yang bisa dikirim ulang.');
+        }
+
+        // Admin boleh koreksi data rekening sebelum retry, kalau memang itu penyebab gagalnya
+        if ($request->filled('bank_name') || $request->filled('account_number') || $request->filled('account_name')) {
+            $request->validate([
+                'bank_name'      => 'required|string',
+                'account_number' => 'required|string|max:50',
+                'account_name'   => 'required|string|max:150',
+            ]);
+
+            $refund->update([
+                'bank_name'      => $request->bank_name,
+                'account_number' => $request->account_number,
+                'account_name'   => $request->account_name,
+            ]);
+        }
+
+        $result = $payoutService->createPayout($refund);
+
+        return redirect()->back()->with(
+            $result['success'] ? 'success' : 'error',
+            $result['success'] ? 'Refund berhasil dikirim ulang ke Xendit.' : ('Gagal kirim ulang: ' . $result['message'])
+        );
+    }
+
+    /**
+     * ❌ 9. Tandai refund gagal permanen — pembeli wajib cek data & ajukan ulang
+     */
+    public function rejectRefund($refundId)
+    {
+        $refund = Refund::findOrFail($refundId);
+
+        if ($refund->status !== 'failed') {
+            return redirect()->back()->with('error', 'Hanya refund berstatus gagal yang bisa ditandai gagal permanen.');
+        }
+
+        $refund->update(['status' => 'rejected']);
+
+        return redirect()->back()->with('success', 'Refund #' . $refund->id . ' ditandai gagal permanen. Pembeli akan diminta mengajukan ulang.');
+    }
+
+    /**
+     * 🔄 10. Sinkronkan status payout langsung dari Xendit (fallback bila webhook
+     * tidak/terlambat diterima — mis. saat tunnel down, atau di sandbox yang butuh
+     * simulasi manual). Menarik status real lalu menerapkan aksi yang sama dgn webhook.
+     */
+    public function syncStatus($refundId, XenditPayoutService $payoutService)
+    {
+        $refund = Refund::findOrFail($refundId);
+
+        if ($refund->status !== 'processing') {
+            return redirect()->back()->with('error', 'Hanya refund berstatus "processing" yang perlu disinkronkan. Status saat ini: ' . $refund->status . '.');
+        }
+
+        $result = $payoutService->fetchPayoutStatus($refund);
+
+        if (!$result['success']) {
+            Log::warning('Sinkronisasi status payout gagal menghubungi Xendit.', [
+                'refund_id' => $refund->id,
+                'message'   => $result['message'],
+            ]);
+            return redirect()->back()->with('error', 'Gagal menghubungi Xendit: ' . $result['message']);
+        }
+
+        $status = $result['status'];
+        Log::info('🔄 Sinkronisasi manual status payout oleh admin.', [
+            'refund_id'    => $refund->id,
+            'xendit_status'=> $status,
+        ]);
+
+        if ($status === 'SUCCEEDED') {
+            try {
+                $r = RefundSettlementService::settleSuccessfulPayout($refund->id);
+                $msg = $r === 'already'
+                    ? 'Refund ini ternyata sudah selesai diproses sebelumnya.'
+                    : 'Status Xendit: SUKSES. Saldo & pembukuan berhasil disinkronkan, refund kini selesai.';
+                return redirect()->back()->with('success', $msg);
+            } catch (\Throwable $e) {
+                return redirect()->back()->with('error', 'Status Xendit sukses, tetapi gagal memproses pembukuan: ' . $e->getMessage());
+            }
+        }
+
+        if ($status === 'FAILED') {
+            Refund::where('id', $refund->id)->where('status', 'processing')->update([
+                'status'               => 'failed',
+                'xendit_payout_status' => 'FAILED',
+                'failure_code'         => $result['raw']['failure_code'] ?? 'UNKNOWN',
+                'failure_message'      => $result['raw']['failure_code'] ?? 'Payout gagal (hasil sinkronisasi manual).',
+                'updated_at'           => now(),
+            ]);
+            return redirect()->back()->with('warning', 'Status Xendit: GAGAL. Refund ditandai "failed" — silakan Retry atau tandai gagal permanen.');
+        }
+
+        // ACCEPTED / REQUESTED / PENDING — payout belum tuntas di Xendit.
+        Refund::where('id', $refund->id)->update(['xendit_payout_status' => $status]);
+        return redirect()->back()->with('info', "⏳ Payout masih diproses Xendit (status: {$status}) — transfer belum tuntas, jadi belum ada yang perlu dicatat. Ini normal. Jika Anda memakai mode sandbox, simulasikan dulu payout-nya di menu Payouts Xendit, lalu klik Sinkronkan Status lagi. Di mode live, cukup tunggu — status akan otomatis tuntas.");
     }
 }

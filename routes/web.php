@@ -270,6 +270,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/refunds/batch/{id}/complete', 'completeBatch')->name('refunds.completeBatch');
             Route::get('/refunds/batch/{id}/export-xendit', 'exportXendit')->name('refunds.exportXendit');
             Route::patch('/refunds/batch/{id}/toggle-status', 'toggleStatus')->name('refunds.toggleStatus');
+            Route::post('/refunds/batch/{id}/send-xendit', 'sendToXendit')->name('refunds.sendToXendit');
+            Route::post('/refunds/item/{id}/retry', 'retryRefund')->name('refunds.item.retry');
+            Route::patch('/refunds/item/{id}/reject', 'rejectRefund')->name('refunds.item.reject');
+            Route::post('/refunds/item/{id}/sync', 'syncStatus')->name('refunds.item.sync');
         });
 
         // Ruang Kendali Finansial & Dompet Audit EO
@@ -368,6 +372,8 @@ Route::post('/guest/merch/qr/{kode_unik}/store', [AbsenMerchController::class, '
 Route::get('/tickets/{id}', [WebhookController::class, 'show'])->name('tickets.show');
 Route::get('/absen/{kode}', [AbsensiController::class, 'showPasswordForm'])->name('absen.form');
 Route::post('/absen/{kode}', [AbsensiController::class, 'handleScan'])->name('absen.submit');
+
+Route::post('/webhook/xendit-payout', [WebhookController::class, 'handlePayoutCallback'])->name('webhook.xendit.payout');
 
 // QR Helpers Publik
 Route::get('/tickets/view/{kode}', [TicketController::class, 'show'])->name('tickets.show_admin');

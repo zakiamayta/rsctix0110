@@ -11,6 +11,7 @@ class Refund extends Model
 
     protected $fillable = [
         'transaction_id',
+        'transaction_merch_id',
         'refund_batch_id',
         'bank_name',
         'account_number',
@@ -19,6 +20,14 @@ class Refund extends Model
         'refunds_tax', // Diperbarui dari platform_service_tax_share sesuai database baru
         'status',
         'processed_at',
+        // 🆕 Kolom alur payout Xendit — WAJIB fillable karena XenditPayoutService
+        // menyimpannya lewat $refund->update() (model instance, tunduk mass-assignment).
+        'xendit_reference_id',
+        'xendit_payout_id',
+        'xendit_payout_status',
+        'failure_code',
+        'failure_message',
+        'sent_to_xendit_at',
     ];
 
     protected $casts = [
@@ -44,4 +53,6 @@ class Refund extends Model
     {
         return $this->belongsTo(RefundBatch::class, 'refund_batch_id');
     }
+
+    public function refundBatch() { return $this->belongsTo(RefundBatch::class, 'refund_batch_id'); }
 }

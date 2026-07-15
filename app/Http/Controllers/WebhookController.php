@@ -12,6 +12,9 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use App\Models\TransactionMerch; 
 use App\Services\TicketWalletService;
 use App\Services\MerchWalletService;
+use App\Models\Refund;
+use App\Models\EODebt;
+use App\Services\XenditPayoutService;
 
 class WebhookController extends Controller
 {
@@ -145,6 +148,131 @@ class WebhookController extends Controller
         }
 
         return response()->json(['message' => 'Ignored webhook'], 200);
+    }
+
+    /// ===================================================
+    /// 🆕 MENANGKAP WEBHOOK PAYOUTS V2 (REFUND OTOMATIS)
+    /// ===================================================
+    public function handlePayoutCallback(Request $request)
+    {
+        set_time_limit(60);
+
+        // 🔐 Verifikasi token — beda slot dari webhook invoice, JANGAN pakai XENDIT_CALLBACK_TOKEN
+        $expectedToken = config('services.xendit.payout_callback_token');
+        if (!empty($expectedToken)) {
+            $incomingToken = (string) $request->header('x-callback-token');
+            if (!hash_equals((string) $expectedToken, $incomingToken)) {
+                Log::warning('Xendit Payout Webhook DITOLAK: token tidak valid.', ['ip' => $request->ip()]);
+                return response()->json(['message' => 'Invalid callback token'], 403);
+            }
+        } else {
+            Log::warning('XENDIT_PAYOUT_CALLBACK_TOKEN belum diset — verifikasi DINONAKTIFKAN.');
+        }
+
+        $data = $request->all();
+        Log::info('Xendit Payout Webhook Received:', $data);
+
+        // Payouts v2 membungkus detail di dalam objek "data"; "?? $data" tetap
+        // menangani kasus payload datar (mis. saat uji coba manual).
+        $payload = $data['data'] ?? $data;
+
+        $referenceId = $payload['reference_id'] ?? null;
+        $status      = strtoupper($payload['status'] ?? '');
+
+        if (!$referenceId || !$status) {
+            Log::warning('Payout webhook: payload tidak valid (reference_id/status kosong).', [
+                'ip'   => $request->ip(),
+                'keys' => array_keys($data),
+            ]);
+            return response()->json(['message' => 'Invalid payload'], 400);
+        }
+
+        $refund = Refund::where('xendit_reference_id', $referenceId)->first();
+        if (!$refund) {
+            Log::warning('Payout webhook: refund tidak ditemukan utk reference_id ' . $referenceId);
+            return response()->json(['message' => 'Refund not found'], 404);
+        }
+
+        try {
+            if ($status === 'SUCCEEDED') {
+                return $this->processSuccessfulPayout($refund, $data);
+            }
+
+            if ($status === 'FAILED') {
+                // 🔒 Idempoten: hanya proses kalau masih 'processing'
+                $affected = Refund::where('id', $refund->id)->where('status', 'processing')->update([
+                    'status'               => 'failed',
+                    'xendit_payout_status' => 'FAILED',
+                    'failure_code'         => $payload['failure_code'] ?? 'UNKNOWN',
+                    'failure_message'      => $payload['failure_code'] ?? 'Payout gagal diproses Xendit.',
+                    'updated_at'           => now(),
+                ]);
+
+                if ($affected === 0) {
+                    Log::info('Payout FAILED duplikat diabaikan.', ['reference_id' => $referenceId]);
+                } else {
+                    Log::warning('Payout webhook: transfer GAGAL dari Xendit.', [
+                        'refund_id'    => $refund->id,
+                        'reference_id' => $referenceId,
+                        'failure_code' => $payload['failure_code'] ?? 'UNKNOWN',
+                    ]);
+                }
+
+                return response()->json(['message' => 'Payout failure recorded'], 200);
+            }
+
+            if ($status === 'REVERSED') {
+                // ⚠️ Kasus jarang: sempat SUCCEEDED, lalu ditolak channel setelahnya.
+                // TIDAK auto-reverse saldo/debt di sini — terlalu berisiko dilakukan otomatis.
+                // Cukup tandai untuk ditinjau manual oleh admin.
+                Refund::where('id', $refund->id)->update([
+                    'status'               => 'needs_review',
+                    'xendit_payout_status' => 'REVERSED',
+                    'failure_code'         => 'REVERSED_AFTER_SUCCESS',
+                    'failure_message'      => 'Payout sempat sukses tapi ditolak channel (rekening tidak valid/dorman). Perlu peninjauan manual admin.',
+                    'updated_at'           => now(),
+                ]);
+
+                Log::warning('⚠️ Payout REVERSED — butuh peninjauan manual.', ['refund_id' => $refund->id]);
+
+                return response()->json(['message' => 'Reversal flagged for review'], 200);
+            }
+
+            // ACCEPTED / REQUESTED — status transisi, cukup dicatat, tidak ada aksi
+            Refund::where('id', $refund->id)->update(['xendit_payout_status' => $status]);
+            Log::info('Payout webhook: status transisi dicatat.', ['refund_id' => $refund->id, 'status' => $status]);
+            return response()->json(['message' => 'Status noted'], 200);
+        } catch (\Throwable $e) {
+            // Kegagalan sistem tak terduga saat memproses webhook (mis. error DB).
+            Log::error('❌ Kegagalan sistem saat memproses webhook payout: ' . $e->getMessage(), [
+                'reference_id' => $referenceId,
+                'status'       => $status,
+                'refund_id'    => $refund->id,
+                'trace'        => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Webhook processing error'], 500);
+        }
+    }
+
+    /**
+     * 💰 Eksekusi finansial saat payout SUKSES.
+     * Logika sesungguhnya ada di RefundSettlementService agar dipakai bersama
+     * antara webhook ini dan tombol "Sinkronkan Status" manual admin.
+     */
+    protected function processSuccessfulPayout(Refund $refund, array $data)
+    {
+        try {
+            $result = \App\Services\RefundSettlementService::settleSuccessfulPayout($refund->id);
+
+            if ($result === 'already') {
+                return response()->json(['message' => 'Already processed'], 200);
+            }
+
+            return response()->json(['message' => 'Payout processed successfully'], 200);
+        } catch (\Throwable $e) {
+            // Sudah dicatat detail + trace di service. Balas 500 supaya Xendit retry.
+            return response()->json(['message' => 'Processing error'], 500);
+        }
     }
 
     /// ===================================================
@@ -287,4 +415,4 @@ public function sendAttendeeEmails($transaction)
             Log::error('Failed to send merch email: ' . $e->getMessage());
         }
     }
-}
+}   

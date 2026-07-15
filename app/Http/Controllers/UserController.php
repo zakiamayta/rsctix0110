@@ -19,16 +19,18 @@ class UserController extends Controller
         // Mengambil semua jenis transaksi (termasuk paid, unpaid, dan refunded)
         $transactions = DB::table('transactions')
             ->join('events', 'transactions.event_id', '=', 'events.id')
-            ->leftJoin('refunds', 'transactions.id', '=', 'refunds.transaction_id')
             ->where('transactions.email', $user->email)
             ->select(
                 'transactions.*',
-                'transactions.id as id', 
+                'transactions.id as id',
                 'transactions.is_registered as is_registered', // ✨ MEMASTIKAN KOLOM ABSENSI TERAMBIL DENGAN AMAN
-                'events.title as event_title', 
+                'events.title as event_title',
                 'events.status as event_status',
                 'events.is_rescheduled as event_is_rescheduled',
-                'refunds.status as refund_status'
+                // Ambil status refund TERBARU per transaksi lewat subquery. Pakai leftJoin
+                // akan menggandakan baris (kartu duplikat) & mengambil status acak bila
+                // pembeli pernah ajukan ulang (baris rejected lama + pending baru).
+                DB::raw('(SELECT r.status FROM refunds r WHERE r.transaction_id = transactions.id ORDER BY r.created_at DESC, r.id DESC LIMIT 1) as refund_status')
             )
             ->orderByDesc('transactions.checkout_time')
             ->get();
@@ -93,6 +95,8 @@ public function myMerch()
             // 2. ALUR MURNI: Ambil status pengajuan refund dari tabel 'refunds' terpusat secara real-time
             $refundCheck = DB::table('refunds')
                 ->where('transaction_merch_id', $trx->id)
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
                 ->first();
 
             // Jika pembeli sudah mengisi form pengajuan, simpan statusnya (waiting/pending/refunded/rejected)
