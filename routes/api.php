@@ -60,6 +60,7 @@ Route::get(
 );
 Route::get('/notifications', [App\Http\Controllers\Api\HomeApiController::class, 'notifications']);
 Route::middleware('auth:sanctum')->post('/refunds/submit', [HomeApiController::class, 'submitRefund']);
+Route::middleware('auth:sanctum')->get('/refunds/detail', [HomeApiController::class, 'refundDetail']);
 /// EVENTS
 Route::get(
     '/events',

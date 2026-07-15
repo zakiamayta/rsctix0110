@@ -124,6 +124,16 @@ class MerchController extends Controller
             $grandTotal = $totalAmount + $serviceTax; /// GRAND TOTAL
 
             /// =========================
+            /// AMBIL EVENT_ID DARI PRODUK (asumsi 1 transaksi = 1 event yang sama)
+            /// Disimpan langsung di transaction_merch supaya lookup status/keputusan
+            /// pembatalan event tidak bergantung pada join items->product yang rapuh.
+            /// =========================
+            $firstProductId = $items[0]['product_id'] ?? null;
+            $productEventId = $firstProductId
+                ? DB::table('products')->where('id', $firstProductId)->value('event_id')
+                : null;
+
+            /// =========================
             /// INSERT TRANSACTION (Sesuai Skema Asli)
             /// =========================
             $trxId = DB::table('transaction_merch')->insertGetId([
@@ -135,6 +145,7 @@ class MerchController extends Controller
                 'payment_status' => $grandTotal == 0 ? 'paid' : 'unpaid',
                 'payment_method' => $grandTotal == 0 ? 'Free' : 'Xendit Gateway',
                 'checkout_time' => now(),
+                'event_id' => $productEventId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -319,14 +330,21 @@ class MerchController extends Controller
 
             $totalItem = $items->sum('quantity');
 
-            // AMBIL EVENT TERKAIT (asumsi 1 transaksi merch hanya berisi produk dari 1 event yang sama)
-            $eventId = $items->first()->event_id ?? null;
+            // AMBIL EVENT TERKAIT.
+            // Prioritaskan kolom transaction_merch.event_id (diisi saat checkout, stabil
+            // walau produk/varian/ukuran-nya belakangan diubah atau dihapus).
+            // Fallback ke event_id dari item pertama untuk transaksi lama sebelum
+            // kolom ini ada (asumsi 1 transaksi merch hanya berisi produk dari 1 event).
+            $eventId = $trx->event_id ?? ($items->first()?->event_id ?? null);
             $event = $eventId ? DB::table('events')->where('id', $eventId)->first() : null;
 
-            $eventTitle = $event->title ?? 'Event';
-            $eventStatus = $event->status ?? 'approved';
+            // Null-safe: kalau event tidak ditemukan (mis. produk sudah dihapus dan
+            // transaksi lama tidak punya event_id sendiri), jangan sampai crash -
+            // cukup anggap event dalam kondisi normal (tidak dibatalkan).
+            $eventTitle = $event?->title ?? 'Event';
+            $eventStatus = $event?->status ?? 'approved';
             // 'refund' | 'ship_independently' | null (EO belum memutuskan)
-            $merchCancelDecision = $event->merch_cancel_decision ?? null;
+            $merchCancelDecision = $event?->merch_cancel_decision ?? null;
 
             // Merch hanya perlu keputusan/tindakan kalau EVENT-nya dibatalkan.
             // Reschedule TIDAK memengaruhi merch (barang tetap bisa diambil/dikirim seperti biasa).

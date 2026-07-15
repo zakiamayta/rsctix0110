@@ -305,7 +305,7 @@ class HomeApiController extends Controller
     public function notifications(Request $request)
     {
         $email = $request->user() ? $request->user()->email : $request->query('email');
-        
+
         if (!$email) {
             return response()->json([
                 'status' => false,
@@ -314,9 +314,75 @@ class HomeApiController extends Controller
             ], 400);
         }
 
-        // 🎟️ A. AMBIL DATA DARI TRANSAKSI TIKET
+        // 🎟️ A. TIKET BERHASIL DIBELI (payment_status = paid) -> notifikasi "Pembelian Berhasil"
+        $ticketPurchased = DB::table('transactions')
+            ->join('events', 'transactions.event_id', '=', 'events.id')
+            ->select(
+                'events.id as event_id',
+                'events.title as event_title',
+                'events.poster as event_poster',
+                'transactions.kode_unik',
+                'transactions.paid_time'
+            )
+            ->where('transactions.email', $email)
+            ->where('transactions.payment_status', 'paid')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'event_id' => $item->event_id,
+                    'invoice_code' => $item->kode_unik,
+                    'type' => 'TICKET_PURCHASED',
+                    'transaction_type' => 'ticket',
+                    'refund_status' => null,
+                    'title' => "Pembelian Tiket Berhasil: " . $item->event_title,
+                    'short_info' => "Tiket berhasil dibeli & pembayaran dikonfirmasi.",
+                    'message' => "Pembayaran tiket untuk event '" . $item->event_title . "' dengan invoice " . $item->kode_unik . " telah berhasil dikonfirmasi.\n\nTerima kasih telah bertransaksi. Tiketmu sudah bisa dilihat di menu 'Tiket Saya'.",
+                    'poster' => $item->event_poster ? asset($item->event_poster) : null,
+                    'created_at' => $item->paid_time ? Carbon::parse($item->paid_time)->toDateTimeString() : null,
+                ];
+            })
+            ->filter(fn ($n) => $n['created_at'] !== null)
+            ->values();
+
+        // 📦 B. MERCH BERHASIL DIBELI (payment_status = paid)
+        $merchPurchased = DB::table('transaction_merch')
+            ->leftJoin('transaction_merch_details', 'transaction_merch.id', '=', 'transaction_merch_details.transaction_merch_id')
+            ->leftJoin('products', 'transaction_merch_details.product_id', '=', 'products.id')
+            ->select(
+                'transaction_merch.id',
+                'transaction_merch.kode_unik',
+                'transaction_merch.paid_time',
+                DB::raw('MIN(products.name) as product_name')
+            )
+            ->where('transaction_merch.email', $email)
+            ->where('transaction_merch.payment_status', 'paid')
+            ->groupBy('transaction_merch.id', 'transaction_merch.kode_unik', 'transaction_merch.paid_time')
+            ->get()
+            ->map(function ($item) {
+                $name = $item->product_name ?? 'Merchandise';
+                return [
+                    'event_id' => null,
+                    'invoice_code' => $item->kode_unik,
+                    'type' => 'MERCH_PURCHASED',
+                    'transaction_type' => 'merch',
+                    'refund_status' => null,
+                    'title' => "Pembelian Merch Berhasil: " . $name,
+                    'short_info' => "Merchandise berhasil dibeli & pembayaran dikonfirmasi.",
+                    'message' => "Pembayaran merchandise '" . $name . "' dengan invoice " . $item->kode_unik . " telah berhasil dikonfirmasi.\n\nTerima kasih telah bertransaksi. Pesananmu sudah bisa dilihat di menu 'Pesanan Saya'.",
+                    'poster' => null,
+                    'created_at' => $item->paid_time ? Carbon::parse($item->paid_time)->toDateTimeString() : null,
+                ];
+            })
+            ->filter(fn ($n) => $n['created_at'] !== null)
+            ->values();
+
+        // 🎟️ C. TIKET: EVENT DIBATALKAN / RESCHEDULE
+        // ✅ FIX BUG: left join ke `refunds` supaya kita tahu apakah user SUDAH mengajukan refund
+        // untuk invoice ini (dan statusnya apa). Dipakai Flutter untuk menyembunyikan/mengganti
+        // tombol "Klaim Refund" saat refund masih diproses, alih-alih user baru tahu setelah submit form.
         $ticketNotifications = DB::table('transactions')
             ->join('events', 'transactions.event_id', '=', 'events.id')
+            ->leftJoin('refunds', 'refunds.transaction_id', '=', 'transactions.id')
             ->select(
                 'events.id as event_id',
                 'events.title as event_title',
@@ -325,7 +391,8 @@ class HomeApiController extends Controller
                 'events.date as event_old_date',
                 'events.proposed_date as event_new_date',
                 'transactions.kode_unik',
-                'transactions.paid_time'
+                'transactions.paid_time',
+                'refunds.status as refund_status'
             )
             ->where('transactions.email', $email)
             ->where('transactions.payment_status', 'paid')
@@ -338,11 +405,12 @@ class HomeApiController extends Controller
                       });
             })
             ->get()
+            ->unique('kode_unik') // Jaga-jaga agar leftJoin refunds tidak menggandakan baris
             ->map(function ($item) {
                 $isCancel = in_array($item->event_status, ['cancelled', 'pending_cancel']);
                 $type = $isCancel ? "CANCELLED" : "RESCHEDULE";
                 $title = $isCancel ? "Pembatalan: " . $item->event_title : "Jadwal Baru: " . $item->event_title;
-                
+
                 if ($isCancel) {
                     $message = "Dengan hormat kami informasikan bahwa event '" . $item->event_title . "' telah dibatalkan.\n\nSesuai kebijakan proteksi pembeli, Anda berhak mendapatkan REFUND TIKET PENUH (100%) untuk kode invoice " . $item->kode_unik . ".";
                 } else {
@@ -350,32 +418,47 @@ class HomeApiController extends Controller
                     $message = "Event '" . $item->event_title . "' mengalami perubahan jadwal.\n\n🗓️ Jadwal Baru: " . $newDateStr . "\n\nJika berhalangan hadir, Anda berhak mengklaim 100% Refund untuk nomor invoice " . $item->kode_unik . ".";
                 }
 
+                // ✅ FIX BUG: sesuaikan short_info dengan status refund yang sudah ada,
+                // supaya user langsung tahu dari list notifikasi tanpa perlu buka form dulu.
+                $shortInfo = $isCancel ? "Event dibatalkan. Ambil refund tiket di sini." : "Jadwal event berubah. Klik detail refund.";
+                if (in_array($item->refund_status, ['waiting', 'pending'])) {
+                    $shortInfo = "Refund sudah diajukan & sedang diproses.";
+                } elseif ($item->refund_status === 'refunded') {
+                    $shortInfo = "Refund sudah selesai & dana telah dikirim.";
+                } elseif ($item->refund_status === 'rejected') {
+                    $shortInfo = "Pengajuan refund ditolak Admin.";
+                }
+
                 return [
                     'event_id' => $item->event_id,
                     'invoice_code' => $item->kode_unik,
                     'type' => $type,
                     'transaction_type' => 'ticket',
+                    'refund_status' => $item->refund_status, // null | waiting | pending | refunded | rejected
                     'title' => $title,
-                    'short_info' => $isCancel ? "Event dibatalkan. Ambil refund tiket di sini." : "Jadwal event berubah. Klik detail refund.",
+                    'short_info' => $shortInfo,
                     'message' => $message,
                     'poster' => $item->event_poster ? asset($item->event_poster) : null,
                     'created_at' => Carbon::parse($item->paid_time)->toDateTimeString(),
                 ];
-    });
+            })
+            ->values();
 
-        // 📦 B. AMBIL DATA DARI TRANSAKSI MERCHANDISE
-        // Menyesuaikan jika event yang berhubungan dengan produk merchandise tersebut dibatalkan
+        // 📦 D. MERCH: EVENT TERKAIT DIBATALKAN
+        // Sama seperti tiket, disertakan refund_status supaya UI tahu apakah tombol klaim boleh muncul.
         $merchNotifications = DB::table('transaction_merch')
             ->join('transaction_merch_details', 'transaction_merch.id', '=', 'transaction_merch_details.transaction_merch_id')
             ->join('products', 'transaction_merch_details.product_id', '=', 'products.id')
             ->join('events', 'products.event_id', '=', 'events.id')
+            ->leftJoin('refunds', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
             ->select(
                 'events.id as event_id',
                 'events.title as event_title',
                 'events.poster as event_poster',
                 'events.status as event_status',
                 'transaction_merch.kode_unik',
-                'transaction_merch.paid_time'
+                'transaction_merch.paid_time',
+                'refunds.status as refund_status'
             )
             ->where('transaction_merch.email', $email)
             ->where('transaction_merch.payment_status', 'paid')
@@ -386,20 +469,88 @@ class HomeApiController extends Controller
                 $title = "Pembatalan Merch: " . $item->event_title;
                 $message = "Sehubungan dengan dibatalkannya event '" . $item->event_title . "', pesanan Merchandise resmi Anda dengan nomor invoice " . $item->kode_unik . " dibatalkan secara otomatis.\n\nAnda berhak mendapatkan pengembalian dana 100% tanpa potongan.";
 
+                $shortInfo = "Pemesanan Merchandise dibatalkan. Klaim refund di sini.";
+                if (in_array($item->refund_status, ['waiting', 'pending'])) {
+                    $shortInfo = "Refund sudah diajukan & sedang diproses.";
+                } elseif ($item->refund_status === 'refunded') {
+                    $shortInfo = "Refund sudah selesai & dana telah dikirim.";
+                } elseif ($item->refund_status === 'rejected') {
+                    $shortInfo = "Pengajuan refund ditolak Admin.";
+                }
+
                 return [
                     'event_id' => $item->event_id,
                     'invoice_code' => $item->kode_unik,
                     'type' => 'CANCELLED',
                     'transaction_type' => 'merch',
+                    'refund_status' => $item->refund_status,
                     'title' => $title,
-                    'short_info' => "Pemesanan Merchandise dibatalkan. Klaim refund di sini.",
+                    'short_info' => $shortInfo,
                     'message' => $message,
                     'poster' => $item->event_poster ? asset($item->event_poster) : null,
                     'created_at' => Carbon::parse($item->paid_time)->toDateTimeString(),
                 ];
-    });
+            })
+            ->values();
 
-        // 🏢 C. STATUS PENGAJUAN EO & EVENT
+        // 💸 E. RIWAYAT PROGRES REFUND (waiting -> pending -> refunded / rejected)
+        // Notifikasi terpisah supaya user selalu tahu perkembangan pengajuannya,
+        // dari "menunggu verifikasi" sampai "selesai" atau "ditolak".
+        $refundTicket = DB::table('refunds')
+            ->join('transactions', 'refunds.transaction_id', '=', 'transactions.id')
+            ->join('events', 'transactions.event_id', '=', 'events.id')
+            ->select(
+                'events.id as event_id',
+                'events.title as event_title',
+                'events.poster as event_poster',
+                'transactions.kode_unik',
+                'refunds.status as refund_status',
+                'refunds.grand_total_refunded',
+                'refunds.updated_at'
+            )
+            ->where('transactions.email', $email)
+            ->get()
+            ->map(function ($item) {
+                return $this->buildRefundStatusNotif(
+                    $item->event_id,
+                    $item->kode_unik,
+                    'ticket',
+                    $item->event_title,
+                    $item->event_poster,
+                    $item->refund_status,
+                    $item->grand_total_refunded,
+                    $item->updated_at
+                );
+            });
+
+        $refundMerch = DB::table('refunds')
+            ->join('transaction_merch', 'refunds.transaction_merch_id', '=', 'transaction_merch.id')
+            ->leftJoin('transaction_merch_details', 'transaction_merch.id', '=', 'transaction_merch_details.transaction_merch_id')
+            ->leftJoin('products', 'transaction_merch_details.product_id', '=', 'products.id')
+            ->select(
+                'transaction_merch.kode_unik',
+                'refunds.status as refund_status',
+                'refunds.grand_total_refunded',
+                'refunds.updated_at',
+                DB::raw('MIN(products.name) as product_name')
+            )
+            ->where('transaction_merch.email', $email)
+            ->groupBy('transaction_merch.kode_unik', 'refunds.status', 'refunds.grand_total_refunded', 'refunds.updated_at')
+            ->get()
+            ->map(function ($item) {
+                return $this->buildRefundStatusNotif(
+                    null,
+                    $item->kode_unik,
+                    'merch',
+                    $item->product_name ?? 'Merchandise',
+                    null,
+                    $item->refund_status,
+                    $item->grand_total_refunded,
+                    $item->updated_at
+                );
+            });
+
+        // 🏢 F. STATUS PENGAJUAN EO & EVENT
         // Agar EO tetap bisa memantau status pengajuannya (disetujui/ditolak/masih ditinjau)
         // meskipun sedang tidak bisa melakukan pengajuan baru.
         $eoNotifications = collect();
@@ -435,6 +586,7 @@ class HomeApiController extends Controller
                     'invoice_code' => null,
                     'type' => $eoType,
                     'transaction_type' => 'eo',
+                    'refund_status' => null,
                     'title' => $eoTitle,
                     'short_info' => $eoShortInfo,
                     'message' => $eoMessage,
@@ -474,6 +626,7 @@ class HomeApiController extends Controller
                         'invoice_code' => null,
                         'type' => $evType,
                         'transaction_type' => 'event_submission',
+                        'refund_status' => null,
                         'title' => $evTitle,
                         'short_info' => $evShortInfo,
                         'message' => $evMessage,
@@ -484,16 +637,85 @@ class HomeApiController extends Controller
             }
         }
 
-        // Gabungkan notifikasi tiket, merchandise, dan status pengajuan EO/Event lalu urutkan berdasarkan tanggal terbaru
-        $allNotifications = $ticketNotifications->concat($merchNotifications)->concat($eoNotifications)
+        // Gabungkan SEMUA jenis notifikasi (pembelian, pembatalan/reschedule, progres refund, EO/event)
+        // lalu urutkan berdasarkan tanggal terbaru, dan tempel ID unik per notifikasi.
+        $allNotifications = $ticketPurchased
+            ->concat($merchPurchased)
+            ->concat($ticketNotifications)
+            ->concat($merchNotifications)
+            ->concat($refundTicket)
+            ->concat($refundMerch)
+            ->concat($eoNotifications)
             ->sortByDesc('created_at')
+            ->values()
+            ->map(function ($notif) {
+                // 🆔 ID unik & stabil (bukan auto increment) supaya Flutter bisa menyimpan status
+                // "sudah dibaca" per notifikasi meskipun tabel `notifications` tidak ada di database.
+                $notif['id'] = md5(
+                    ($notif['type'] ?? '') . '|' .
+                    ($notif['invoice_code'] ?? '') . '|' .
+                    ($notif['event_id'] ?? '') . '|' .
+                    ($notif['created_at'] ?? '')
+                );
+                return $notif;
+            })
             ->values();
 
         return response()->json([
             'status' => true,
-            'total_unread' => $allNotifications->count(),
-            'data' => $allNotifications
+            'total' => $allNotifications->count(),
+            'data' => $allNotifications,
         ]);
+    }
+
+    /**
+     * Bangun payload notifikasi progres refund (waiting / pending / refunded / rejected)
+     * untuk satu baris di tabel `refunds`. Dipakai untuk tiket maupun merchandise.
+     */
+    private function buildRefundStatusNotif($eventId, $invoiceCode, $trxType, $itemTitle, $poster, $status, $amount, $updatedAt)
+    {
+        $formattedAmount = 'Rp ' . number_format((float) $amount, 0, ',', '.');
+
+        switch ($status) {
+            case 'waiting':
+                $type = 'REFUND_WAITING';
+                $title = "Refund Menunggu Verifikasi: " . $itemTitle;
+                $shortInfo = "Pengajuan refund masuk antrean verifikasi Admin.";
+                $message = "Pengajuan refund untuk invoice " . $invoiceCode . " (" . $itemTitle . ") sudah kami terima dan sedang menunggu verifikasi Admin.\n\nNominal yang akan dikembalikan: " . $formattedAmount . ".\n\nMohon tunggu ya, kamu tidak perlu mengajukan refund lagi untuk invoice ini.";
+                break;
+            case 'pending':
+                $type = 'REFUND_PROCESSING';
+                $title = "Refund Sedang Diproses: " . $itemTitle;
+                $shortInfo = "Refund sudah diverifikasi & sedang diproses transfer.";
+                $message = "Kabar baik! Refund untuk invoice " . $invoiceCode . " (" . $itemTitle . ") sudah diverifikasi dan sedang diproses oleh tim kami.\n\nNominal yang akan dikembalikan: " . $formattedAmount . ".\n\nDana akan segera dikirim ke rekening yang kamu daftarkan.";
+                break;
+            case 'refunded':
+                $type = 'REFUND_COMPLETED';
+                $title = "Refund Selesai: " . $itemTitle;
+                $shortInfo = "Dana refund sudah dikirim ke rekeningmu.";
+                $message = "Refund untuk invoice " . $invoiceCode . " (" . $itemTitle . ") telah selesai diproses.\n\nDana sebesar " . $formattedAmount . " sudah dikirim ke rekening tujuan yang kamu daftarkan.\n\nTerima kasih atas kesabarannya.";
+                break;
+            case 'rejected':
+            default:
+                $type = 'REFUND_REJECTED';
+                $title = "Refund Ditolak: " . $itemTitle;
+                $shortInfo = "Pengajuan refund ditolak Admin.";
+                $message = "Mohon maaf, pengajuan refund untuk invoice " . $invoiceCode . " (" . $itemTitle . ") ditolak oleh Admin.\n\nSilakan hubungi Customer Service kami untuk informasi lebih lanjut.";
+                break;
+        }
+
+        return [
+            'event_id' => $eventId,
+            'invoice_code' => $invoiceCode,
+            'type' => $type,
+            'transaction_type' => $trxType,
+            'refund_status' => $status,
+            'title' => $title,
+            'short_info' => $shortInfo,
+            'message' => $message,
+            'poster' => $poster ? asset($poster) : null,
+            'created_at' => Carbon::parse($updatedAt)->toDateTimeString(),
+        ];
     }
 
     /**
@@ -505,6 +727,62 @@ class HomeApiController extends Controller
         return response()->json([
             'status' => true,
             'data' => XenditBankList::all(), // [ ['name' => '...', 'code' => 'ID_XXX'], ... ] terurut alfabet
+        ]);
+    }
+
+    /**
+     * Detail nominal refund untuk satu invoice, dipakai Flutter untuk menampilkan
+     * kartu "Nominal Dana Refund" di RefundFormScreen SEBELUM form disubmit.
+     * Tidak menulis apa pun ke database — murni baca.
+     */
+    public function refundDetail(Request $request)
+    {
+        $invoiceCode = trim((string) $request->query('invoice_code', ''));
+
+        if ($invoiceCode === '') {
+            return response()->json([
+                'status' => false,
+                'message' => 'Kode invoice wajib disertakan.',
+            ], 422);
+        }
+
+        // 1. Cek apakah ini Kode Invoice Tiket (`transactions`)
+        $ticketTx = DB::table('transactions')->where('kode_unik', $invoiceCode)->first();
+        $merchTx = null;
+
+        if (!$ticketTx) {
+            // 2. Jika bukan tiket, cek apakah ini Kode Invoice Merchandise (`transaction_merch`)
+            $merchTx = DB::table('transaction_merch')->where('kode_unik', $invoiceCode)->first();
+        }
+
+        if (!$ticketTx && !$merchTx) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Nomor invoice transaksi tidak terdaftar di sistem kami.',
+            ], 404);
+        }
+
+        $alreadyClaimed = DB::table('refunds')
+            ->where(function ($q) use ($ticketTx, $merchTx) {
+                if ($ticketTx) $q->where('transaction_id', $ticketTx->id);
+                if ($merchTx) $q->where('transaction_merch_id', $merchTx->id);
+            })->exists();
+
+        // ✅ Nominal refund = grand_total dikurangi service_tax (service_tax tidak dikembalikan).
+        // Dihitung eksplisit dari grand_total - service_tax, bukan mengandalkan kolom total_amount,
+        // supaya tetap benar meski total_amount di suatu baris tidak sinkron dengan grand_total.
+        $refundAmount = $ticketTx
+            ? ($ticketTx->grand_total - $ticketTx->service_tax)
+            : ($merchTx->grand_total - $merchTx->service_tax);
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'invoice_code'    => $invoiceCode,
+                'refund_amount'   => (int) $refundAmount,
+                'refund_tax'      => 2500,
+                'already_claimed' => $alreadyClaimed,
+            ],
         ]);
     }
 
@@ -566,8 +844,14 @@ class HomeApiController extends Controller
             ], 400);
         }
 
-        // Ambil nominal total dana pengembalian dari tabel terkait
-        $grandTotalRefund = $ticketTx ? $ticketTx->grand_total : $merchTx->grand_total;
+        // ✅ FIX: Pembeli hanya berhak menerima harga tiket/merch murni,
+        // yaitu grand_total dikurangi service_tax. service_tax tidak dikembalikan.
+        // Dihitung eksplisit dari grand_total - service_tax (bukan kolom total_amount)
+        // supaya konsisten dengan refundDetail() dan tetap benar meski total_amount
+        // di suatu baris tidak sinkron dengan grand_total.
+        $grandTotalRefund = $ticketTx
+            ? ($ticketTx->grand_total - $ticketTx->service_tax)
+            : ($merchTx->grand_total - $merchTx->service_tax);
 
         DB::beginTransaction();
         try {
